@@ -1,0 +1,206 @@
+// Tạo component ProductDialog.razor riêng
+@using ProductService.Models.ViewModel
+@using MainEcommerceService.Models.ViewModel
+@using MudBlazor
+@using BlazorWebApp.Services
+@inject ISnackbar Snackbar
+@inject ProdService ProdService
+@inject SignalRService SignalRService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            @(Product?.ProductId > 0 ? "Edit Product" : "Add New Product")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="productForm.ProductName" Label="Product Name" Required="true" 
+                             Error="@(!IsValidProductName)" ErrorText="Product name is required" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="productForm.Description" Label="Description" Lines="3" 
+                             Placeholder="Enter product description..." />
+            </MudItem>
+            <MudItem xs="6">
+                <MudSelect T="int" @bind-Value="productForm.CategoryId" Label="Category" Required="true"
+                          Error="@(!IsValidCategory)" ErrorText="Please select a category">
+                    <MudSelectItem T="int" Value="0" Disabled="true">-- Select Category --</MudSelectItem>
+                    @foreach (var category in Categories)
+                    {
+                        <MudSelectItem T="int" Value="@category.CategoryId">@category.CategoryName</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="6">
+                <MudNumericField T="decimal" @bind-Value="productForm.Price" Label="Price" Format="F2" Required="true" 
+                                Min="0.01m" Error="@(!IsValidPrice)" ErrorText="Price must be greater than 0"
+                                Adornment="Adornment.Start" AdornmentText="$" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudNumericField T="int" @bind-Value="productForm.Quantity" Label="Quantity" Required="true" 
+                                Min="0" Error="@(!IsValidQuantity)" ErrorText="Quantity must be 0 or greater" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudNumericField T="decimal?" @bind-Value="productForm.DiscountPrice" Label="Discount Price" Format="F2" 
+                                Min="0" Max="@productForm.Price" 
+                                Adornment="Adornment.Start" AdornmentText="$"
+                                HelperText="Leave empty if no discount" />
+            </MudItem>
+
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" 
+                  Disabled="@(!IsFormValid)" StartIcon="@(Product?.ProductId > 0 ? Icons.Material.Filled.Save : Icons.Material.Filled.Add)">
+            @(Product?.ProductId > 0 ? "Update Product" : "Create Product")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [Parameter] public ProductVM Product { get; set; }
+    [Parameter] public List<CategoryVM> Categories { get; set; } = new();
+    [Parameter] public int UserId { get; set; }
+
+    private ProductVM productForm = new();
+    private bool isProcessing = false;
+
+    // Validation properties
+    private bool IsValidProductName => !string.IsNullOrWhiteSpace(productForm.ProductName);
+    private bool IsValidCategory => productForm.CategoryId > 0;
+    private bool IsValidPrice => productForm.Price > 0;
+    private bool IsValidQuantity => productForm.Quantity >= 0;
+    private bool IsFormValid => IsValidProductName && IsValidCategory && IsValidPrice && IsValidQuantity && !isProcessing;
+
+    protected override void OnInitialized()
+    {
+        if (Product != null)
+        {
+            // Edit mode - copy existing product data
+            productForm = new ProductVM 
+            { 
+                ProductName = Product.ProductName,
+                Description = Product.Description,
+                Price = Product.Price,
+                DiscountPrice = Product.DiscountPrice,
+                Quantity = Product.Quantity,
+                CategoryId = Product.CategoryId,
+                SellerId = Product.SellerId,
+            };
+        }
+        else
+        {
+            // Add mode - create new product with default values
+            productForm = new ProductVM 
+            { 
+                ProductName = "",
+                Description = "",
+                Price = 0,
+                DiscountPrice = null,
+                Quantity = 0,
+                CategoryId = 0,
+                SellerId = UserId,
+                CreatedAt = DateTime.Now
+            };
+        }
+    }
+
+    private async Task Submit()
+    {
+        try
+        {
+            if (!IsFormValid)
+            {
+                Snackbar.Add("Please fill in all required fields correctly.", Severity.Warning);
+                return;
+            }
+
+            if (productForm.DiscountPrice.HasValue && productForm.DiscountPrice >= productForm.Price)
+            {
+                Snackbar.Add("Discount price must be less than regular price.", Severity.Warning);
+                return;
+            }
+
+            isProcessing = true;
+            StateHasChanged();
+
+            bool result;
+            
+            if (Product?.ProductId > 0)
+            {
+                // Update existing product
+                productForm.UpdatedAt = DateTime.Now;
+                result = await ProdService.UpdateProductAsync(Product.ProductId, productForm);
+
+                if (result)
+                {
+                    // Gửi thông báo SignalR cho product updated
+                    var categoryName = Categories.FirstOrDefault(c => c.CategoryId == productForm.CategoryId)?.CategoryName ?? "Unknown";
+                    await SignalRService.NotifyProductUpdatedAsync(Product.ProductId, productForm.ProductName, productForm.Price);
+                    
+                    // Kiểm tra thay đổi giá
+                    if (Product.Price != productForm.Price)
+                    {
+                        await SignalRService.NotifyProductPriceChangedAsync(Product.ProductId, productForm.ProductName, Product.Price, productForm.Price);
+                    }
+                    
+                    // Kiểm tra thay đổi số lượng
+                    if (Product.Quantity != productForm.Quantity)
+                    {
+                        await SignalRService.NotifyProductStockChangedAsync(Product.ProductId, productForm.ProductName, productForm.Quantity);
+                        
+                        // Kiểm tra low stock alert (dưới 10 sản phẩm)
+                        if (productForm.Quantity < 10)
+                        {
+                            await SignalRService.NotifyLowStockAsync(Product.ProductId, productForm.ProductName, productForm.Quantity, 10);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Create new product
+                productForm.CreatedAt = DateTime.Now;
+                result = await ProdService.CreateProductAsync(productForm, UserId);
+
+                if (result)
+                {
+                    // Gửi thông báo SignalR cho product created
+                    var categoryName = Categories.FirstOrDefault(c => c.CategoryId == productForm.CategoryId)?.CategoryName ?? "Unknown";
+                    await SignalRService.NotifyProductCreatedAsync(0, productForm.ProductName, categoryName); // ProductId sẽ được tạo sau
+                }
+            }
+
+            if (result)
+            {
+                var message = Product?.ProductId > 0 ? "Product updated successfully!" : "Product created successfully!";
+                Snackbar.Add(message, Severity.Success);
+                MudDialog.Close(DialogResult.Ok(productForm));
+            }
+            else
+            {
+                var message = Product?.ProductId > 0 ? "Failed to update product" : "Failed to create product";
+                Snackbar.Add(message, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving product: {ex.Message}");
+            Snackbar.Add("An error occurred while saving the product. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

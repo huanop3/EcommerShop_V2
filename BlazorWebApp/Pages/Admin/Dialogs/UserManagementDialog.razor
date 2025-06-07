@@ -1,0 +1,323 @@
+@using MudBlazor
+@using System.ComponentModel.DataAnnotations
+@using BlazorWebApp.Services
+@using MainEcommerceService.Models.ViewModel
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject UserService UserService
+@inject AddressService AddressService
+@inject SignalRService SignalRService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.ManageAccounts" Class="mr-2" />
+            Manage User: @GetFullName()
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" md="4" Class="d-flex flex-column align-center">
+                <MudAvatar Size="Size.Large" Style="height: 120px; width: 120px; font-size: 48px;" Class="my-4">
+                    @GetInitials()
+                </MudAvatar>
+                
+                <MudPaper Elevation="0" Class="py-4 px-2">
+                    <MudText Align="Align.Center" Typo="Typo.subtitle1">
+                        User ID: @editableUser.Id
+                    </MudText>
+                    <MudText Align="Align.Center" Typo="Typo.caption" Class="mud-text-secondary">
+                        Username: @editableUser.UserName
+                    </MudText>
+                    <MudText Align="Align.Center" Typo="Typo.caption" Class="mud-text-secondary">
+                        Joined: @(editableUser.JoinedDate?.ToShortDateString() ?? "N/A")
+                    </MudText>
+                </MudPaper>
+                
+                <MudPaper Width="100%" Elevation="0" Class="py-2">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Account Status</MudText>
+                    <MudSwitch @bind-Value="editableUser.IsActive" Color="Color.Primary"
+                              Label="@(editableUser.IsActive == true ? "Active" : "Inactive")" />
+                </MudPaper>
+            </MudItem>
+            
+            <MudItem xs="12" md="8">
+                <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+                    <MudTabPanel Text="Basic Info" Icon="@Icons.Material.Filled.Person">
+                        <EditForm Model="@editableUser" OnValidSubmit="SaveChanges">
+                            <DataAnnotationsValidator />
+                            
+                            <MudGrid>
+                                <MudItem xs="12" md="6">
+                                    <MudTextField @bind-Value="editableUser.FirstName" Label="First Name" 
+                                                Required="true" RequiredError="First name is required"
+                                                Variant="Variant.Outlined" FullWidth="true" Class="mb-3" />
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudTextField @bind-Value="editableUser.LastName" Label="Last Name" 
+                                                Required="true" RequiredError="Last name is required"
+                                                Variant="Variant.Outlined" FullWidth="true" Class="mb-3" />
+                                </MudItem>
+                            </MudGrid>
+
+                            <MudTextField Value="@editableUser.UserName" Label="Username" 
+                                         ReadOnly="true" 
+                                         Variant="Variant.Outlined" FullWidth="true" Class="mb-3"
+                                         Style="background-color: #f5f5f5;" />
+                                         
+                            <MudTextField @bind-Value="editableUser.Email" Label="Email" 
+                                         Required="true" RequiredError="Email is required"
+                                         Variant="Variant.Outlined" FullWidth="true" Class="mb-3" />
+                            
+                            <MudSelect T="string" @bind-Value="editableUser.Role" Label="Role" 
+                                      Required="true" RequiredError="Role is required"
+                                      Variant="Variant.Outlined" FullWidth="true" Class="mb-3">
+                                @foreach (var role in AvailableRoles)
+                                {
+                                    <MudSelectItem Value="@role.RoleName">
+                                        <div class="d-flex align-center">
+                                            <MudChip T="string" Color="@GetRoleColor(role.RoleName)" 
+                                                    Size="Size.Small" Class="mr-2">
+                                                @role.RoleName
+                                            </MudChip>
+                                        </div>
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                            
+                            @if (editableUser.Role == "Admin")
+                            {
+                                <MudAlert Severity="Severity.Warning" Variant="Variant.Filled" Class="mb-3">
+                                    This user has Admin privileges with full system access.
+                                </MudAlert>
+                            }
+                        </EditForm>
+                    </MudTabPanel>
+
+                    
+                    <MudTabPanel Text="Actions" Icon="@Icons.Material.Filled.Settings">
+                        <MudButton Variant="Variant.Filled" FullWidth="true"
+                                  Color="Color.Error" Class="mb-3"
+                                  StartIcon="@Icons.Material.Filled.DeleteForever"
+                                  OnClick="ConfirmDeleteUser">
+                            Delete User
+                        </MudButton>
+                    </MudTabPanel>
+                </MudTabs>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveChanges">Save Changes</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    
+    [Parameter] public UserVM User { get; set; } = new UserVM();
+    [Parameter] public List<RoleVM> AvailableRoles { get; set; } = new List<RoleVM>();
+    [Parameter] public EventCallback OnUserUpdated { get; set; }
+    [Parameter] public EventCallback OnUserDeleted { get; set; }
+    
+    private UserVM editableUser = new UserVM();
+    private UserListVM userToUpdate = new UserListVM();
+    private List<AddressVM> userAddresses = new();
+
+    protected override void OnInitialized()
+    {
+        // Tạo bản sao của User để edit mà không ảnh hưởng đến object gốc
+        editableUser = new UserVM
+        {
+            Id = User.Id,
+            UserName = User.UserName,
+            FirstName = User.FirstName,
+            LastName = User.LastName,
+            Email = User.Email,
+            Role = User.Role,
+            IsActive = User.IsActive,
+            IsDeleted = User.IsDeleted,
+            JoinedDate = User.JoinedDate
+        };
+        
+        // Copy properties to update model
+        userToUpdate = new UserListVM
+        {
+            Id = User.Id,
+            FirstName = User.FirstName,
+            LastName = User.LastName,
+            Email = User.Email,
+            Role = User.Role,
+            IsActive = User.IsActive,
+            IsDeleted = User.IsDeleted
+        };
+    }
+    
+    private string GetFullName()
+    {
+        return $"{editableUser.FirstName} {editableUser.LastName}".Trim();
+    }
+    
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+    
+    // 🔥 IMPROVED SaveChanges method với enhanced SignalR
+    private async Task SaveChanges()
+    {
+            // Update model với giá trị từ editableUser
+            userToUpdate.FirstName = editableUser.FirstName;
+            userToUpdate.LastName = editableUser.LastName;
+            userToUpdate.Email = editableUser.Email;
+            userToUpdate.Role = editableUser.Role;
+            userToUpdate.IsActive = editableUser.IsActive;
+            userToUpdate.IsDeleted = editableUser.IsDeleted;
+            
+            // 🔥 THÊM: Track changes để gửi thông báo phù hợp
+            var statusChanged = User.IsActive != editableUser.IsActive;
+            var roleChanged = User.Role != editableUser.Role;
+            var infoChanged = User.FirstName != editableUser.FirstName || 
+                             User.LastName != editableUser.LastName || 
+                             User.Email != editableUser.Email;
+            
+            // Call API to update user
+            var result = await UserService.UpdateUserAsync(userToUpdate);
+
+            if (result.Success)
+            {
+                var fullName = GetFullName();
+                Snackbar.Add($"User {fullName} updated successfully", Severity.Success);
+                
+                // Gọi callback để refresh table ngay lập tức
+                if (OnUserUpdated.HasDelegate)
+                {
+                    await OnUserUpdated.InvokeAsync();
+                }
+                
+                // 🔥 IMPROVED: Gửi multiple SignalR notifications dựa trên thay đổi
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        // Luôn gửi UserUpdated notification
+                        await SignalRService.NotifyUserUpdatedAsync(editableUser.Id, fullName);
+                        Console.WriteLine($"🔔 UserManagementDialog sent UserUpdated: UserId={editableUser.Id}, Name={fullName}");
+                        
+                        // Gửi thêm thông báo nếu status thay đổi
+                        if (statusChanged)
+                        {
+                            var status = editableUser.IsActive == true ? "Active" : "Inactive";
+                            await Task.Delay(200); // Small delay để tránh conflict
+                            await SignalRService.NotifyUserStatusChangedAsync(editableUser.Id, status);
+                            Console.WriteLine($"🔔 UserManagementDialog sent UserStatusChanged: UserId={editableUser.Id}, Status={status}");
+                            
+                        }
+                        
+                        // Gửi thêm thông báo nếu role thay đổi (đặc biệt quan trọng)
+                        if (roleChanged)
+                        {
+                            await Task.Delay(400); // Delay lớn hơn cho role change
+                            await SignalRService.NotifyUserRoleUpdatedAsync(editableUser.Id, editableUser.UserName, editableUser.Role);
+                            Console.WriteLine($"🔔 UserManagementDialog sent UserRoleUpdated: UserId={editableUser.Id}, Role={editableUser.Role}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"❌ SignalR notification failed: {ex.Message}");
+                    }
+                });
+                
+                MudDialog.Close(DialogResult.Ok(editableUser));
+            }
+            else
+            {
+                Snackbar.Add($"Failed to update user: {result.Message}", Severity.Error);
+            }
+        }
+
+    
+    // 🔥 IMPROVED ConfirmDeleteUser method
+    private async Task ConfirmDeleteUser()
+    {
+        var parameters = new DialogParameters
+        {
+            ["ContentText"] = $"Are you sure you want to delete user {GetFullName()}? This action cannot be undone.",
+            ["ButtonText"] = "Delete",
+            ["Color"] = Color.Error
+        };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete User", parameters, options);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            try
+            {
+                var fullName = GetFullName();
+                var userId = editableUser.Id;
+                
+                // Gọi API để xóa người dùng
+                await UserService.DeleteUserAsync(editableUser.Id.ToString());
+
+                // Gọi callback để refresh table ngay lập tức
+                if (OnUserDeleted.HasDelegate)
+                {
+                    await OnUserDeleted.InvokeAsync();
+                }
+                
+                // 🔥 IMPROVED: Gửi SignalR notification
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await SignalRService.NotifyUserDeletedAsync(userId);
+                        Console.WriteLine($"🔔 UserManagementDialog sent UserDeleted: UserId={userId}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"❌ SignalR notification failed: {ex.Message}");
+                    }
+                });
+                
+                Snackbar.Add($"User {fullName} deleted successfully", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error deleting user: {ex.Message}");
+                Snackbar.Add($"Error deleting user: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+    private string GetInitials()
+    {
+        string fn = editableUser.FirstName?.Trim() ?? "";
+        string ln = editableUser.LastName?.Trim() ?? "";
+        
+        if (string.IsNullOrEmpty(fn) && string.IsNullOrEmpty(ln))
+            return "?";
+            
+        if (string.IsNullOrEmpty(ln))
+            return fn.Length > 0 ? fn[0].ToString().ToUpper() : "?";
+            
+        if (string.IsNullOrEmpty(fn))
+            return ln.Length > 0 ? ln[0].ToString().ToUpper() : "?";
+            
+        return $"{fn[0]}{ln[0]}".ToUpper();
+    }
+    
+    private Color GetRoleColor(string role)
+    {
+        return role switch
+        {
+            "Admin" => Color.Error,
+            "Customer" => Color.Info,
+            "Seller" => Color.Success,
+            "Shipper" => Color.Primary,
+            _ => Color.Default
+        };
+    }
+}

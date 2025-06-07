@@ -1,0 +1,1016 @@
+@page "/checkout"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using BlazorWebApp.Services
+@using MainEcommerceService.Models.ViewModel
+@using ProductService.Models.ViewModel
+@using System.Text.Json
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AddressService AddressService
+@inject UserService UserService
+@inject CouponService CouponService
+@inject ToastService ToastService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@attribute [Authorize]
+
+<PageTitle>Checkout - Grabit</PageTitle>
+<link href="css/checkout.css" rel="stylesheet" />
+
+<div class="checkout-container">
+    <div class="border-container">
+        <div class="breadcrumb">
+            <div class="container">
+                <a href="/">Home</a> / <a href="/cart">Cart</a> / <span>Checkout</span>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-section">
+            <div class="loading-content">
+                <div class="loading-spinner1"></div>
+                <h3>Preparing your checkout...</h3>
+                <p>Loading your cart and address information</p>
+            </div>
+        </div>
+    }
+    else if (!cartItems.Any())
+    {
+        <div class="empty-checkout">
+            <div class="empty-content">
+                <div class="empty-icon">
+                    <i class="fas fa-shopping-cart"></i>
+                </div>
+                <h3>Your cart is empty</h3>
+                <p>Add some items to your cart before checkout</p>
+                <a href="/products" class="btn btn-primary">
+                    <i class="fas fa-shopping-bag"></i>
+                    Continue Shopping
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="checkout-section">
+            <div class="checkout-main">
+                <h2 class="checkout-title">
+                    <i class="fas fa-credit-card"></i>
+                    Checkout Details
+                </h2>
+                
+                <div class="checkout-steps">
+                    <div class="step active">
+                        <div class="step-number">1</div>
+                        <div class="step-title">Shipping Information</div>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-title">Payment Method</div>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-title">Order Review</div>
+                    </div>
+                </div>
+
+                <div class="checkout-content">
+                    <!-- Step 1: Shipping Information -->
+                    <div class="checkout-step-content active">
+                        
+                        <!-- Contact Information Section -->
+                        <div class="form-section">
+                            <div class="section-header">
+                                <h3 class="form-section-title">
+                                    <i class="fas fa-user"></i>
+                                    Contact Information
+                                </h3>
+                                @if (currentUser != null)
+                                {
+                                    <div class="user-info-badge">
+                                        <span class="user-name">@GetFullName(currentUser)</span>
+                                        <span class="user-email">@currentUser.Email</span>
+                                    </div>
+                                }
+                            </div>
+                            
+                            <div class="contact-info-display">
+                                <div class="info-row">
+                                    <div class="info-item">
+                                        <label>Email Address</label>
+                                        <span class="info-value">@(currentUser?.Email ?? "Not available")</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Phone Number</label>
+                                        <span class="info-value">
+                                            @if (!string.IsNullOrEmpty(currentUser?.PhoneNumber))
+                                            {
+                                                @currentUser.PhoneNumber
+                                            }
+                                            else
+                                            {
+                                                <span class="missing-info">
+                                                    <i class="fas fa-exclamation-triangle"></i>
+                                                    Please add phone number in your profile
+                                                </span>
+                                            }
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                @if (string.IsNullOrEmpty(currentUser?.PhoneNumber))
+                                {
+                                    <div class="missing-phone-section">
+                                        <div class="alert alert-warning">
+                                            <i class="fas fa-phone"></i>
+                                            <div class="alert-content">
+                                                <strong>Phone number required</strong>
+                                                <p>We need your phone number for delivery updates.</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <EditForm Model="@phoneUpdateModel" OnValidSubmit="@UpdatePhoneNumber">
+                                            <DataAnnotationsValidator />
+                                            <div class="phone-input-group">
+                                                <div class="form-group">
+                                                    <label for="phoneNumber">Phone Number *</label>
+                                                    <InputText @bind-Value="phoneUpdateModel.PhoneNumber" 
+                                                              class="form-control" 
+                                                              placeholder="(123) 456-7890" 
+                                                              required />
+                                                    <ValidationMessage For="@(() => phoneUpdateModel.PhoneNumber)" />
+                                                </div>
+                                                <button type="submit" class="btn btn-primary" disabled="@isUpdatingPhone">
+                                                    @if (isUpdatingPhone)
+                                                    {
+                                                        <i class="fas fa-spinner fa-spin"></i>
+                                                        <span>Updating...</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <i class="fas fa-save"></i>
+                                                        <span>Save</span>
+                                                    }
+                                                </button>
+                                            </div>
+                                        </EditForm>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Shipping Address Section -->
+                        <div class="form-section">
+                            <div class="section-header">
+                                <h3 class="form-section-title">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    Shipping Address
+                                </h3>
+                                @if (userAddresses.Any())
+                                {
+                                    <button type="button" class="btn btn-outline btn-sm" @onclick="AddNewAddress">
+                                        <i class="fas fa-plus"></i>
+                                        Add New Address
+                                    </button>
+                                }
+                            </div>
+
+                            @if (userAddresses?.Any() == true)
+                            {
+                                <div class="address-selection">
+                                    <div class="address-grid">
+                                        @foreach (var address in userAddresses)
+                                        {
+                                            <div class="address-card @(selectedAddressId == address.AddressId ? "selected" : "")" 
+                                                 @onclick="() => SelectAddress(address.AddressId)">
+                                                <div class="address-header">
+                                                    <div class="address-radio">
+                                                        <input type="radio" 
+                                                               name="selectedAddress" 
+                                                               value="@address.AddressId" 
+                                                               checked="@(selectedAddressId == address.AddressId)"
+                                                               @onchange="() => SelectAddress(address.AddressId)" />
+                                                    </div>
+                                                    <div class="address-badges">
+                                                        @if (address.IsDefault == true)
+                                                        {
+                                                            <span class="default-badge">
+                                                                <i class="fas fa-star"></i>
+                                                                Default
+                                                            </span>
+                                                        }
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="address-content">
+                                                    <div class="address-line">@address.AddressLine1</div>
+                                                    @if (!string.IsNullOrEmpty(address.AddressLine2))
+                                                    {
+                                                        <div class="address-line">@address.AddressLine2</div>
+                                                    }
+                                                    <div class="address-location">
+                                                        @address.City, @address.State @address.PostalCode
+                                                    </div>
+                                                    <div class="address-country">@address.Country</div>
+                                                </div>
+                                                
+                                                <div class="address-actions">
+                                                    <button class="edit-btn" 
+                                                            @onclick:stopPropagation="true"
+                                                            @onclick="() => EditAddress(address)"
+                                                            title="Edit address">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <button class="delete-btn" 
+                                                            @onclick:stopPropagation="true"
+                                                            @onclick="() => ShowDeleteConfirmation(address)"
+                                                            title="Delete address"
+                                                            disabled="@address.IsDefault">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                    
+                                    <div class="address-actions-footer">
+                                        @if (userAddresses.Count > 1)
+                                        {
+                                            <div class="address-info">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-info-circle"></i>
+                                                    You have @userAddresses.Count saved addresses.
+                                                </small>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="no-address-section">
+                                    <div class="no-address-content">
+                                        <div class="no-address-icon">
+                                            <i class="fas fa-map-marker-alt"></i>
+                                        </div>
+                                        <h4>No shipping address found</h4>
+                                        <p>Please add a shipping address to continue with your order.</p>
+                                        <button type="button" class="btn btn-primary" @onclick="AddNewAddress">
+                                            <i class="fas fa-plus"></i>
+                                            Add Shipping Address
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Delivery Options using static service -->
+                        @if (selectedAddressId.HasValue)
+                        {
+                            <div class="form-section">
+                                <h3 class="form-section-title">
+                                    <i class="fas fa-truck"></i>
+                                    Delivery Options
+                                </h3>
+                                
+                                <div class="delivery-options">
+                                    @foreach (var option in PricingCalculationService.GetShippingOptions(currentPricing.Subtotal))
+                                    {
+                                        <div class="delivery-option @(selectedDeliveryOption == option.Code ? "selected" : "")"
+                                             @onclick="@(() => SelectDeliveryOption(option.Code))">
+                                            <div class="delivery-radio">
+                                                <input type="radio" 
+                                                       name="deliveryOption" 
+                                                       checked="@(selectedDeliveryOption == option.Code)"
+                                                       @onchange="@(() => SelectDeliveryOption(option.Code))" />
+                                            </div>
+                                            <div class="delivery-info">
+                                                <div class="delivery-title">@option.Name</div>
+                                                <div class="delivery-time">@option.Description</div>
+                                                <div class="delivery-desc">Estimated delivery: @option.EstimatedDays business days</div>
+                                            </div>
+                                            <div class="delivery-price">
+                                                @if (option.IsFree)
+                                                {
+                                                    <span class="free-shipping">FREE</span>
+                                                    @if (option.Code == "standard")
+                                                    {
+                                                        <small class="original-price">$@PricingCalculationService.STANDARD_SHIPPING_COST.ToString("F2")</small>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="price">$@option.Cost.ToString("F2")</span>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+
+                        <!-- Checkout Actions -->
+                        <div class="checkout-actions">
+                            <a href="/cart" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i>
+                                Back to Cart
+                            </a>
+                            
+                            <button type="button" 
+                                    class="btn btn-primary btn-continue" 
+                                    @onclick="ContinueToPayment"
+                                    disabled="@(!CanContinueToPayment())">
+                                <span>Continue to Payment</span>
+                                <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Order Summary Sidebar using static services -->
+            <div class="order-summary-sidebar">
+                <div class="order-summary-box">
+                    <h3>
+                        <i class="fas fa-receipt"></i>
+                        Order Summary
+                    </h3>
+                    
+                    <div class="order-summary-items">
+                        @foreach (var item in cartItems)
+                        {
+                            <div class="summary-item">
+                                <div class="summary-item-image">
+                                    <img src="@GetProductImageUrl(item)" alt="@item.ProductName" />
+                                </div>
+                                <div class="summary-item-info">
+                                    <span class="summary-item-name">@item.ProductName</span>
+                                    <span class="summary-item-quantity">Qty: @item.CartQuantity</span>
+                                </div>
+                                <span class="summary-item-price">$@item.TotalPrice.ToString("F2")</span>
+                            </div>
+                        }
+                    </div>
+                    
+                    <div class="summary-total">
+                        <div class="summary-row">
+                            <span>Subtotal (@currentPricing.TotalQuantity items)</span>
+                            <span>$@currentPricing.Subtotal.ToString("F2")</span>
+                        </div>
+                        
+                       
+                        
+                        @if (appliedCoupon != null && currentPricing.CouponDiscount > 0)
+                        {
+                            <div class="summary-row discount">
+                                <span>
+                                    <i class="fas fa-ticket-alt"></i>
+                                    Coupon (@appliedCoupon.CouponCode)
+                                </span>
+                                <span>-$@currentPricing.CouponDiscount.ToString("F2")</span>
+                            </div>
+                        }
+                        
+                        <div class="summary-row">
+                            <span>Shipping (@selectedDeliveryOption)</span>
+                            <span>
+                                @if (currentPricing.IsFreeShipping)
+                                {
+                                    <span class="free-shipping">FREE</span>
+                                }
+                                else
+                                {
+                                    <text>$@currentPricing.ShippingCost.ToString("F2")</text>
+                                }
+                            </span>
+                        </div>
+                        
+                        <div class="summary-row order-total">
+                            <span>Total</span>
+                            <span>$@currentPricing.TotalAmount.ToString("F2")</span>
+                        </div>
+                        
+                        @if (currentPricing.TotalSavings > 0)
+                        {
+                            <div class="savings-highlight">
+                                <i class="fas fa-piggy-bank"></i>
+                                You save $@currentPricing.TotalSavings.ToString("F2") on this order!
+                            </div>
+                        }
+
+                        @if (!currentPricing.FreeShippingEligible && currentPricing.AmountToFreeShipping > 0)
+                        {
+                            <div class="free-shipping-promo">
+                                <i class="fas fa-truck"></i>
+                                Add $@currentPricing.AmountToFreeShipping.ToString("F2") more for free standard shipping!
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Address Modal - Giữ nguyên như cũ -->
+@if (isAddressModalOpen)
+{
+    <div class="modal-overlay" @onclick="CloseAddressModal">
+        <div class="modal-content large-modal" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3>
+                    <i class="fas fa-map-marker-alt"></i>
+                    @(isEditingAddress ? "Edit Address" : "Add New Address")
+                </h3>
+                <button class="modal-close" @onclick="CloseAddressModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <EditForm Model="@editingAddress" OnValidSubmit="@SaveAddress">
+                <DataAnnotationsValidator />
+                <div class="modal-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="addressLine1">Address Line 1 *</label>
+                            <InputText @bind-Value="editingAddress.AddressLine1" 
+                                      class="form-control" 
+                                      placeholder="Street address, P.O. box" />
+                            <ValidationMessage For="@(() => editingAddress.AddressLine1)" />
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="addressLine2">Address Line 2</label>
+                            <InputText @bind-Value="editingAddress.AddressLine2" 
+                                      class="form-control" 
+                                      placeholder="Apartment, suite, unit, building, floor, etc." />
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="city">City *</label>
+                            <InputText @bind-Value="editingAddress.City" 
+                                      class="form-control" />
+                            <ValidationMessage For="@(() => editingAddress.City)" />
+                        </div>
+                        <div class="form-group">
+                            <label for="state">State/Province</label>
+                            <InputText @bind-Value="editingAddress.State" 
+                                      class="form-control" />
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="postalCode">Postal Code</label>
+                            <InputText @bind-Value="editingAddress.PostalCode" 
+                                      class="form-control" />
+                        </div>
+                        <div class="form-group">
+                            <label for="country">Country *</label>
+                            <InputText @bind-Value="editingAddress.Country" 
+                                      class="form-control" />
+                            <ValidationMessage For="@(() => editingAddress.Country)" />
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <InputCheckbox @bind-Value="isDefaultAddress" />
+                                <span class="checkmark"></span>
+                                Set as default address
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseAddressModal">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary" disabled="@isSavingAddress">
+                        @if (isSavingAddress)
+                        {
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save"></i>
+                            <span>@(isEditingAddress ? "Update" : "Save") Address</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<!-- Delete Confirmation Modal - Giữ nguyên như cũ -->
+@if (showDeleteModal && addressToDelete != null)
+{
+    <div class="modal-overlay" @onclick="CancelDelete">
+        <div class="modal-content delete-modal" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3>
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Confirm Delete
+                </h3>
+                <button class="modal-close" @onclick="CancelDelete">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="delete-warning">
+                    <div class="warning-icon">
+                        <i class="fas fa-trash-alt"></i>
+                    </div>
+                    <div class="warning-content">
+                        <h4>Delete Address</h4>
+                        <p>Are you sure you want to delete this address? This action cannot be undone.</p>
+                        
+                        <div class="address-preview">
+                            <div class="preview-content">
+                                <div>@addressToDelete.AddressLine1</div>
+                                @if (!string.IsNullOrEmpty(addressToDelete.AddressLine2))
+                                {
+                                    <div>@addressToDelete.AddressLine2</div>
+                                }
+                                <div>@addressToDelete.City, @addressToDelete.State @addressToDelete.PostalCode</div>
+                                <div>@addressToDelete.Country</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="CancelDelete">
+                    <i class="fas fa-times"></i>
+                    Cancel
+                </button>
+                <button class="btn btn-danger" 
+                        @onclick="ConfirmDelete"
+                        disabled="@(isDeleting || addressToDelete.IsDefault == true)">
+                    @if (isDeleting)
+                    {
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>Deleting...</span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-trash"></i>
+                        <span>Delete Address</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // User and Address data
+    private ProfileVM? currentUser;
+    private List<AddressVM> userAddresses = new();
+    private List<CartVM> cartItems = new();
+    private int? selectedAddressId;
+    private string selectedDeliveryOption = "standard";
+    
+    // Phone update
+    private PhoneUpdateModel phoneUpdateModel = new();
+    private bool isUpdatingPhone = false;
+    
+    // Address modal
+    private bool isAddressModalOpen = false;
+    private bool isEditingAddress = false;
+    private bool isSavingAddress = false;
+    private AddressVM editingAddress = new();
+    private bool isDefaultAddress = false;
+    
+    // Coupon
+    private string couponCode = "";
+    private string couponError = "";
+    private bool isApplyingCoupon = false;
+    
+    // Loading states
+    private bool isLoading = true;
+    
+    // User ID
+    private int? currentUserId;
+    
+    // Delete functionality properties
+    private bool showDeleteModal = false;
+    private AddressVM? addressToDelete = null;
+    private bool isDeleting = false;
+
+    // Use static services for pricing and coupon management
+    private CouponVM? appliedCoupon => CouponStateService.GetAppliedCoupon();
+    private PricingBreakdown currentPricing => CouponStateService.GetCurrentPricingBreakdown(cartItems, selectedDeliveryOption);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCheckoutData();
+        LoadAppliedCoupon();
+        UpdatePricingData();
+    }
+
+    private void LoadAppliedCoupon()
+    {
+        var savedCoupon = CouponStateService.GetAppliedCoupon();
+        if (savedCoupon != null)
+        {
+            // Verify coupon is still valid
+            if (!PricingCalculationService.IsValidCoupon(savedCoupon))
+            {
+                CouponStateService.RemoveAppliedCoupon();
+                ToastService.ShowWarning("Previously applied coupon is no longer valid");
+            }
+            else
+            {
+                ToastService.ShowInfo($"Coupon '{savedCoupon.CouponCode}' is applied to your order");
+            }
+        }
+    }
+
+    private void UpdatePricingData()
+    {
+        // Update pricing data whenever cart or delivery option changes
+        CouponStateService.UpdatePricingData(cartItems, appliedCoupon, selectedDeliveryOption);
+    }
+
+    private async Task LoadCheckoutData()
+    {
+        isLoading = true;
+        StateHasChanged();
+        
+        try
+        {
+            currentUserId = await GetCurrentUserIdAsync();
+            if (!currentUserId.HasValue)
+            {
+                Navigation.NavigateTo("/login");
+                return;
+            }
+
+            // Load user profile
+            currentUser = await UserService.GetProfileAsync(currentUserId.Value);
+            if (currentUser != null)
+            {
+                phoneUpdateModel.PhoneNumber = currentUser.PhoneNumber ?? "";
+            }
+
+            // Load user addresses
+            var addresses = await AddressService.GetAddressesByUserIdAsync(currentUserId.Value);
+            userAddresses = addresses.ToList();
+            
+            // Auto-select default address or first available
+            var defaultAddress = userAddresses.FirstOrDefault(a => a.IsDefault == true);
+            if (defaultAddress != null)
+            {
+                selectedAddressId = defaultAddress.AddressId;
+            }
+            else if (userAddresses.Any())
+            {
+                selectedAddressId = userAddresses.First().AddressId;
+            }
+
+            // Load cart items
+            cartItems = CartVM.GetAllCartItems();
+            
+            // If cart is empty, redirect to cart page
+            if (!cartItems.Any())
+            {
+                ToastService.ShowWarning("Your cart is empty. Add some items before checkout.");
+                Navigation.NavigateTo("/cart");
+                return;
+            }
+
+            // Update pricing after loading data
+            UpdatePricingData();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error loading checkout data: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task<int?> GetCurrentUserIdAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity.IsAuthenticated)
+        {
+            var userIdClaim = user.Claims.FirstOrDefault(c => c.Type == "UserId");
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return userId;
+            }
+        }
+        return null;
+    }
+
+    // Phone number update
+    private async Task UpdatePhoneNumber()
+    {
+        if (currentUser == null) return;
+
+        try
+        {
+            isUpdatingPhone = true;
+            
+            currentUser.PhoneNumber = phoneUpdateModel.PhoneNumber;
+            var success = await UserService.UpdateProfileAsync(currentUser);
+            
+            if (success)
+            {
+                ToastService.ShowSuccess("Phone number updated successfully!");
+            }
+            else
+            {
+                ToastService.ShowError("Failed to update phone number.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error updating phone number: {ex.Message}");
+        }
+        finally
+        {
+            isUpdatingPhone = false;
+        }
+    }
+
+    // Delete address methods
+    private void ShowDeleteConfirmation(AddressVM address)
+    {
+        addressToDelete = address;
+        showDeleteModal = true;
+        StateHasChanged();
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteModal = false;
+        addressToDelete = null;
+        isDeleting = false;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (addressToDelete == null)
+            return;
+
+        isDeleting = true;
+        StateHasChanged();
+
+        try
+        {
+            var success = await AddressService.DeleteAddressAsync(addressToDelete.AddressId);
+            
+            if (success)
+            {
+                // Remove from local list
+                userAddresses = userAddresses?.Where(a => a.AddressId != addressToDelete.AddressId).ToList();
+                
+                // If deleted address was selected, clear selection
+                if (selectedAddressId == addressToDelete.AddressId)
+                {
+                    selectedAddressId = null;
+                    
+                    // Auto-select first address if available
+                    if (userAddresses?.Any() == true)
+                    {
+                        var firstAddress = userAddresses.First();
+                        SelectAddress(firstAddress.AddressId);
+                    }
+                }
+
+                ToastService.ShowSuccess($"Address has been deleted successfully.");
+
+                // Close modal
+                CancelDelete();
+            }
+            else
+            {
+                ToastService.ShowError("Failed to delete address. Please try again.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error deleting address: {ex.Message}");
+        }
+        finally
+        {
+            isDeleting = false;
+            StateHasChanged();
+        }
+    }
+
+    // Address management
+    private void SelectAddress(int addressId)
+    {
+        selectedAddressId = addressId;
+        StateHasChanged();
+    }
+
+    private async Task AddNewAddress()
+    {
+        editingAddress = new AddressVM();
+        isDefaultAddress = !userAddresses.Any();
+        isEditingAddress = false;
+        await OpenAddressModal();
+    }
+
+    private async Task EditAddress(AddressVM address)
+    {
+        editingAddress = new AddressVM
+        {
+            AddressId = address.AddressId,
+            UserId = address.UserId,
+            AddressLine1 = address.AddressLine1,
+            AddressLine2 = address.AddressLine2,
+            City = address.City,
+            State = address.State,
+            PostalCode = address.PostalCode,
+            Country = address.Country,
+            IsDefault = address.IsDefault
+        };
+        isDefaultAddress = address.IsDefault ?? false;
+        isEditingAddress = true;
+        await OpenAddressModal();
+    }
+
+    private async Task OpenAddressModal()
+    {
+        isAddressModalOpen = true;
+        StateHasChanged();
+        await Task.Delay(50);
+        await JSRuntime.InvokeVoidAsync("document.body.classList.add", "modal-open");
+    }
+
+    private async Task CloseAddressModal()
+    {
+        isAddressModalOpen = false;
+        await JSRuntime.InvokeVoidAsync("document.body.classList.remove", "modal-open");
+        StateHasChanged();
+    }
+
+    private async Task SaveAddress()
+    {
+        if (currentUserId == null) return;
+
+        try
+        {
+            isSavingAddress = true;
+            editingAddress.UserId = currentUserId.Value;
+            editingAddress.IsDefault = isDefaultAddress;
+
+            bool success = isEditingAddress 
+                ? await AddressService.UpdateAddressAsync(editingAddress)
+                : await AddressService.CreateAddressAsync(editingAddress);
+
+            if (success)
+            {
+                ToastService.ShowSuccess($"Address {(isEditingAddress ? "updated" : "saved")} successfully!");
+                await CloseAddressModal();
+                
+                // Reload addresses
+                var addresses = await AddressService.GetAddressesByUserIdAsync(currentUserId.Value);
+                userAddresses = addresses.ToList();
+                
+                // Auto-select the new/updated address
+                if (!isEditingAddress)
+                {
+                    var newAddress = userAddresses.OrderByDescending(a => a.CreatedAt).FirstOrDefault();
+                    if (newAddress != null)
+                    {
+                        selectedAddressId = newAddress.AddressId;
+                    }
+                }
+                
+                StateHasChanged();
+            }
+            else
+            {
+                ToastService.ShowError($"Failed to {(isEditingAddress ? "update" : "save")} address.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error saving address: {ex.Message}");
+        }
+        finally
+        {
+            isSavingAddress = false;
+        }
+    }
+
+    // Delivery options with pricing update
+    private void SelectDeliveryOption(string option)
+    {
+        selectedDeliveryOption = option;
+        CouponStateService.UpdateDeliveryOption(option, cartItems);
+        StateHasChanged();
+    }
+
+    // Coupon management using static services
+    private async Task OnCouponKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(couponCode))
+        {
+            await ApplyCoupon();
+        }
+    }
+
+    private async Task ApplyCoupon()
+    {
+        if (string.IsNullOrWhiteSpace(couponCode)) return;
+
+        try
+        {
+            isApplyingCoupon = true;
+            couponError = "";
+
+            var coupon = await CouponService.GetCouponByCodeAsync(couponCode.Trim());
+            
+            if (CouponStateService.ApplyCouponWithPricing(coupon, cartItems, selectedDeliveryOption))
+            {
+                couponCode = "";
+                ToastService.ShowSuccess($"Coupon '{coupon.CouponCode}' applied! You save ${currentPricing.CouponDiscount:F2}");
+            }
+            else
+            {
+                couponError = PricingCalculationService.GetCouponValidationMessage(coupon);
+            }
+        }
+        catch (Exception ex)
+        {
+            couponError = "Error applying coupon. Please try again.";
+            Console.WriteLine($"Error applying coupon: {ex.Message}");
+        }
+        finally
+        {
+            isApplyingCoupon = false;
+        }
+    }
+
+    private void RemoveCoupon()
+    {
+        CouponStateService.RemoveCouponWithPricing(cartItems, selectedDeliveryOption);
+        ToastService.ShowInfo("Coupon removed");
+    }
+
+    private async Task ContinueToPayment()
+    {
+        // Save final checkout state
+        CouponStateService.UpdateCheckoutData(selectedAddressId, selectedDeliveryOption);
+        
+        Navigation.NavigateTo("/payment");
+    }
+
+    // Validation and navigation
+    private bool CanContinueToPayment()
+    {
+        return selectedAddressId.HasValue && 
+               !string.IsNullOrEmpty(currentUser?.PhoneNumber) && 
+               cartItems.Any() &&
+               !string.IsNullOrEmpty(selectedDeliveryOption);
+    }
+
+    // Utility methods
+    private string GetFullName(ProfileVM user)
+    {
+        if (string.IsNullOrWhiteSpace(user.FirstName) && string.IsNullOrWhiteSpace(user.LastName))
+            return user.UserName ?? "Unknown User";
+        return $"{user.FirstName?.Trim()} {user.LastName?.Trim()}".Trim();
+    }
+
+    private string GetProductImageUrl(CartVM item)
+    {
+        return $"https://via.placeholder.com/60x60/f8f9fa/6c757d?text=Product+{item.ProductId ?? 0}";
+    }
+
+    public class PhoneUpdateModel
+    {
+        [Required(ErrorMessage = "Phone number is required")]
+        [Phone(ErrorMessage = "Please enter a valid phone number")]
+        public string PhoneNumber { get; set; } = "";
+    }
+}

@@ -1,0 +1,122 @@
+@using BlazorWebApp.Services
+@inject ToastService ToastService
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+<link href="css/toast.css" rel="stylesheet" />
+
+<div class="toast-container">
+    @foreach (var toast in toasts)
+    {
+        <div class="toast @GetToastClass(toast.Type) @(toast.IsVisible ? "show" : "")" 
+             id="toast-@toast.Id">
+            <div class="toast-icon">
+                <i class="@GetToastIcon(toast.Type)"></i>
+            </div>
+            <div class="toast-content">
+                @toast.Message
+            </div>
+            <button class="toast-close" @onclick="() => RemoveToast(toast.Id)">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="toast-progress" style="width: @(GetProgressWidth(toast))%"></div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ToastMessage> toasts = new();
+    private readonly Dictionary<string, Timer> timers = new();
+
+    protected override void OnInitialized()
+    {
+        ToastService.OnToastAdded += AddToast;
+        ToastService.OnToastRemoved += RemoveToast;
+    }
+
+    private async void AddToast(ToastMessage toast)
+    {
+        await InvokeAsync(() =>
+        {
+            toasts.Add(toast);
+            StateHasChanged();
+        });
+
+        // Auto-remove after duration
+        var timer = new Timer(async _ =>
+        {
+            await InvokeAsync(() => RemoveToast(toast.Id));
+        }, null, toast.Duration, Timeout.Infinite);
+
+        timers[toast.Id] = timer;
+    }
+
+    private async void RemoveToast(string toastId)
+    {
+        await InvokeAsync(async () =>
+        {
+            var toast = toasts.FirstOrDefault(t => t.Id == toastId);
+            if (toast != null)
+            {
+                // Add leaving animation
+                await JSRuntime.InvokeVoidAsync("addToastAnimation", $"toast-{toastId}", "leaving");
+                
+                // Wait for animation to complete
+                await Task.Delay(300);
+                
+                toasts.Remove(toast);
+                
+                if (timers.TryGetValue(toastId, out var timer))
+                {
+                    timer?.Dispose();
+                    timers.Remove(toastId);
+                }
+                
+                StateHasChanged();
+            }
+        });
+    }
+
+    private string GetToastClass(ToastType type)
+    {
+        return type switch
+        {
+            ToastType.Success => "success",
+            ToastType.Error => "error",
+            ToastType.Warning => "warning",
+            ToastType.Info => "info",
+            _ => "info"
+        };
+    }
+
+    private string GetToastIcon(ToastType type)
+    {
+        return type switch
+        {
+            ToastType.Success => "fas fa-check",
+            ToastType.Error => "fas fa-exclamation-triangle",
+            ToastType.Warning => "fas fa-exclamation",
+            ToastType.Info => "fas fa-info",
+            _ => "fas fa-info"
+        };
+    }
+
+    private double GetProgressWidth(ToastMessage toast)
+    {
+        var elapsed = (DateTime.Now - toast.CreatedAt).TotalMilliseconds;
+        var progress = Math.Max(0, 100 - (elapsed / toast.Duration * 100));
+        return progress;
+    }
+
+    public void Dispose()
+    {
+        ToastService.OnToastAdded -= AddToast;
+        ToastService.OnToastRemoved -= RemoveToast;
+        
+        foreach (var timer in timers.Values)
+        {
+            timer?.Dispose();
+        }
+        timers.Clear();
+    }
+}

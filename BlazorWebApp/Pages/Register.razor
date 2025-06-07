@@ -1,0 +1,353 @@
+@page "/register"
+@using web_api_base.Models.ViewModel
+@using BlazorWebApp.Services
+@inject NavigationManager NavigationManager
+@inject LoginService LoginService
+@inject SignalRService SignalRService
+
+<PageTitle>Register - Grocery Shop</PageTitle>
+
+<link href="css/auth.css" rel="stylesheet" />
+
+@if (isRegistering)
+{
+    <div class="loading-overlay fade-in">
+        <div class="loading-spinner-large"></div>
+        <p class="loading-text-large">Creating your account...</p>
+    </div>
+}
+
+<!-- Success Modal -->
+@if (showSuccessModal)
+{
+    <div class="success-modal-overlay fade-in">
+        <div class="success-modal">
+            <div class="success-modal-content">
+                <div class="success-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h3>Registration Successful!</h3>
+                <p class="success-message">
+                    Welcome <strong>@registerModel.FirstName</strong>! Your account has been created successfully.
+                </p>
+                <div class="countdown-info">
+                    <p>Redirecting to login page in <span class="countdown">@redirectCountdown</span> seconds...</p>
+                </div>
+                <div class="success-actions">
+                    <button class="btn-submit" @onclick="RedirectToLogin">
+                        <i class="fas fa-sign-in-alt mr-2"></i>
+                        Login Now
+                    </button>
+                    <button class="btn-secondary" @onclick="CloseSuccessModal">
+                        Stay Here
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="auth-container">
+    <div class="auth-box register-box">
+        <div class="auth-header">
+            <h2>Create an Account</h2>
+            <p>Join our community and enjoy fresh products delivered to your doorstep</p>
+        </div>
+        
+        <div class="auth-form">
+            <!-- Error message display -->
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="error-message">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span>@errorMessage</span>
+                </div>
+            }
+            
+            <EditForm Model="registerModel" OnValidSubmit="HandleRegistration" OnInvalidSubmit="HandleInvalidSubmit">
+                <DataAnnotationsValidator />
+                
+                <div class="form-group @(formSubmitted && string.IsNullOrEmpty(registerModel.Username) ? "input-validation-error" : "")">
+                    <label for="username">Username</label>
+                    <div class="input-group">
+                        <i class="fas fa-user"></i>
+                        <InputText id="username" placeholder="Enter username" @bind-Value="registerModel.Username" />
+                    </div>
+                    <ValidationMessage For="@(() => registerModel.Username)" class="field-validation-error" />
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group @(formSubmitted && string.IsNullOrEmpty(registerModel.FirstName) ? "input-validation-error" : "")">
+                        <label for="firstName">First Name</label>
+                        <div class="input-group">
+                            <i class="fas fa-user"></i>
+                            <InputText id="firstName" placeholder="Enter first name" @bind-Value="registerModel.FirstName" />
+                        </div>
+                        <ValidationMessage For="@(() => registerModel.FirstName)" class="field-validation-error" />
+                    </div>
+                    
+                    <div class="form-group @(formSubmitted && string.IsNullOrEmpty(registerModel.LastName) ? "input-validation-error" : "")">
+                        <label for="lastName">Last Name</label>
+                        <div class="input-group">
+                            <i class="fas fa-user"></i>
+                            <InputText id="lastName" placeholder="Enter last name" @bind-Value="registerModel.LastName" />
+                        </div>
+                        <ValidationMessage For="@(() => registerModel.LastName)" class="field-validation-error" />
+                    </div>
+                </div>
+                
+                <div class="form-group @(formSubmitted && string.IsNullOrEmpty(registerModel.Email) ? "input-validation-error" : "")">
+                    <label for="email">Email Address</label>
+                    <div class="input-group">
+                        <i class="fas fa-envelope"></i>
+                        <InputText type="email" id="email" placeholder="Enter your email" @bind-Value="registerModel.Email" />
+                    </div>
+                    <ValidationMessage For="@(() => registerModel.Email)" class="field-validation-error" />
+                </div>
+                
+                <div class="form-group @(formSubmitted && string.IsNullOrEmpty(registerModel.PhoneNumber) ? "input-validation-error" : "")">
+                    <label for="phone">Phone Number</label>
+                    <div class="input-group">
+                        <i class="fas fa-phone"></i>
+                        <InputText type="tel" id="phone" placeholder="Enter phone number" @bind-Value="registerModel.PhoneNumber" />
+                    </div>
+                    <ValidationMessage For="@(() => registerModel.PhoneNumber)" class="field-validation-error" />
+                </div>
+                
+                <div class="form-group @(formSubmitted && string.IsNullOrEmpty(registerModel.Password) ? "input-validation-error" : "")">
+                    <label for="password">Password</label>
+                    <div class="input-group">
+                        <i class="fas fa-lock"></i>
+                        <InputText type="@(ShowPassword ? "text" : "password")" id="password" placeholder="Enter password" @bind-Value="registerModel.Password" />
+                        <button type="button" class="password-toggle" @onclick="TogglePasswordVisibility">
+                            <i class="@(ShowPassword ? "fas fa-eye-slash" : "fas fa-eye")"></i>
+                        </button>
+                    </div>
+                    <ValidationMessage For="@(() => registerModel.Password)" class="field-validation-error" />
+                </div>
+                
+                <div class="form-group @(formSubmitted && (string.IsNullOrEmpty(registerModel.ConfirmPassword) || registerModel.Password != registerModel.ConfirmPassword) ? "input-validation-error" : "")">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <div class="input-group">
+                        <i class="fas fa-lock"></i>
+                        <InputText type="@(ShowConfirmPassword ? "text" : "password")" id="confirmPassword" placeholder="Confirm password" @bind-Value="registerModel.ConfirmPassword" />
+                        <button type="button" class="password-toggle" @onclick="ToggleConfirmPasswordVisibility">
+                            <i class="@(ShowConfirmPassword ? "fas fa-eye-slash" : "fas fa-eye")"></i>
+                        </button>
+                    </div>
+                    <ValidationMessage For="@(() => registerModel.ConfirmPassword)" class="field-validation-error" />
+                    @if (formSubmitted && registerModel.Password != registerModel.ConfirmPassword && !string.IsNullOrEmpty(registerModel.Password) && !string.IsNullOrEmpty(registerModel.ConfirmPassword))
+                    {
+                        <span class="field-validation-error">Passwords do not match</span>
+                    }
+                </div>
+                
+                <div class="form-submit">
+                    <button type="submit" class="btn-submit" disabled="@isRegistering">
+                        @if (isRegistering)
+                        {
+                            <span class="spinner-border spinner-border-sm mr-2" role="status" aria-hidden="true"></span>
+                            <span>Creating account...</span>
+                        }
+                        else
+                        {
+                            <span>Create Account</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+            
+            <div class="auth-divider">
+                <span>OR</span>
+            </div>
+            
+            <div class="social-auth">
+                <button class="btn-social btn-google">
+                    <i class="fab fa-google"></i>
+                    <span>Register with Google</span>
+                </button>
+                <button class="btn-social btn-facebook">
+                    <i class="fab fa-facebook-f"></i>
+                    <span>Register with Facebook</span>
+                </button>
+            </div>
+            
+            <div class="auth-footer">
+                <p>Already have an account? <a href="/login">Login Here</a></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private RegisterLoginVM registerModel = new RegisterLoginVM();
+    private bool ShowPassword { get; set; } = false;
+    private bool ShowConfirmPassword { get; set; } = false;
+    private bool isRegistering = false;
+    private bool formSubmitted = false;
+    private bool showSuccessModal = false;
+    private string errorMessage = string.Empty;
+    private int redirectCountdown = 5;
+    private Timer? countdownTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Đảm bảo kết nối SignalR được thiết lập
+        if (!SignalRService.IsMainHubConnected)
+        {
+            await SignalRService.StartConnectionAsync();
+        }
+    }
+
+    private void TogglePasswordVisibility()
+    {
+        ShowPassword = !ShowPassword;
+    }
+
+    private void ToggleConfirmPasswordVisibility()
+    {
+        ShowConfirmPassword = !ShowConfirmPassword;
+    }
+
+    private async Task HandleRegistration()
+    {
+        formSubmitted = true;
+        errorMessage = string.Empty;
+        isRegistering = true;
+        
+        try
+        {
+            // Validate form fields
+            if (string.IsNullOrWhiteSpace(registerModel.Username) || 
+                string.IsNullOrWhiteSpace(registerModel.FirstName) || 
+                string.IsNullOrWhiteSpace(registerModel.LastName) || 
+                string.IsNullOrWhiteSpace(registerModel.Email) ||
+                string.IsNullOrWhiteSpace(registerModel.Password) || 
+                string.IsNullOrWhiteSpace(registerModel.ConfirmPassword))
+            {
+                errorMessage = "Please fill in all required fields";
+                return;
+            }
+            
+            // Validate passwords match
+            if (registerModel.Password != registerModel.ConfirmPassword)
+            {
+                errorMessage = "Passwords don't match";
+                return;
+            }
+
+            // Basic email validation
+            if (!IsValidEmail(registerModel.Email))
+            {
+                errorMessage = "Please enter a valid email address";
+                return;
+            }
+            
+            var result = await LoginService.Register(registerModel);
+            bool success = result.Success;
+
+            if (success)
+            {
+                // Chờ một chút để UI update xong trước khi hiển thị modal
+                await Task.Delay(500);
+                
+                // Hiển thị success modal
+                await ShowSuccessModalAsync();
+                
+                // Thông báo qua SignalR cho admin về user mới đăng ký
+                string fullName = $"{registerModel.FirstName} {registerModel.LastName}".Trim();
+                if (string.IsNullOrEmpty(fullName))
+                {
+                    fullName = registerModel.Username;
+                }
+                
+                // Thông báo qua SignalR
+                await SignalRService.NotifyUserCreatedAsync(fullName);
+            }
+            else
+            {
+                errorMessage ="Registration failed. The username or email may already be in use.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred during registration. Please try again later.";
+            Console.WriteLine($"Registration error: {ex.Message}");
+        }
+        finally
+        {
+            isRegistering = false;
+            StateHasChanged();
+        }
+    }
+
+    private bool IsValidEmail(string email)
+    {
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(email);
+            return addr.Address == email;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task ShowSuccessModalAsync()
+    {
+        // Đảm bảo loading overlay đã tắt trước khi hiển thị modal
+        isRegistering = false;
+        StateHasChanged();
+        
+        // Chờ một chút để UI render
+        await Task.Delay(100);
+        
+        showSuccessModal = true;
+        redirectCountdown = 5;
+        StateHasChanged();
+
+        // Bắt đầu countdown timer
+        countdownTimer = new Timer(async _ =>
+        {
+            await InvokeAsync(() =>
+            {
+                redirectCountdown--;
+                if (redirectCountdown <= 0)
+                {
+                    countdownTimer?.Dispose();
+                    RedirectToLogin();
+                }
+                else
+                {
+                    StateHasChanged();
+                }
+            });
+        }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    private void CloseSuccessModal()
+    {
+        showSuccessModal = false;
+        countdownTimer?.Dispose();
+        StateHasChanged();
+    }
+
+    private void RedirectToLogin()
+    {
+        countdownTimer?.Dispose();
+        showSuccessModal = false;
+        NavigationManager.NavigateTo("/login");
+    }
+    
+    private void HandleInvalidSubmit()
+    {
+        formSubmitted = true;
+        errorMessage = "Please enter valid information in all required fields";
+    }
+
+    public void Dispose()
+    {
+        countdownTimer?.Dispose();
+    }
+}

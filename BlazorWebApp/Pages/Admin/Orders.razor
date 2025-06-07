@@ -1,0 +1,182 @@
+@page "/admin/orders"
+@using MudBlazor
+@layout _AdminLayout
+
+<PageTitle>Orders Management - Grabit</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12">
+        <MudPaper Elevation="0" Class="d-flex align-center justify-space-between pa-4" Style="background-color: white; border-radius: 4px;">
+            <MudText Typo="Typo.h4">Orders</MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print">Export</MudButton>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudGrid Class="mt-4">
+    <MudItem xs="12">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="searchString" Placeholder="Search orders..." 
+                                 Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                                 Immediate="true" Class="mt-0" />
+                </MudItem>
+                <MudItem xs="12" md="6" Class="d-flex justify-end">
+                    <MudDateRangePicker @bind-DateRange="dateRange" Label="Date Range" 
+                                       Class="mr-2" Style="max-width: 300px;" />
+                    <MudSelect T="string" Label="Status" @bind-Value="selectedStatus">
+                        <MudSelectItem Value="@("")">All Statuses</MudSelectItem>
+                        <MudSelectItem Value="@("Delivered")">Delivered</MudSelectItem>
+                        <MudSelectItem Value="@("Processing")">Processing</MudSelectItem>
+                        <MudSelectItem Value="@("Shipped")">Shipped</MudSelectItem>
+                        <MudSelectItem Value="@("Cancelled")">Cancelled</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+            
+            <MudTable Items="@FilteredOrders" Dense="false" Hover="true" Bordered="false" Striped="false" 
+                     Loading="@isLoading" LoadingProgressColor="Color.Primary" FixedHeader="true" Height="calc(100vh - 300px)"
+                     Class="mt-3">
+                <HeaderContent>
+                    <MudTh Style="width: 100px">Order ID</MudTh>
+                    <MudTh Style="width: 180px">Customer</MudTh>
+                    <MudTh>Products</MudTh>
+                    <MudTh Style="width: 120px">Date</MudTh>
+                    <MudTh Style="width: 100px">Amount</MudTh>
+                    <MudTh Style="width: 120px">Status</MudTh>
+                    <MudTh Style="width: 80px; text-align: center">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Order ID">@context.OrderId</MudTd>
+                    <MudTd DataLabel="Customer">
+                        <div class="d-flex align-center">
+                            <MudAvatar Size="Size.Small" Class="mr-2" Image="@context.CustomerAvatarUrl"></MudAvatar>
+                            <MudText Typo="Typo.body1">@context.CustomerName</MudText>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Products">@context.Products</MudTd>
+                    <MudTd DataLabel="Date">@context.Date</MudTd>
+                    <MudTd DataLabel="Amount">@context.Amount</MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small" 
+                                Variant="Variant.Filled">
+                            @context.Status
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                            <MudMenuItem Icon="@Icons.Material.Filled.Visibility">View Details</MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Edit">Update Status</MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Print">Print Invoice</MudMenuItem>
+                        </MudMenu>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] {10, 25, 50}" />
+                </PagerContent>
+            </MudTable>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private bool isLoading = false;
+    private string searchString = "";
+    private string selectedStatus = "";
+    private DateRange dateRange = new DateRange(DateTime.Now.AddMonths(-1), DateTime.Now);
+
+    private List<OrderData> orders = new()
+    {
+        new OrderData
+        {
+            OrderId = "#ORD-7892",
+            CustomerName = "John Doe",
+            CustomerAvatarUrl = "/images/admin/avatar1.jpg",
+            Products = "Mixed Nuts Berries Pack",
+            Date = "May 1, 2023",
+            Amount = "$55.00",
+            Status = "Delivered"
+        },
+        new OrderData
+        {
+            OrderId = "#ORD-7891",
+            CustomerName = "Jane Smith",
+            CustomerAvatarUrl = "/images/admin/avatar2.jpg",
+            Products = "Multi Grain Combo Cookies",
+            Date = "April 30, 2023",
+            Amount = "$30.00",
+            Status = "Processing"
+        },
+        new OrderData
+        {
+            OrderId = "#ORD-7890",
+            CustomerName = "Robert Johnson",
+            CustomerAvatarUrl = "/images/admin/avatar3.jpg",
+            Products = "Fresh Mango Juice Pack",
+            Date = "April 30, 2023",
+            Amount = "$55.00",
+            Status = "Shipped"
+        },
+        new OrderData
+        {
+            OrderId = "#ORD-7889",
+            CustomerName = "Emily Davis",
+            CustomerAvatarUrl = "/images/admin/avatar4.jpg",
+            Products = "Dates Value Fresh Pouch",
+            Date = "April 29, 2023",
+            Amount = "$65.00",
+            Status = "Cancelled"
+        },
+        new OrderData
+        {
+            OrderId = "#ORD-7888",
+            CustomerName = "Michael Wilson",
+            CustomerAvatarUrl = "/images/admin/avatar5.jpg",
+            Products = "Organic Apples",
+            Date = "April 29, 2023",
+            Amount = "$12.00",
+            Status = "Delivered"
+        },
+        new OrderData
+        {
+            OrderId = "#ORD-7887",
+            CustomerName = "Sarah Taylor",
+            CustomerAvatarUrl = "/images/admin/avatar6.jpg",
+            Products = "Fresh Veggies Pack",
+            Date = "April 28, 2023",
+            Amount = "$38.50",
+            Status = "Processing"
+        }
+    };
+
+    private IEnumerable<OrderData> FilteredOrders => orders
+        .Where(o => string.IsNullOrWhiteSpace(searchString) || 
+                   o.OrderId.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+                   o.CustomerName.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+                   o.Products.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+        .Where(o => string.IsNullOrWhiteSpace(selectedStatus) || o.Status == selectedStatus);
+
+    private Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Delivered" => Color.Success,
+            "Processing" => Color.Info,
+            "Shipped" => Color.Warning,
+            "Cancelled" => Color.Error,
+            _ => Color.Default
+        };
+    }
+    
+    private class OrderData
+    {
+        public string OrderId { get; set; }
+        public string CustomerName { get; set; }
+        public string CustomerAvatarUrl { get; set; }
+        public string Products { get; set; }
+        public string Date { get; set; }
+        public string Amount { get; set; }
+        public string Status { get; set; }
+    }
+}

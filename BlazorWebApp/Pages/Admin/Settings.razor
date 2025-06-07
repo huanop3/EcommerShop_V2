@@ -1,0 +1,394 @@
+@page "/admin/settings"
+@using MudBlazor
+@using System.ComponentModel.DataAnnotations
+@layout _AdminLayout
+
+<PageTitle>Settings - Grabit</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Settings</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="3">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px; height: calc(100vh - 150px);">
+            <MudList T="string" Clickable="true" SelectedValue="@selectedSetting" 
+                    SelectedValueChanged="@((string value) => OnSettingSelected(value))">
+                <MudListItem T="string" Value="@("general")" Icon="@Icons.Material.Filled.Settings" Text="General Settings" />
+                <MudListItem T="string" Value="@("store")" Icon="@Icons.Material.Filled.Storefront" Text="Store Information" />
+                <MudListItem T="string" Value="@("shipping")" Icon="@Icons.Material.Filled.LocalShipping" Text="Shipping" />
+                <MudListItem T="string" Value="@("payment")" Icon="@Icons.Material.Filled.Payment" Text="Payment Methods" />
+                <MudListItem T="string" Value="@("tax")" Icon="@Icons.Material.Filled.Receipt" Text="Tax Settings" />
+                <MudListItem T="string" Value="@("email")" Icon="@Icons.Material.Filled.Email" Text="Email Templates" />
+                <MudListItem T="string" Value="@("users")" Icon="@Icons.Material.Filled.PeopleAlt" Text="User Management" />
+                <MudListItem T="string" Value="@("backup")" Icon="@Icons.Material.Filled.Backup" Text="Backup & Restore" />
+                <MudListItem T="string" Value="@("seo")" Icon="@Icons.Material.Filled.Search" Text="SEO Settings" />
+                <MudListItem T="string" Value="@("analytics")" Icon="@Icons.Material.Filled.Analytics" Text="Analytics" />
+            </MudList>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="9">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px; height: calc(100vh - 150px); overflow-y: auto;">
+            @if (selectedSetting == "general")
+            {
+                <MudText Typo="Typo.h5" Class="mb-4">General Settings</MudText>
+                <MudForm @ref="form" @bind-IsValid="@success">
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <MudTextField T="string" @bind-Value="generalSettings.StoreName" 
+                                        Label="Store Name" Required="true" RequiredError="Store name is required" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField T="string" @bind-Value="generalSettings.StoreTagline" 
+                                        Label="Store Tagline" Required="true" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField T="string" @bind-Value="generalSettings.StoreEmail" 
+                                        Label="Store Email" Required="true" 
+                                        RequiredError="Email is required" 
+                                        Validation="@(new EmailAddressAttribute() {ErrorMessage = "Invalid email address"})" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField T="string" @bind-Value="generalSettings.StorePhone" 
+                                        Label="Store Phone" Required="true" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField T="string" @bind-Value="generalSettings.StoreCurrency" 
+                                        Label="Default Currency" Required="true" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudSelect T="string" @bind-Value="generalSettings.DateFormat" Label="Date Format">
+                                <MudSelectItem Value="@("MM/dd/yyyy")">MM/dd/yyyy</MudSelectItem>
+                                <MudSelectItem Value="@("dd/MM/yyyy")">dd/MM/yyyy</MudSelectItem>
+                                <MudSelectItem Value="@("yyyy-MM-dd")">yyyy-MM-dd</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.subtitle1">Default Language</MudText>
+                            <MudRadioGroup T="string" @bind-SelectedOption="@generalSettings.DefaultLanguage">
+                                <MudRadio T="string" Option="@("en_US")">English (US)</MudRadio>
+                                <MudRadio T="string" Option="@("vi_VN")">Vietnamese</MudRadio>
+                                <MudRadio T="string" Option="@("fr_FR")">French</MudRadio>
+                                <MudRadio T="string" Option="@("es_ES")">Spanish</MudRadio>
+                            </MudRadioGroup>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudSwitch T="bool" @bind-Checked="generalSettings.EnableReviews" 
+                                      Label="Enable Product Reviews" Color="Color.Primary" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudSwitch T="bool" @bind-Checked="generalSettings.EnableRatings" 
+                                      Label="Enable Product Ratings" Color="Color.Primary" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudSwitch T="bool" @bind-Checked="generalSettings.RequireLogin" 
+                                      Label="Require Login for Purchasing" Color="Color.Primary" />
+                        </MudItem>
+                        <MudItem xs="12" Class="d-flex justify-end mt-4">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                                      Disabled="@(!success)" OnClick="@(() => SaveSettings())">
+                                Save Settings
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudForm>
+            }
+            else if (selectedSetting == "store")
+            {
+                <MudText Typo="Typo.h5" Class="mb-4">Store Information</MudText>
+                <MudForm @ref="form" @bind-IsValid="@success">
+                    <MudGrid>
+                        <MudItem xs="12">
+                            <MudTextField T="string" @bind-Value="storeSettings.Address" 
+                                        Label="Store Address" Required="true" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField T="string" @bind-Value="storeSettings.City" 
+                                        Label="City" Required="true" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField T="string" @bind-Value="storeSettings.State" 
+                                        Label="State/Province" Required="true" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField T="string" @bind-Value="storeSettings.PostalCode" 
+                                        Label="Postal Code" Required="true" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudSelect T="string" @bind-Value="storeSettings.Country" Label="Country" Required="true">
+                                <MudSelectItem Value="@("US")">United States</MudSelectItem>
+                                <MudSelectItem Value="@("VN")">Vietnam</MudSelectItem>
+                                <MudSelectItem Value="@("GB")">United Kingdom</MudSelectItem>
+                                <MudSelectItem Value="@("FR")">France</MudSelectItem>
+                                <MudSelectItem Value="@("DE")">Germany</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.subtitle1" Class="mb-2">Store Logo</MudText>
+                            <div class="d-flex align-center">
+                                <MudAvatar Image="/images/logo.png" Size="Size.Large" Square="true" Class="mr-4" />
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                                          StartIcon="@Icons.Material.Filled.CloudUpload" Size="Size.Small">
+                                    Upload New Logo
+                                </MudButton>
+                            </div>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField T="string" @bind-Value="storeSettings.BusinessHours" 
+                                        Label="Business Hours" Required="true" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField T="string" @bind-Value="storeSettings.SocialMediaLinks" 
+                                        Label="Social Media Links" Lines="3" />
+                        </MudItem>
+                        <MudItem xs="12" Class="d-flex justify-end mt-4">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                                      Disabled="@(!success)" OnClick="@(() => SaveSettings())">
+                                Save Settings
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudForm>
+            }
+            else if (selectedSetting == "shipping")
+            {
+                <MudText Typo="Typo.h5" Class="mb-4">Shipping Settings</MudText>
+                <MudForm @ref="form">
+                    <MudGrid>
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.subtitle1" Class="mb-2">Shipping Methods</MudText>
+                            <MudPaper Class="pa-4 mb-4" Elevation="0" Style="background-color: #f8f9fa; border-radius: 4px;">
+                                <MudGrid>
+                                    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+                                        <div class="d-flex align-center">
+                                            <MudSwitch T="bool" @bind-Checked="shippingSettings.EnableFreeShipping" Color="Color.Primary" />
+                                            <div>
+                                                <MudText Typo="Typo.body1">Free Shipping</MudText>
+                                                <MudText Typo="Typo.caption">Free shipping for orders above a certain amount</MudText>
+                                            </div>
+                                        </div>
+                                        @if (shippingSettings.EnableFreeShipping)
+                                        {
+                                            <MudNumericField T="decimal" @bind-Value="shippingSettings.FreeShippingThreshold" 
+                                                          Label="Minimum Order Amount" Variant="Variant.Outlined" 
+                                                          Adornment="Adornment.Start" AdornmentText="$" />
+                                        }
+                                    </MudItem>
+                                </MudGrid>
+                            </MudPaper>
+                            
+                            <MudPaper Class="pa-4 mb-4" Elevation="0" Style="background-color: #f8f9fa; border-radius: 4px;">
+                                <MudGrid>
+                                    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+                                        <div class="d-flex align-center">
+                                            <MudSwitch T="bool" @bind-Checked="shippingSettings.EnableFlatRate" Color="Color.Primary" />
+                                            <div>
+                                                <MudText Typo="Typo.body1">Flat Rate Shipping</MudText>
+                                                <MudText Typo="Typo.caption">Fixed shipping rate for all orders</MudText>
+                                            </div>
+                                        </div>
+                                        @if (shippingSettings.EnableFlatRate)
+                                        {
+                                            <MudNumericField T="decimal" @bind-Value="shippingSettings.FlatRate" 
+                                                          Label="Flat Rate" Variant="Variant.Outlined" 
+                                                          Adornment="Adornment.Start" AdornmentText="$" />
+                                        }
+                                    </MudItem>
+                                </MudGrid>
+                            </MudPaper>
+                            
+                            <MudPaper Class="pa-4 mb-4" Elevation="0" Style="background-color: #f8f9fa; border-radius: 4px;">
+                                <MudGrid>
+                                    <MudItem xs="12" Class="d-flex justify-space-between align-center">
+                                        <div class="d-flex align-center">
+                                            <MudSwitch T="bool" @bind-Checked="shippingSettings.EnableLocalPickup" Color="Color.Primary" />
+                                            <div>
+                                                <MudText Typo="Typo.body1">Local Pickup</MudText>
+                                                <MudText Typo="Typo.caption">Allow customers to pick up orders from your store</MudText>
+                                            </div>
+                                        </div>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudPaper>
+                        </MudItem>
+                        
+                        <MudItem xs="12" Class="d-flex justify-end mt-4">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => SaveSettings())">
+                                Save Settings
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudForm>
+            }
+            else if (selectedSetting == "payment")
+            {
+                <MudText Typo="Typo.h5" Class="mb-4">Payment Methods</MudText>
+                <MudGrid>
+                    <MudItem xs="12">
+                        <MudPaper Class="pa-4 mb-4" Elevation="0" Style="background-color: #f8f9fa; border-radius: 4px;">
+                            <MudGrid>
+                                <MudItem xs="12" Class="d-flex justify-space-between align-center">
+                                    <div class="d-flex align-center">
+                                        <MudSwitch T="bool" @bind-Checked="paymentSettings.EnableCreditCards" Color="Color.Primary" />
+                                        <div>
+                                            <MudText Typo="Typo.body1">Credit Cards</MudText>
+                                            <MudText Typo="Typo.caption">Accept Visa, Mastercard, American Express, etc.</MudText>
+                                        </div>
+                                    </div>
+                                    <MudImage Src="/images/admin/credit-cards.png" Width="120" Alt="Credit Cards" />
+                                </MudItem>
+                            </MudGrid>
+                        </MudPaper>
+                        
+                        <MudPaper Class="pa-4 mb-4" Elevation="0" Style="background-color: #f8f9fa; border-radius: 4px;">
+                            <MudGrid>
+                                <MudItem xs="12" Class="d-flex justify-space-between align-center">
+                                    <div class="d-flex align-center">
+                                        <MudSwitch T="bool" @bind-Checked="paymentSettings.EnablePaypal" Color="Color.Primary" />
+                                        <div>
+                                            <MudText Typo="Typo.body1">PayPal</MudText>
+                                            <MudText Typo="Typo.caption">Accept payments through PayPal</MudText>
+                                        </div>
+                                    </div>
+                                    <MudImage Src="/images/admin/paypal.png" Width="100" Alt="PayPal" />
+                                </MudItem>
+                                @if (paymentSettings.EnablePaypal)
+                                {
+                                    <MudItem xs="12" md="6">
+                                        <MudTextField T="string" @bind-Value="paymentSettings.PaypalEmail" 
+                                                    Label="PayPal Email" Required="true" />
+                                    </MudItem>
+                                }
+                            </MudGrid>
+                        </MudPaper>
+                        
+                        <MudPaper Class="pa-4 mb-4" Elevation="0" Style="background-color: #f8f9fa; border-radius: 4px;">
+                            <MudGrid>
+                                <MudItem xs="12" Class="d-flex justify-space-between align-center">
+                                    <div class="d-flex align-center">
+                                        <MudSwitch T="bool" @bind-Checked="paymentSettings.EnableCashOnDelivery" Color="Color.Primary" />
+                                        <div>
+                                            <MudText Typo="Typo.body1">Cash on Delivery</MudText>
+                                            <MudText Typo="Typo.caption">Allow customers to pay when receiving their order</MudText>
+                                        </div>
+                                    </div>
+                                </MudItem>
+                            </MudGrid>
+                        </MudPaper>
+                    </MudItem>
+                    
+                    <MudItem xs="12" Class="d-flex justify-end mt-4">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => SaveSettings())">
+                            Save Settings
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            }
+            else
+            {
+                <div class="d-flex flex-column justify-center align-center" style="height: 400px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Large" Class="mb-4" />
+                    <MudText Typo="Typo.h6">Select a setting category from the left menu</MudText>
+                </div>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private string selectedSetting = "general";
+    private bool success = false;
+    private MudForm form;
+    
+    private GeneralSettingsModel generalSettings = new GeneralSettingsModel
+    {
+        StoreName = "Grabit",
+        StoreTagline = "Fresh Organic Products",
+        StoreEmail = "info@grabit.com",
+        StorePhone = "+1 (123) 456-7890",
+        StoreCurrency = "USD",
+        DateFormat = "MM/dd/yyyy",
+        DefaultLanguage = "en_US",
+        EnableReviews = true,
+        EnableRatings = true,
+        RequireLogin = false
+    };
+    
+    private StoreSettingsModel storeSettings = new StoreSettingsModel
+    {
+        Address = "123 Main Street",
+        City = "New York",
+        State = "NY",
+        PostalCode = "10001",
+        Country = "US",
+        BusinessHours = "Monday-Friday: 9AM-6PM, Saturday: 10AM-4PM, Sunday: Closed",
+        SocialMediaLinks = "Facebook: facebook.com/grabit\nInstagram: instagram.com/grabit\nTwitter: twitter.com/grabit"
+    };
+    
+    private ShippingSettingsModel shippingSettings = new ShippingSettingsModel
+    {
+        EnableFreeShipping = true,
+        FreeShippingThreshold = 50,
+        EnableFlatRate = true,
+        FlatRate = 5.99M,
+        EnableLocalPickup = true
+    };
+    
+    private PaymentSettingsModel paymentSettings = new PaymentSettingsModel
+    {
+        EnableCreditCards = true,
+        EnablePaypal = true,
+        PaypalEmail = "payments@grabit.com",
+        EnableCashOnDelivery = true
+    };
+    
+    private void OnSettingSelected(string value)
+    {
+        selectedSetting = value;
+    }
+    
+    private void SaveSettings()
+    {
+        // In a real app, you'd save the settings to a database or configuration file
+    }
+    
+    public class GeneralSettingsModel
+    {
+        public string StoreName { get; set; }
+        public string StoreTagline { get; set; }
+        public string StoreEmail { get; set; }
+        public string StorePhone { get; set; }
+        public string StoreCurrency { get; set; }
+        public string DateFormat { get; set; }
+        public string DefaultLanguage { get; set; }
+        public bool EnableReviews { get; set; }
+        public bool EnableRatings { get; set; }
+        public bool RequireLogin { get; set; }
+    }
+    
+    public class StoreSettingsModel
+    {
+        public string Address { get; set; }
+        public string City { get; set; }
+        public string State { get; set; }
+        public string PostalCode { get; set; }
+        public string Country { get; set; }
+        public string BusinessHours { get; set; }
+        public string SocialMediaLinks { get; set; }
+    }
+    
+    public class ShippingSettingsModel
+    {
+        public bool EnableFreeShipping { get; set; }
+        public decimal FreeShippingThreshold { get; set; }
+        public bool EnableFlatRate { get; set; }
+        public decimal FlatRate { get; set; }
+        public bool EnableLocalPickup { get; set; }
+    }
+    
+    public class PaymentSettingsModel
+    {
+        public bool EnableCreditCards { get; set; }
+        public bool EnablePaypal { get; set; }
+        public string PaypalEmail { get; set; }
+        public bool EnableCashOnDelivery { get; set; }
+    }
+}

@@ -1,0 +1,10 @@
+/AppHost/bin
+/AppHost/obj
+/BlazorWebApp/bin
+/BlazorWebApp/obj
+/GateWayService/bin
+/GateWayService/obj
+/MainEcommerceService/bin
+/MainEcommerceService/obj
+/ProductService/bin
+/ProductService/obj
