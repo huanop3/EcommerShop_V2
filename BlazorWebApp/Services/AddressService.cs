@@ -54,7 +54,6 @@ namespace BlazorWebApp.Services
 
         public async Task<IEnumerable<AddressVM>> GetAddressesByUserIdAsync(int userId)
         {
-            await SetAuthorizationHeader();
             try
             {
                 var response = await _httpClient.GetAsync($"https://localhost:7260/api/Address/GetAddressesByUserId?userId={userId}");
@@ -82,7 +81,6 @@ namespace BlazorWebApp.Services
 
         public async Task<AddressVM> GetAddressByIdAsync(int addressId)
         {
-            await SetAuthorizationHeader();
             try
             {
                 var response = await _httpClient.GetAsync($"https://localhost:7260/api/Address/GetAddressById?addressId={addressId}");

@@ -33,7 +33,6 @@ namespace MainEcommerceService.Controllers
                 return BadRequest(response);
             }
         }
-        [Authorize]
         [HttpGet("GetAddressesByUserId")]
         public async Task<IActionResult> GetAddressesByUserId(int userId)
         {
@@ -75,7 +74,6 @@ namespace MainEcommerceService.Controllers
             }
         }
 
-        [Authorize]
         [HttpGet("GetAddressById")]
         public async Task<IActionResult> GetAddressById(int addressId)
         {

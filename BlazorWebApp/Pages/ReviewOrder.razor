@@ -13,6 +13,7 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 @inject OrderService OrderService
+@inject CouponService CouponService
 @inject SignalRService SignalRService
 @attribute [Authorize]
 
@@ -526,7 +527,7 @@
             {
                 UserId = currentUserId.Value,
                 ShippingAddressId = selectedAddress?.AddressId,
-                CouponId = appliedCoupon?.CouponId,
+                CouponId = appliedCoupon.CouponId,
                 OrderItems = cartItems.Select(item => new OrderItemRequest
                 {
                     ProductId = item.ProductId ?? 0,
@@ -537,49 +538,19 @@
 
             // ✅ Gọi API để tạo order
             var orderCreated = await OrderService.CreateOrderWithItemsAsync(createOrderRequest);
-
-            if (orderCreated)
-            {
-                // ✅ Tạo order data cho OrderStateService
-                var orderData = new OrderDataModel
-                {
-                    UserId = currentUserId,
-                    Items = cartItems,
-                    ShippingAddress = selectedAddress,
-                    DeliveryOption = selectedDeliveryOption,
-                    PaymentMethod = selectedPaymentMethod,
-                    DeliveryInstructions = deliveryInstructions,
-                    Pricing = currentPricing,
-                    AppliedCoupon = appliedCoupon,
-                    OrderDate = DateTime.Now,
-                    OrderNotes = deliveryInstructions,
-                    Metadata = new Dictionary<string, object>
-                    {
-                        ["browser"] = "Blazor WebApp",
-                        ["order_confirmed_at"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                        ["final_confirmation"] = finalConfirmation,
-                        ["api_order_created"] = true
-                    }
-                };
-
-                // Save order data to static service
-                OrderStateService.SaveOrderData(orderData);
-
                 // ✅ Clear cart and checkout data after successful order
-                CartVM.ClearCart();
-                CouponStateService.ClearAllData();
+
 
                 // Show success message
                 ToastService.ShowSuccess("Order placed successfully! Redirecting to order confirmation...");
 
+                await CouponService.UpdateCouponUsageCount(appliedCoupon.CouponId);
+                CartVM.ClearCart();
+                CouponStateService.ClearAllData();
                 // Redirect to order confirmation page
                 await Task.Delay(1500);
-                Navigation.NavigateTo("/order-confirmation", true);
-            }
-            else
-            {
-                ToastService.ShowError("Failed to create order. Please try again.");
-            }
+                Navigation.NavigateTo($"/order-detail/{orderCreated.OrderId}", true);
+                await SignalRService.NotifyOrderCreatedAsync(int.Parse(orderCreated.OrderId), currentUserId.Value, currentPricing.TotalAmount);
         }
         catch (Exception ex)
         {

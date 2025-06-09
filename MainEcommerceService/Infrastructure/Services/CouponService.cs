@@ -18,6 +18,7 @@ public interface ICouponService
     Task<HTTPResponseClient<string>> DeactivateCoupon(int couponId);
     Task<HTTPResponseClient<IEnumerable<CouponVM>>> GetActiveCoupons();
     Task<HTTPResponseClient<bool>> ValidateCoupon(string couponCode);
+    Task<HTTPResponseClient<bool>> UpdateCouponUsageCount(int couponId);
 }
 
 public class CouponService : ICouponService
@@ -276,8 +277,8 @@ public class CouponService : ICouponService
             await _unitOfWork.CommitTransaction();
 
             // Xóa cache để đảm bảo dữ liệu mới nhất
-            await _cacheService.DeleteAsync("AllCoupons");
-            await _cacheService.DeleteAsync("PagedCoupons_*");
+            await _cacheService.DeleteByPatternAsync("AllCoupons");
+            await _cacheService.DeleteByPatternAsync("PagedCoupons_*");
 
             // Gửi thông báo realtime qua SignalR
             await _hubContext.Clients.All.SendAsync("CouponCreated", coupon.CouponId, coupon.CouponCode);
@@ -318,8 +319,8 @@ public class CouponService : ICouponService
 
             // Kiểm tra mã giảm giá có bị trùng không (ngoại trừ chính nó)
             var existingCoupon = await _unitOfWork._couponRepository.Query()
-                .FirstOrDefaultAsync(c => c.CouponCode == couponVM.CouponCode && 
-                                         c.CouponId != couponVM.CouponId && 
+                .FirstOrDefaultAsync(c => c.CouponCode == couponVM.CouponCode &&
+                                         c.CouponId != couponVM.CouponId &&
                                          c.IsDeleted == false);
 
             if (existingCoupon != null)
@@ -348,10 +349,10 @@ public class CouponService : ICouponService
             await _unitOfWork.CommitTransaction();
 
             // Xóa cache để đảm bảo dữ liệu mới nhất
-            await _cacheService.DeleteAsync("AllCoupons");
-            await _cacheService.DeleteAsync("PagedCoupons_*");
-            await _cacheService.DeleteAsync($"Coupon_{couponVM.CouponId}");
-            await _cacheService.DeleteAsync($"CouponCode_{couponVM.CouponCode}");
+            await _cacheService.DeleteByPatternAsync("AllCoupons");
+            await _cacheService.DeleteByPatternAsync("PagedCoupons_*");
+            await _cacheService.DeleteByPatternAsync($"Coupon_{couponVM.CouponId}");
+            await _cacheService.DeleteByPatternAsync($"CouponCode_{couponVM.CouponCode}");
 
             // Gửi thông báo realtime qua SignalR
             await _hubContext.Clients.All.SendAsync("CouponUpdated", coupon.CouponId, coupon.CouponCode);
@@ -401,10 +402,10 @@ public class CouponService : ICouponService
             await _unitOfWork.CommitTransaction();
 
             // Xóa cache
-            await _cacheService.DeleteAsync("AllCoupons");
-            await _cacheService.DeleteAsync("PagedCoupons_*");
-            await _cacheService.DeleteAsync($"Coupon_{couponId}");
-            await _cacheService.DeleteAsync($"CouponCode_{coupon.CouponCode}");
+            await _cacheService.DeleteByPatternAsync("AllCoupons");
+            await _cacheService.DeleteByPatternAsync("PagedCoupons_*");
+            await _cacheService.DeleteByPatternAsync($"Coupon_{couponId}");
+            await _cacheService.DeleteByPatternAsync($"CouponCode_{coupon.CouponCode}");
 
             // Gửi thông báo realtime qua SignalR
             await _hubContext.Clients.All.SendAsync("CouponDeleted", couponId);
@@ -449,9 +450,9 @@ public class CouponService : ICouponService
             await _unitOfWork.CommitTransaction();
 
             // Xóa cache
-            await _cacheService.DeleteAsync("AllCoupons");
-            await _cacheService.DeleteAsync("PagedCoupons_*");
-            await _cacheService.DeleteAsync($"Coupon_{couponId}");
+            await _cacheService.DeleteByPatternAsync("AllCoupons");
+            await _cacheService.DeleteByPatternAsync("PagedCoupons_*");
+            await _cacheService.DeleteByPatternAsync($"Coupon_{couponId}");
 
             await _hubContext.Clients.All.SendAsync("CouponActivated", couponId);
 
@@ -493,9 +494,9 @@ public class CouponService : ICouponService
             await _unitOfWork.CommitTransaction();
 
             // Xóa cache
-            await _cacheService.DeleteAsync("AllCoupons");
-            await _cacheService.DeleteAsync("PagedCoupons_*");
-            await _cacheService.DeleteAsync($"Coupon_{couponId}");
+            await _cacheService.DeleteByPatternAsync("AllCoupons");
+            await _cacheService.DeleteByPatternAsync("PagedCoupons_*");
+            await _cacheService.DeleteByPatternAsync($"Coupon_{couponId}");
 
             await _hubContext.Clients.All.SendAsync("CouponDeactivated", couponId);
 
@@ -533,9 +534,9 @@ public class CouponService : ICouponService
 
             var currentDate = DateTime.Now;
             var coupons = await _unitOfWork._couponRepository.Query()
-                .Where(c => c.IsDeleted == false && 
-                           c.IsActive == true && 
-                           c.StartDate <= currentDate && 
+                .Where(c => c.IsDeleted == false &&
+                           c.IsActive == true &&
+                           c.StartDate <= currentDate &&
                            c.EndDate >= currentDate)
                 .ToListAsync();
 
@@ -609,6 +610,39 @@ public class CouponService : ICouponService
             response.StatusCode = 500;
             response.Message = $"Lỗi khi kiểm tra mã giảm giá: {ex.Message}";
             response.DateTime = DateTime.Now;
+        }
+        return response;
+    }
+    public async Task<HTTPResponseClient<bool>> UpdateCouponUsageCount(int couponId)
+    {
+        var response = new HTTPResponseClient<bool>();
+        try
+        {
+            var coupon = await _unitOfWork._couponRepository.GetByIdAsync(couponId);
+            if (coupon == null || coupon.IsDeleted == true)
+            {
+                response.Data = false;
+                response.Success = false;
+                response.StatusCode = 404;
+                response.Message = "Không tìm thấy mã giảm giá";
+                return response;
+            }
+
+            coupon.UsageCount++;
+            _unitOfWork._couponRepository.Update(coupon);
+            await _unitOfWork.SaveChangesAsync();
+
+            response.Data = true;
+            response.Success = true;
+            response.StatusCode = 200;
+            response.Message = "Cập nhật số lần sử dụng mã giảm giá thành công";
+        }
+        catch (Exception ex)
+        {
+            response.Data = false;
+            response.Success = false;
+            response.StatusCode = 500;
+            response.Message = $"Lỗi khi cập nhật số lần sử dụng mã giảm giá: {ex.Message}";
         }
         return response;
     }

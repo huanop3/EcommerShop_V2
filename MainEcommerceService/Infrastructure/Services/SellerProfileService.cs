@@ -692,7 +692,7 @@ public class SellerProfileService : ISellerProfileService
             $"SellerProfileByUser_{userId}"
         };
 
-        var tasks = cacheKeys.Select(key => _cacheService.DeleteAsync(key));
+        var tasks = cacheKeys.Select(key => _cacheService.DeleteByPatternAsync(key));
         await Task.WhenAll(tasks);
     }
 }

@@ -475,44 +475,69 @@
     private int lowStockCount = 0;
     private DateTime? lastUpdateTime;
     private Timer? cleanupTimer;
-
+        private bool hasInitialized = false;
+    private string? lastCategorySlug = null; // ✅ Track last parameters
+    private string? lastSearch = null;
 protected override async Task OnInitializedAsync()
-{
-    try
     {
-        isLoading = true;
-        
-        // Initialize SignalR
-        await SignalRService.StartConnectionAsync();
-        RegisterSignalREvents();
-
-        // Load data
-        await LoadCategories();
-        
-        // Handle URL parameters (including search)
-        await HandleParametersFromUrl();
-        
-        await LoadProductsPage();
-        
-        // Initialize cleanup timer
-        cleanupTimer = new Timer(CleanupOldHighlights, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+        try
+        {
+            isLoading = true;
+            
+            // ✅ Initialize tracking variables
+            lastCategorySlug = CategorySlug;
+            lastSearch = Search;
+            
+            await SignalRService.StartConnectionAsync();
+            RegisterSignalREvents();
+            await LoadCategories();
+            await HandleParametersFromUrl();
+            await LoadProductsPage();
+            
+            hasInitialized = true;
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error loading page: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
     }
-    catch (Exception ex)
-    {
-        ToastService.ShowError($"Error loading page: {ex.Message}");
-    }
-    finally
-    {
-        isLoading = false;
-        StateHasChanged();
-    }
-}
 
 protected override async Task OnParametersSetAsync()
-{
-    await HandleParametersFromUrl();
-    await LoadProductsPage();
-}
+    {
+        if (!hasInitialized) return;
+        
+        // ✅ CHỈ process nếu parameters thực sự thay đổi
+        bool parametersChanged = false;
+        
+        if (CategorySlug != lastCategorySlug)
+        {
+            Console.WriteLine($"🔄 CategorySlug changed: '{lastCategorySlug}' → '{CategorySlug}'");
+            lastCategorySlug = CategorySlug;
+            parametersChanged = true;
+        }
+        
+        if (Search != lastSearch)
+        {
+            Console.WriteLine($"🔄 Search changed: '{lastSearch}' → '{Search}'");
+            lastSearch = Search;
+            parametersChanged = true;
+        }
+        
+        if (!parametersChanged)
+        {
+            Console.WriteLine("🚫 OnParametersSetAsync skipped - no parameter changes");
+            return;
+        }
+        
+        Console.WriteLine("✅ OnParametersSetAsync processing - parameters changed");
+        await HandleParametersFromUrl();
+        await LoadProductsPage();
+    }
 
     private async Task HandleCategoryFromUrl()
     {
@@ -736,25 +761,41 @@ protected override async Task OnParametersSetAsync()
     }
 
     private async Task FilterByCategory(int? categoryId, string? categoryName = null)
+{
+    try
     {
+        Console.WriteLine($"🎯 FilterByCategory called - ID: {categoryId}, Name: '{categoryName}'");
+        
         selectedCategoryId = categoryId;
         selectedCategoryName = categoryName;
         currentPage = 1;
         jumpToPage = 1;
 
-        // Update URL
+        // Clear search when filtering by category
+        searchTerm = "";
+        
+        // ✅ SỬA: Load data trực tiếp, không cần navigate
+        await LoadProductsPage();
+        
+        // ✅ Update URL AFTER loading (optional)
         if (categoryId.HasValue && !string.IsNullOrEmpty(categoryName))
         {
             var slug = categoryName.Replace(" ", "-").ToLower();
-            Navigation.NavigateTo($"/products/{slug}",false);
+            lastCategorySlug = slug;
+            Navigation.NavigateTo($"/products/{slug}", replace: true);
         }
         else
         {
-            Navigation.NavigateTo("/products",false);
+            lastCategorySlug = null;
+            Navigation.NavigateTo("/products", replace: true);
         }
-
-        await LoadProductsPage();
     }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error in FilterByCategory: {ex.Message}");
+        ToastService.ShowError("Failed to filter by category");
+    }
+}
     private string CreateSlug(string categoryName)
     {
         if (string.IsNullOrEmpty(categoryName))

@@ -290,8 +290,8 @@ public class UserService : IUserService
             await _unitOfWork.CommitTransaction();
 
             // Xóa cache để đảm bảo dữ liệu mới nhất
-            await _cacheService.DeleteAsync("AllUsers");
-            await _cacheService.DeleteAsync("PagedUsers");
+            await _cacheService.DeleteByPatternAsync("AllUsers");
+            await _cacheService.DeleteByPatternAsync("PagedUsers");
 
             // Gửi thông báo realtime qua SignalR
             await _hubContext.Clients.All.SendAsync("UserUpdated", userlistVM.Id, userlistVM.LastName);
@@ -367,8 +367,8 @@ public class UserService : IUserService
             await _unitOfWork.CommitTransaction();
 
             // Xóa cache
-            await _cacheService.DeleteAsync("AllUsers");
-            await _cacheService.DeleteAsync("PagedUsers");
+            await _cacheService.DeleteByPatternAsync("AllUsers");
+            await _cacheService.DeleteByPatternAsync("PagedUsers");
 
             // Gửi thông báo realtime qua SignalR
             await _hubContext.Clients.All.SendAsync("UserDeleted", userId);
@@ -457,8 +457,8 @@ public class UserService : IUserService
             await _unitOfWork.CommitTransaction();
 
             // Xóa cache để đảm bảo dữ liệu mới nhất
-            await _cacheService.DeleteAsync("AllUsers");
-            await _cacheService.DeleteAsync("PagedUsers");
+            await _cacheService.DeleteByPatternAsync("AllUsers");
+            await _cacheService.DeleteByPatternAsync("PagedUsers");
 
             // Gửi thông báo realtime qua SignalR
             await _hubContext.Clients.All.SendAsync("ProfileUpdated", user.Username);

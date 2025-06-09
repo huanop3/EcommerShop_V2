@@ -18,59 +18,36 @@ public class KafkaConsumerService : BackgroundService
         _logger = logger;
     }
 
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("🚀 MainEcommerce: KafkaConsumerService ExecuteAsync STARTING");
+        _logger.LogInformation("🚀 MainEcommerce KafkaConsumer starting...");
         
-        return Task.Run(async () =>
+        try
         {
-            try
+            await EnsureTopicsExistAsync();
+            
+            // 🔥 SỬA: Chạy các consumer trong separate tasks
+            var tasks = new[]
             {
-                _logger.LogInformation("🔧 MainEcommerce: About to ensure topics exist");
-                await EnsureTopicsExistAsync();
-                
-                _logger.LogInformation("🔧 MainEcommerce: Starting consumer tasks");
-                
-                // ✅ Chạy riêng từng consumer với error handling
-                var task1 = Task.Run(async () =>
-                {
-                    try
-                    {
-                        _logger.LogInformation("🔧 MainEcommerce: Starting seller-request consumer...");
-                        await ConsumeAsync("seller-request", stoppingToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "❌ MainEcommerce: Error in seller-request consumer");
-                    }
-                }, stoppingToken);
-                
-                var task2 = Task.Run(async () =>
-                {
-                    try
-                    {
-                        _logger.LogInformation("🔧 MainEcommerce: Starting product-update-result consumer...");
-                        await ConsumeProductUpdateResultAsync("product-update-result", stoppingToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "❌ MainEcommerce: Error in product-update-result consumer");
-                    }
-                }, stoppingToken);
-                
-                _logger.LogInformation("🔧 MainEcommerce: Both consumer tasks started");
-                
-                await Task.WhenAll(task1, task2);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "❌ MainEcommerce: FATAL ERROR in ExecuteAsync");
-                throw;
-            }
-        }, stoppingToken);
+                Task.Run(() => ConsumeSellerRequestAsync(stoppingToken), stoppingToken),
+                Task.Run(() => ConsumeProductUpdateResultAsync(stoppingToken), stoppingToken),
+                Task.Run(() => ConsumeOrderCancelledAsync(stoppingToken), stoppingToken)
+            };
+            
+            await Task.WhenAll(tasks);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("🛑 MainEcommerce KafkaConsumer stopped due to cancellation");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ MainEcommerce KafkaConsumer failed");
+            throw;
+        }
     }
 
-    private async Task ConsumeAsync(string topic, CancellationToken stoppingToken)
+    private async Task ConsumeSellerRequestAsync(CancellationToken stoppingToken)
     {
         var consumerConfig = new ConsumerConfig
         {
@@ -78,544 +55,347 @@ public class KafkaConsumerService : BackgroundService
             GroupId = "main-ecommerce-seller-request",
             AutoOffsetReset = AutoOffsetReset.Earliest,
             EnableAutoCommit = false,
-            SessionTimeoutMs = 6000,
-            HeartbeatIntervalMs = 2000
+            SessionTimeoutMs = 30000,
+            HeartbeatIntervalMs = 10000,
+            MaxPollIntervalMs = 300000
         };
 
-        var producerConfig = new ProducerConfig
-        {
-            BootstrapServers = _bootstrapServers,
-            Acks = Acks.All
-        };
+        var producerConfig = new ProducerConfig { BootstrapServers = _bootstrapServers };
 
         using var consumer = new ConsumerBuilder<string, string>(consumerConfig)
-            .SetErrorHandler((_, e) => _logger.LogError("Consumer error: {Error}", e.Reason))
+            .SetErrorHandler((_, e) => _logger.LogError("❌ Seller request consumer error: {Error}", e.Reason))
             .Build();
-        using var producer = new ProducerBuilder<string, string>(producerConfig)
-            .SetErrorHandler((_, e) => _logger.LogError("Producer error: {Error}", e.Reason))
-            .Build();
-
-        // Retry subscription
-        var retryCount = 0;
-        const int maxRetries = 5;
+        using var producer = new ProducerBuilder<string, string>(producerConfig).Build();
         
-        while (retryCount < maxRetries && !stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                consumer.Subscribe(topic);
-                _logger.LogInformation("✅ MainEcommerce: Successfully subscribed to {Topic}", topic);
-                break;
-            }
-            catch (Exception ex)
-            {
-                retryCount++;
-                _logger.LogWarning(ex, "⚠️ MainEcommerce: Failed to subscribe to {Topic}. Retry {RetryCount}/{MaxRetries}", topic, retryCount, maxRetries);
-                
-                if (retryCount < maxRetries)
-                {
-                    await Task.Delay(2000, stoppingToken);
-                }
-            }
-        }
-
-        if (retryCount >= maxRetries)
-        {
-            _logger.LogError("❌ MainEcommerce: Failed to subscribe to {Topic} after {MaxRetries} attempts", topic, maxRetries);
-            return;
-        }
-
-        _logger.LogInformation("🔄 MainEcommerce: Starting seller request listener for topic {Topic}...", topic);
-
         try
         {
+            consumer.Subscribe("seller-request");
+            _logger.LogInformation("✅ Subscribed to seller-request topic");
+
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    var consumeResult = consumer.Consume(TimeSpan.FromMilliseconds(1000));
+                    // 🔥 SỬA: Timeout ngắn hơn
+                    var result = consumer.Consume(TimeSpan.FromSeconds(1));
                     
-                    if (consumeResult != null)
+                    if (result?.Message != null)
                     {
-                        _logger.LogInformation("📨 MainEcommerce: Received request: Key={Key}, Value={Value}", 
-                            consumeResult.Message.Key, consumeResult.Message.Value);
-
-                        // ✅ FIX: Proper scope management
-                        var scope = _scopeFactory.CreateScope();
-                        try
-                        {
-                            await ProcessMessageAsync(scope.ServiceProvider, producer, consumeResult.Message.Value);
-                            consumer.Commit(consumeResult);
-                            _logger.LogInformation("✅ MainEcommerce: Successfully processed and committed message");
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "❌ MainEcommerce: Error processing message - will not commit");
-                        }
-                        finally
-                        {
-                            // ✅ Safe disposal
-                            await DisposeServiceScopeAsync(scope);
-                        }
+                        _logger.LogDebug("📨 Received seller request: {Key}", result.Message.Key);
+                        
+                       await using var scope = _scopeFactory.CreateAsyncScope();
+                        await ProcessSellerRequest(scope.ServiceProvider, producer, result.Message.Value);
+                        consumer.Commit(result);
+                        
+                        _logger.LogDebug("✅ Processed seller request: {Key}", result.Message.Key);
                     }
-                }
-                catch (ConsumeException ex) when (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
-                {
-                    _logger.LogWarning("⚠️ MainEcommerce: Topic '{Topic}' not found. Waiting...", topic);
-                    await Task.Delay(5000, stoppingToken);
+                    
+                    // 🔥 THÊM: Yield control
+                    await Task.Delay(10, stoppingToken);
                 }
                 catch (ConsumeException ex)
                 {
-                    _logger.LogError(ex, "❌ MainEcommerce: Error consuming Kafka message from {Topic}", topic);
+                    _logger.LogError(ex, "❌ Error consuming seller request");
                     await Task.Delay(1000, stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogInformation("🛑 Seller request consumer cancelled");
+                    break;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "❌ MainEcommerce: Unexpected error in consumer loop");
-                    await Task.Delay(1000, stoppingToken);
+                    _logger.LogError(ex, "❌ Unexpected error in seller request consumer");
+                    await Task.Delay(5000, stoppingToken);
                 }
             }
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("🛑 MainEcommerce: Kafka consumer service is stopping.");
         }
         finally
         {
-            consumer.Close();
+            try
+            {
+                consumer.Unsubscribe();
+                consumer.Close();
+                _logger.LogInformation("🔒 Seller request consumer closed");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error closing seller request consumer");
+            }
         }
     }
 
-    private async Task ProcessMessageAsync(IServiceProvider serviceProvider, IProducer<string, string> producer, string messageValue)
+    private async Task ProcessSellerRequest(IServiceProvider serviceProvider, IProducer<string, string> producer, string messageValue)
     {
         try
         {
-            _logger.LogInformation("🔍 MainEcommerce: Processing message: {Message}", messageValue);
-            
             var request = JsonSerializer.Deserialize<SellerRequestMessage>(messageValue);
-            
-            if (request == null)
+            if (request?.Action != "GET_SELLER_BY_USER_ID") return;
+
+            var sellerService = serviceProvider.GetRequiredService<ISellerProfileService>();
+            var sellerResponse = await sellerService.GetSellerProfileByUserId(request.UserId);
+
+            var response = new SellerResponseMessage
             {
-                _logger.LogWarning("⚠️ MainEcommerce: Failed to deserialize request message");
-                return;
-            }
-
-            _logger.LogInformation("📋 MainEcommerce: Parsed request - RequestId={RequestId}, Action={Action}, UserId={UserId}", 
-                request.RequestId, request.Action, request.UserId);
-            
-            if (request.Action == "GET_SELLER_BY_USER_ID")
-            {
-                var sellerProfileService = serviceProvider.GetRequiredService<ISellerProfileService>();
-
-                _logger.LogInformation("🔍 MainEcommerce: Getting seller for UserId={UserId}", request.UserId);
-
-                var sellerResponse = await sellerProfileService.GetSellerProfileByUserId(request.UserId);
-
-                var responseMessage = new SellerResponseMessage
+                RequestId = request.RequestId,
+                Success = sellerResponse.Success,
+                Data = sellerResponse.Success ? new SellerProfileVM
                 {
-                    RequestId = request.RequestId,
-                    Success = sellerResponse.Success
-                };
-
-                if (sellerResponse.Success && sellerResponse.Data != null)
-                {
-                    responseMessage.Data = new SellerProfileVM
-                    {
-                        SellerId = sellerResponse.Data.SellerId,
-                        StoreName = sellerResponse.Data.StoreName,
-                        UserId = sellerResponse.Data.UserId,
-                    };
-                    responseMessage.ErrorMessage = null;
-                    
-                    _logger.LogInformation("✅ MainEcommerce: Found seller - SellerId={SellerId}, StoreName={StoreName}", 
-                        sellerResponse.Data.SellerId, sellerResponse.Data.StoreName);
-                }
-                else
-                {
-                    responseMessage.Data = null;
-                    responseMessage.ErrorMessage = sellerResponse.Message ?? $"Seller not found for UserId: {request.UserId}";
-                    
-                    _logger.LogWarning("⚠️ MainEcommerce: Seller not found for UserId={UserId}: {Message}", 
-                        request.UserId, sellerResponse.Message);
-                }
-
-                await SendResponseAsync(producer, responseMessage);
-
-                _logger.LogInformation("✅ MainEcommerce: Processed request {RequestId} for user {UserId} with success={Success}", 
-                    request.RequestId, request.UserId, responseMessage.Success);
-            }
-            else
-            {
-                _logger.LogWarning("⚠️ MainEcommerce: Unknown action: {Action}", request.Action);
-                
-                var errorResponse = new SellerResponseMessage
-                {
-                    RequestId = request.RequestId,
-                    Success = false,
-                    Data = null,
-                    ErrorMessage = $"Unknown action: {request.Action}"
-                };
-                
-                await SendResponseAsync(producer, errorResponse);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "❌ MainEcommerce: Error processing message: {Message}", messageValue);
-            throw;
-        }
-    }
-
-    private async Task SendResponseAsync(IProducer<string, string> producer, SellerResponseMessage response)
-    {
-        try
-        {
-            var responseJson = JsonSerializer.Serialize(response);
-            
-            _logger.LogInformation("📤 MainEcommerce: Sending response: RequestId={RequestId}, Success={Success}, Json={Json}", 
-                response.RequestId, response.Success, responseJson);
-
-            var message = new Message<string, string>
-            {
-                Key = response.RequestId,
-                Value = responseJson
+                    SellerId = sellerResponse.Data.SellerId,
+                    StoreName = sellerResponse.Data.StoreName,
+                    UserId = sellerResponse.Data.UserId
+                } : null,
+                ErrorMessage = sellerResponse.Success ? null : sellerResponse.Message
             };
 
-            var result = await producer.ProduceAsync("seller-response", message);
+            await producer.ProduceAsync("seller-response", new Message<string, string>
+            {
+                Key = response.RequestId,
+                Value = JsonSerializer.Serialize(response)
+            });
             
-            _logger.LogInformation("✅ MainEcommerce: Response sent successfully - RequestId={RequestId}, Topic={Topic}, Partition={Partition}, Offset={Offset}", 
-                response.RequestId, result.Topic, result.Partition.Value, result.Offset.Value);
+            _logger.LogInformation("✅ Processed seller request for user {UserId}", request.UserId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ MainEcommerce: Failed to send response for request {RequestId}", response.RequestId);
+            _logger.LogError(ex, "❌ Error processing seller request: {Message}", messageValue);
             throw;
         }
     }
 
-    private async Task ConsumeProductUpdateResultAsync(string topic, CancellationToken stoppingToken)
+    private async Task ConsumeProductUpdateResultAsync(CancellationToken stoppingToken)
     {
-        var consumerConfig = new ConsumerConfig
+        var config = new ConsumerConfig
         {
             BootstrapServers = _bootstrapServers,
             GroupId = "main-ecommerce-product-update-consumer",
             AutoOffsetReset = AutoOffsetReset.Earliest,
             EnableAutoCommit = false,
-            SessionTimeoutMs = 6000,
-            HeartbeatIntervalMs = 2000,
-            EnablePartitionEof = false,
-            AllowAutoCreateTopics = true
+            SessionTimeoutMs = 30000,
+            HeartbeatIntervalMs = 10000,
+            MaxPollIntervalMs = 300000
         };
 
-        using var consumer = new ConsumerBuilder<string, string>(consumerConfig)
-            .SetErrorHandler((_, e) => 
-            {
-                _logger.LogError("❌ MainEcommerce ProductUpdate Consumer error: {Error}", e.Reason);
-            })
-            .SetLogHandler((_, log) =>
-            {
-                _logger.LogDebug("📋 MainEcommerce ProductUpdate Consumer log: {Level} - {Message}", log.Level, log.Message);
-            })
+        using var consumer = new ConsumerBuilder<string, string>(config)
+            .SetErrorHandler((_, e) => _logger.LogError("❌ Product update consumer error: {Error}", e.Reason))
             .Build();
-
-        // Retry subscription logic
-        var retryCount = 0;
-        const int maxRetries = 10;
-        
-        while (retryCount < maxRetries && !stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                consumer.Subscribe(topic);
-                _logger.LogInformation("✅ MainEcommerce: Successfully subscribed to {Topic} (attempt {Attempt})", topic, retryCount + 1);
-                break;
-            }
-            catch (Exception ex)
-            {
-                retryCount++;
-                _logger.LogWarning(ex, "⚠️ MainEcommerce: Failed to subscribe to {Topic}. Retry {RetryCount}/{MaxRetries}", topic, retryCount, maxRetries);
-                
-                if (retryCount < maxRetries)
-                {
-                    await Task.Delay(3000, stoppingToken);
-                }
-            }
-        }
-
-        if (retryCount >= maxRetries)
-        {
-            _logger.LogError("❌ MainEcommerce: Failed to subscribe to {Topic} after {MaxRetries} attempts", topic, maxRetries);
-            return;
-        }
-
-        _logger.LogInformation("🚀 MainEcommerce: Starting product update result listener for topic {Topic}...", topic);
 
         try
         {
+            consumer.Subscribe("product-update-result");
+            _logger.LogInformation("✅ Subscribed to product-update-result topic");
+
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    var consumeResult = consumer.Consume(TimeSpan.FromMilliseconds(5000));
+                    // 🔥 SỬA: Timeout ngắn hơn
+                    var result = consumer.Consume(TimeSpan.FromSeconds(1));
                     
-                    if (consumeResult != null && consumeResult.Message != null)
+                    if (result?.Message != null)
                     {
-                        _logger.LogInformation("📨 MainEcommerce: Received product update result - Topic={Topic}, Partition={Partition}, Offset={Offset}, Key={Key}", 
-                            consumeResult.Topic, consumeResult.Partition, consumeResult.Offset, consumeResult.Message.Key);
+                        _logger.LogDebug("📨 Received product update result: {Key}", result.Message.Key);
 
-                        _logger.LogDebug("📋 MainEcommerce: Message content: {Value}", consumeResult.Message.Value);
-
-                        // ✅ FIX: Proper scope management
-                        var scope = _scopeFactory.CreateScope();
-                        try
-                        {
-                            await ProcessProductUpdateResultAsync(scope.ServiceProvider, consumeResult.Message.Value);
-                            consumer.Commit(consumeResult);
-                            _logger.LogInformation("✅ MainEcommerce: Successfully processed and committed product update result - Offset={Offset}", consumeResult.Offset);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "❌ MainEcommerce: Error processing product update result - will not commit. Offset={Offset}", consumeResult.Offset);
-                        }
-                        finally
-                        {
-                            // ✅ Safe disposal
-                            await DisposeServiceScopeAsync(scope);
-                        }
+                        await using var scope = _scopeFactory.CreateAsyncScope();
+                        await ProcessProductUpdateResult(scope.ServiceProvider, result.Message.Value);
+                        consumer.Commit(result);
+                        
+                        _logger.LogDebug("✅ Processed product update result: {Key}", result.Message.Key);
                     }
-                    else
-                    {
-                        _logger.LogDebug("🔍 MainEcommerce: No new messages in topic {Topic}", topic);
-                    }
-                }
-                catch (ConsumeException ex) when (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
-                {
-                    _logger.LogWarning("⚠️ MainEcommerce: Topic '{Topic}' not found. Waiting...", topic);
-                    await Task.Delay(5000, stoppingToken);
+                    
+                    // 🔥 THÊM: Yield control
+                    await Task.Delay(10, stoppingToken);
                 }
                 catch (ConsumeException ex)
                 {
-                    _logger.LogError(ex, "❌ MainEcommerce: Error consuming product update result from {Topic} - Error Code: {ErrorCode}", topic, ex.Error.Code);
-                    await Task.Delay(2000, stoppingToken);
+                    _logger.LogError(ex, "❌ Error consuming product update result");
+                    await Task.Delay(1000, stoppingToken);
                 }
                 catch (OperationCanceledException)
                 {
-                    _logger.LogInformation("🛑 MainEcommerce: Product update consumer cancellation requested");
+                    _logger.LogInformation("🛑 Product update consumer cancelled");
                     break;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "❌ MainEcommerce: Unexpected error in product update consumer loop");
-                    await Task.Delay(2000, stoppingToken);
+                    _logger.LogError(ex, "❌ Unexpected error in product update consumer");
+                    await Task.Delay(5000, stoppingToken);
                 }
             }
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("🛑 MainEcommerce: Product update consumer service is stopping.");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "❌ MainEcommerce: Fatal error in product update consumer");
         }
         finally
         {
             try
             {
+                consumer.Unsubscribe();
                 consumer.Close();
-                _logger.LogInformation("🔒 MainEcommerce: Product update consumer closed");
+                _logger.LogInformation("🔒 Product update consumer closed");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ MainEcommerce: Error closing product update consumer");
+                _logger.LogError(ex, "❌ Error closing product update consumer");
             }
         }
     }
 
-    // ✅ FIX: Cải thiện ProcessProductUpdateResultAsync
-    private async Task ProcessProductUpdateResultAsync(IServiceProvider serviceProvider, string messageValue)
-    {
-        var maxRetries = 3;
-        var retryCount = 0;
-        
-        while (retryCount < maxRetries)
-        {
-            try
-            {
-                _logger.LogInformation("🔍 MainEcommerce: Processing product update result (attempt {Attempt}): {MessageLength} characters", 
-                    retryCount + 1, messageValue?.Length ?? 0);
-
-                if (string.IsNullOrWhiteSpace(messageValue))
-                {
-                    _logger.LogWarning("⚠️ MainEcommerce: Received empty or null product update result");
-                    return;
-                }
-
-                ProductUpdateMessage updateResult;
-                try
-                {
-                    updateResult = JsonSerializer.Deserialize<ProductUpdateMessage>(messageValue);
-                    if (updateResult == null)
-                    {
-                        _logger.LogWarning("⚠️ MainEcommerce: Deserialized product update result is null");
-                        return;
-                    }
-                }
-                catch (JsonException jsonEx)
-                {
-                    _logger.LogError(jsonEx, "❌ MainEcommerce: Failed to deserialize product update result: {Message}", messageValue);
-                    throw new InvalidOperationException($"Invalid JSON format: {jsonEx.Message}", jsonEx);
-                }
-
-                _logger.LogInformation("📋 MainEcommerce: Parsed update result - RequestId={RequestId}, OrderId={OrderId}, Success={Success}, ErrorMessage={ErrorMessage}", 
-                    updateResult.RequestId, updateResult.OrderId, updateResult.Success, updateResult.ErrorMessage ?? "None");
-
-                var orderService = serviceProvider.GetRequiredService<IOrderService>();
-
-                // ✅ Cập nhật trạng thái order
-                string newStatus = updateResult.Success ? "Confirmed" : "Cancelled";
-                var result = await orderService.UpdateOrderStatusByName(updateResult.OrderId, newStatus);
-
-                // ✅ Update processing status
-                // await orderService.UpdateOrderProcessingStatus(
-                //     updateResult.OrderId, 
-                //     updateResult.Success, 
-                //     updateResult.Success ? "Inventory updated successfully" : updateResult.ErrorMessage);
-
-                // ✅ TEMPORARY: Log thay vì call method
-                _logger.LogInformation("📋 MainEcommerce: Would update processing status for order {OrderId}: Success={Success}, Message={Message}", 
-                    updateResult.OrderId, updateResult.Success, updateResult.Success ? "Inventory updated successfully" : updateResult.ErrorMessage);
-
-                if (result.Success)
-                {
-                    _logger.LogInformation("✅ MainEcommerce: Updated order {OrderId} status to {Status}", 
-                        updateResult.OrderId, newStatus);
-
-                    // ✅ Gửi thông báo SignalR
-                    var hubContext = serviceProvider.GetRequiredService<IHubContext<NotificationHub>>();
-                    
-                    if (updateResult.Success)
-                    {
-                        // ✅ Send to specific user and all users
-                        await hubContext.Clients.All.SendAsync("OrderConfirmed", updateResult.OrderId);
-                        await hubContext.Clients.Group($"User_{updateResult.OrderId}")
-                            .SendAsync("OrderConfirmed", updateResult.OrderId);
-                        
-                        _logger.LogInformation("📡 MainEcommerce: Sent OrderConfirmed SignalR notification for order {OrderId}", updateResult.OrderId);
-                    }
-                    else
-                    {
-                        await hubContext.Clients.All.SendAsync("OrderCancelled", updateResult.OrderId, updateResult.ErrorMessage);
-                        await hubContext.Clients.Group($"User_{updateResult.OrderId}")
-                            .SendAsync("OrderCancelled", updateResult.OrderId, updateResult.ErrorMessage);
-                        
-                        _logger.LogInformation("📡 MainEcommerce: Sent OrderCancelled SignalR notification for order {OrderId}", updateResult.OrderId);
-                    }
-                    
-                    return; // Success - exit retry loop
-                }
-                else
-                {
-                    if (retryCount < maxRetries - 1)
-                    {
-                        retryCount++;
-                        _logger.LogWarning("⚠️ MainEcommerce: Failed to update order status, retrying {RetryCount}/{MaxRetries}: {Message}", 
-                            retryCount, maxRetries, result.Message);
-                        await Task.Delay(1000 * retryCount);
-                        continue;
-                    }
-                    
-                    _logger.LogError("❌ MainEcommerce: Failed to update order {OrderId} status after {MaxRetries} attempts: {Message}", 
-                        updateResult.OrderId, maxRetries, result.Message);
-                    throw new InvalidOperationException($"Failed to update order status: {result.Message}");
-                }
-            }
-            catch (Exception ex) when (retryCount < maxRetries - 1)
-            {
-                retryCount++;
-                _logger.LogWarning(ex, "⚠️ MainEcommerce: Error processing product update result (attempt {Attempt}/{MaxRetries}): {Message}", 
-                    retryCount, maxRetries, ex.Message);
-                await Task.Delay(1000 * retryCount);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "❌ MainEcommerce: Error processing product update result after {MaxRetries} attempts: {Message}", 
-                    maxRetries, messageValue);
-                throw;
-            }
-        }
-    }
-
-    // ✅ ADD: Safe disposal helper
-    private async Task DisposeServiceScopeAsync(IServiceScope scope)
+    private async Task ProcessProductUpdateResult(IServiceProvider serviceProvider, string messageValue)
     {
         try
         {
-            if (scope is IAsyncDisposable asyncDisposable)
-            {
-                await asyncDisposable.DisposeAsync();
-            }
-            else
-            {
-                scope.Dispose();
-            }
+            if (string.IsNullOrWhiteSpace(messageValue)) return;
+
+            var updateResult = JsonSerializer.Deserialize<ProductUpdateMessage>(messageValue);
+            if (updateResult == null) return;
+
+            var orderService = serviceProvider.GetRequiredService<IOrderService>();
+            var hubContext = serviceProvider.GetRequiredService<IHubContext<NotificationHub>>();
+
+            string newStatus = updateResult.Success ? "Confirmed" : "Cancelled";
+            await Task.Delay(5000); // Simulate some processing delay
+            await orderService.UpdateOrderStatusByName(updateResult.OrderId, newStatus);
+            await hubContext.Clients.All.SendAsync("YourOrderStatusChanged", updateResult.OrderId,newStatus,$"Your order status has been updated to {newStatus}");
+
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ MainEcommerce: Error disposing service scope");
+            _logger.LogError(ex, "❌ Error processing product update result: {Message}", messageValue);
+            throw;
+        }
+    }
+
+    private async Task ConsumeOrderCancelledAsync(CancellationToken stoppingToken)
+    {
+        var config = new ConsumerConfig
+        {
+            BootstrapServers = _bootstrapServers,
+            GroupId = "main-ecommerce-order-cancelled-consumer",
+            AutoOffsetReset = AutoOffsetReset.Earliest,
+            EnableAutoCommit = false,
+            SessionTimeoutMs = 30000,
+            HeartbeatIntervalMs = 10000,
+            MaxPollIntervalMs = 300000
+        };
+
+        using var consumer = new ConsumerBuilder<string, string>(config)
+            .SetErrorHandler((_, e) => _logger.LogError("❌ Order cancelled consumer error: {Error}", e.Reason))
+            .Build();
+
+        try
+        {
+            consumer.Subscribe("order-cancelled-result");
+            _logger.LogInformation("✅ Subscribed to order-cancelled-result topic");
+
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    var result = consumer.Consume(TimeSpan.FromSeconds(1));
+                    
+                    if (result?.Message != null)
+                    {
+                        _logger.LogDebug("📨 Received order cancelled result: {Key}", result.Message.Key);
+
+                        await using var scope = _scopeFactory.CreateAsyncScope();
+                        await ProcessOrderCancelledResult(scope.ServiceProvider, result.Message.Value);
+                        consumer.Commit(result);
+                        
+                        _logger.LogDebug("✅ Processed order cancelled result: {Key}", result.Message.Key);
+                    }
+                    
+                    await Task.Delay(10, stoppingToken);
+                }
+                catch (ConsumeException ex)
+                {
+                    _logger.LogError(ex, "❌ Error consuming order cancelled result");
+                    await Task.Delay(1000, stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogInformation("🛑 Order cancelled consumer cancelled");
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "❌ Unexpected error in order cancelled consumer");
+                    await Task.Delay(5000, stoppingToken);
+                }
+            }
+        }
+        finally
+        {
+            try
+            {
+                consumer.Unsubscribe();
+                consumer.Close();
+                _logger.LogInformation("🔒 Order cancelled consumer closed");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error closing order cancelled consumer");
+            }
+        }
+    }
+
+    private async Task ProcessOrderCancelledResult(IServiceProvider serviceProvider, string messageValue)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(messageValue)) return;
+
+            var updateResult = JsonSerializer.Deserialize<ProductUpdateMessage>(messageValue);
+            if (updateResult == null) return;
+
+            var orderService = serviceProvider.GetRequiredService<IOrderService>();
+            var hubContext = serviceProvider.GetRequiredService<IHubContext<NotificationHub>>();
+
+            string newStatus = updateResult.Success ? "Cancelled" : "Confirmed";
+            await Task.Delay(5000); // Simulate some processing delay
+            await orderService.UpdateOrderStatusByName(updateResult.OrderId, newStatus);
+            await hubContext.Clients.All.SendAsync("YourOrderStatusChanged", updateResult.OrderId,newStatus,$"Your order status has been updated to {newStatus}");
+
+            _logger.LogInformation("✅ Updated order {OrderId} status to {Status} after cancellation result", updateResult.OrderId, newStatus);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Error processing order cancelled result: {Message}", messageValue);
+            throw;
         }
     }
 
     private async Task EnsureTopicsExistAsync()
     {
-        var config = new AdminClientConfig { BootstrapServers = _bootstrapServers };
-        
-        using var adminClient = new AdminClientBuilder(config).Build();
-        
-        var requiredTopics = new[] { 
-            "seller-request", 
-            "seller-response",
-            "order-created",
-            "product-update-result"
-        };
-
         try
         {
+            var config = new AdminClientConfig { BootstrapServers = _bootstrapServers };
+            using var adminClient = new AdminClientBuilder(config).Build();
+            
+            var topics = new[] { "seller-request", "seller-response", "order-created-result", "product-update-result", "order-cancelled-result" };
             var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(10));
-            var existingTopics = metadata.Topics.Select(t => t.Topic).ToHashSet();
+            var existing = metadata.Topics.Select(t => t.Topic).ToHashSet();
+            var toCreate = topics.Where(t => !existing.Contains(t));
 
-            var topicsToCreate = requiredTopics.Where(topic => !existingTopics.Contains(topic)).ToList();
-
-            if (topicsToCreate.Any())
+            if (toCreate.Any())
             {
-                var topicSpecs = topicsToCreate.Select(topic => new TopicSpecification
-                {
-                    Name = topic,
-                    NumPartitions = 1,
-                    ReplicationFactor = 1
-                }).ToList();
-
-                await adminClient.CreateTopicsAsync(topicSpecs);
-                _logger.LogInformation("✅ MainEcommerce: Created topics: {Topics}", string.Join(", ", topicsToCreate));
+                var specs = toCreate.Select(t => new TopicSpecification { Name = t, NumPartitions = 1, ReplicationFactor = 1 });
+                await adminClient.CreateTopicsAsync(specs);
+                _logger.LogInformation("✅ Created Kafka topics: {Topics}", string.Join(", ", toCreate));
             }
             else
             {
-                _logger.LogInformation("✅ MainEcommerce: All required topics already exist: {Topics}", string.Join(", ", requiredTopics));
-            }
-        }
-        catch (CreateTopicsException ex)
-        {
-            foreach (var result in ex.Results)
-            {
-                if (result.Error.Code != ErrorCode.TopicAlreadyExists)
-                {
-                    _logger.LogError("❌ MainEcommerce: Failed to create topic {Topic}: {Error}", result.Topic, result.Error.Reason);
-                }
+                _logger.LogInformation("✅ All required Kafka topics already exist");
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ MainEcommerce: Error ensuring topics exist");
+            _logger.LogError(ex, "❌ Error ensuring Kafka topics exist");
+            throw;
         }
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("🛑 MainEcommerce KafkaConsumer stopping...");
+        await base.StopAsync(cancellationToken);
+        _logger.LogInformation("✅ MainEcommerce KafkaConsumer stopped");
     }
 }

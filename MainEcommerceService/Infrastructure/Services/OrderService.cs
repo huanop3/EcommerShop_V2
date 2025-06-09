@@ -20,6 +20,8 @@ public interface IOrderService
     Task<HTTPResponseClient<IEnumerable<OrderVM>>> GetOrdersByDateRange(DateTime startDate, DateTime endDate);
     Task<HTTPResponseClient<string>> CreateOrderWithItems(OrderVM orderVM, List<OrderItemVM> orderItems);
     Task<HTTPResponseClient<string>> UpdateOrderStatusByName(int orderId, string statusName);
+    Task<HTTPResponseClient<string>> GetOrderStatusNameByOrderId(int orderId);
+    Task<HTTPResponseClient<bool>> CancelOrder(int orderId);
 }
 
 public class OrderService : IOrderService
@@ -251,7 +253,7 @@ public class OrderService : IOrderService
             // Tạo đơn hàng với trạng thái Pending
             var pendingStatus = await _unitOfWork._orderStatusRepository.Query()
                 .FirstOrDefaultAsync(os => os.StatusName == "Pending" && os.IsDeleted == false);
-            
+
             if (pendingStatus == null)
             {
                 response.Success = false;
@@ -412,7 +414,7 @@ public class OrderService : IOrderService
             order.IsDeleted = true;
             order.UpdatedAt = DateTime.Now;
             _unitOfWork._orderRepository.Update(order);
-            
+
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitTransaction();
 
@@ -471,7 +473,7 @@ public class OrderService : IOrderService
             order.OrderStatusId = statusId;
             order.UpdatedAt = DateTime.Now;
             _unitOfWork._orderRepository.Update(order);
-            
+
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitTransaction();
 
@@ -633,7 +635,7 @@ public class OrderService : IOrderService
             // Tạo đơn hàng với trạng thái Pending
             var pendingStatus = await _unitOfWork._orderStatusRepository.Query()
                 .FirstOrDefaultAsync(os => os.StatusName == "Pending" && os.IsDeleted == false);
-            
+
             if (pendingStatus == null)
             {
                 response.Success = false;
@@ -703,7 +705,7 @@ public class OrderService : IOrderService
                     "order-created",
                     order.OrderId.ToString(),
                     orderCreatedMessage);
-                
+
                 _logger.LogInformation("✅ MainService: Successfully sent order created message to Kafka for order {OrderId}", order.OrderId);
             }
             catch (Exception kafkaEx)
@@ -719,7 +721,7 @@ public class OrderService : IOrderService
             response.Success = true;
             response.StatusCode = 201;
             response.Message = "Tạo đơn hàng với chi tiết thành công, đang xử lý sản phẩm";
-            response.Data = $"ORDER_WITH_ITEMS_CREATED_SUCCESS_{order.OrderId}";
+            response.Data = order.OrderId.ToString();
             response.DateTime = DateTime.Now;
         }
         catch (Exception ex)
@@ -790,7 +792,7 @@ public class OrderService : IOrderService
             response.Data = $"ORDER_STATUS_UPDATED_SUCCESS_{orderId}_{statusName}";
             response.DateTime = DateTime.Now;
 
-            _logger.LogInformation("✅ Updated order {OrderId} status from {OldStatus} to {NewStatus}", 
+            _logger.LogInformation("✅ Updated order {OrderId} status from {OldStatus} to {NewStatus}",
                 orderId, oldStatusId, newStatus.StatusId);
         }
         catch (Exception ex)
@@ -805,7 +807,154 @@ public class OrderService : IOrderService
         }
         return response;
     }
+    public async Task<HTTPResponseClient<string>> GetOrderStatusNameByOrderId(int orderId)
+    {
+        var response = new HTTPResponseClient<string>();
+        try
+        {
+            string cacheKey = $"OrderStatus_{orderId}";
+            var cachedStatus = await _cacheService.GetAsync<string>(cacheKey);
+            if (cachedStatus != null)
+            {
+                response.Data = cachedStatus;
+                response.Success = true;
+                response.StatusCode = 200;
+                response.Message = "Lấy trạng thái đơn hàng từ cache thành công";
+                response.DateTime = DateTime.Now;
+                return response;
+            }
+            var order = await _unitOfWork._orderRepository.GetByIdAsync(orderId);
+            if (order == null || order.IsDeleted == true)
+            {
+                response.Success = false;
+                response.StatusCode = 404;
+                response.Message = "Không tìm thấy đơn hàng";
+                response.Data = "ORDER_NOT_FOUND";
+                response.DateTime = DateTime.Now;
+                return response;
+            }
 
+            var statusName = await _unitOfWork._orderStatusRepository.Query()
+                .Where(os => os.StatusId == order.OrderStatusId && os.IsDeleted == false)
+                .Select(os => os.StatusName)
+                .FirstOrDefaultAsync();
+
+            if (string.IsNullOrEmpty(statusName))
+            {
+                response.Success = false;
+                response.StatusCode = 404;
+                response.Message = "Không tìm thấy trạng thái đơn hàng";
+                response.Data = "ORDER_STATUS_NOT_FOUND";
+                response.DateTime = DateTime.Now;
+                return response;
+            }
+
+            response.Success = true;
+            response.StatusCode = 200;
+            response.Message = "Lấy trạng thái đơn hàng thành công";
+            response.Data = statusName;
+            response.DateTime = DateTime.Now;
+        }
+        catch (Exception ex)
+        {
+            response.Success = false;
+            response.StatusCode = 500;
+            response.Message = $"Lỗi khi lấy trạng thái đơn hàng: {ex.Message}";
+            response.Data = "ORDER_STATUS_RETRIEVAL_FAILED";
+            response.DateTime = DateTime.Now;
+            _logger.LogError(ex, "❌ Error getting order status for order {OrderId}", orderId);
+        }
+        return response;
+    }
+    public async Task<HTTPResponseClient<bool>> CancelOrder(int orderId)
+    {
+        var response = new HTTPResponseClient<bool>();
+        try
+        {
+            await _unitOfWork.BeginTransaction();
+            var order = await _unitOfWork._orderRepository.GetByIdAsync(orderId);
+            if (order == null || order.IsDeleted == true)
+            {
+                response.Success = false;
+                response.StatusCode = 404;
+                response.Message = "Không tìm thấy đơn hàng";
+                response.Data = false;
+                response.DateTime = DateTime.Now;
+                return response;
+            }
+
+            // Get order items before sending Kafka message
+            var orderItemsFromDb = await _unitOfWork._orderItemRepository.Query()
+                .Where(oi => oi.OrderId == orderId && oi.IsDeleted == false)
+                .ToListAsync();
+            //Kiểm tra trạng thát đơn hàng nếu đang ở trạng thái Shipped trở lên (statusId >= 4) thì không thể hủy
+            if (order.OrderStatusId >= 4)
+            {
+                response.Success = false;
+                response.StatusCode = 400;
+                response.Message = "Không thể hủy đơn hàng đã được giao hoặc đang trong quá trình giao hàng";
+                response.Data = false;
+                response.DateTime = DateTime.Now;
+                return response;
+            }
+            try
+            {
+                // Gửi message tới Kafka để xử lý hủy đơn hàng
+                var orderCancelledMessage = new OrderCreatedMessage
+                {
+                    RequestId = Guid.NewGuid().ToString(),
+                    OrderId = order.OrderId,
+                    UserId = order.UserId,
+                    OrderItems = orderItemsFromDb.Select(oi => new OrderItemData
+                    {
+                        ProductId = oi.ProductId,
+                        Quantity = oi.Quantity,
+                        UnitPrice = oi.UnitPrice
+                    }).ToList(),
+                    CreatedAt = order.CreatedAt.Value
+                };
+                await _kafkaProducer.SendMessageAsync(
+                    "order-cancelled",
+                    order.OrderId.ToString(),
+                    orderCancelledMessage);
+                _logger.LogInformation("📤 Sent order cancelled message to Kafka for order {OrderId}", order.OrderId);
+            }
+            catch (Exception kafkaEx)
+            {
+                _logger.LogError(kafkaEx, "❌ Failed to send order cancelled message to Kafka for order {OrderId}", order.OrderId);
+            }
+            //Nếu message gửi thành công, cập nhật trạng thái đơn hàng
+            order.OrderStatusId = (await _unitOfWork._orderStatusRepository.Query()
+                .FirstOrDefaultAsync(os => os.StatusName == "Cancelled" && os.IsDeleted == false)).StatusId;
+            // Đánh dấu đơn hàng là đã bị xóa
+            if (order.OrderStatusId == 8)
+            {
+                order.UpdatedAt = DateTime.Now;
+                _unitOfWork._orderRepository.Update(order);
+                await _unitOfWork.SaveChangesAsync();
+                await _hubContext.Clients.All.SendAsync("OrderStatusChanged", orderId, order.UserId, order.OrderStatusId, "Cancelled");
+                response.Success = true;
+                response.StatusCode = 200;
+                response.Message = "Hủy đơn hàng thành công";
+                response.Data = true;
+                response.DateTime = DateTime.Now;
+                _logger.LogInformation("✅ Order {OrderId} cancelled successfully", orderId);
+            }
+            await _unitOfWork.CommitTransaction();
+            await InvalidateAllOrderCaches(orderId, order.UserId, order.OrderStatusId);
+        }
+        catch (Exception ex)
+        {
+            await _unitOfWork.RollbackTransaction();
+            response.Success = false;
+            response.StatusCode = 500;
+            response.Message = $"Lỗi khi hủy đơn hàng: {ex.Message}";
+            response.Data = false;
+            response.DateTime = DateTime.Now;
+            _logger.LogError(ex, "❌ Error cancelling order {OrderId}", orderId);
+        }
+        return response;
+    }
     private async Task InvalidateAllOrderCaches(int orderId, int userId, int statusId)
     {
         var cacheKeys = new[]
@@ -814,10 +963,12 @@ public class OrderService : IOrderService
             $"Order_{orderId}",
             $"OrdersByUser_{userId}",
             $"OrdersByStatus_{statusId}",
-            $"OrderItemsByOrder_{orderId}"
+            $"OrderItemsByOrder_{orderId}",
+            $"OrderStatus_{orderId}",
+            $"AllProducts"
         };
 
-        var tasks = cacheKeys.Select(key => _cacheService.DeleteAsync(key));
+        var tasks = cacheKeys.Select(key => _cacheService.DeleteByPatternAsync(key));
         await Task.WhenAll(tasks);
     }
 }

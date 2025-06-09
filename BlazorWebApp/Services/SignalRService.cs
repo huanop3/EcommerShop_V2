@@ -575,6 +575,35 @@ namespace BlazorWebApp.Services
                 }
             }
         }
+        //Order notification methods (MainEcommerceService)
+        public async Task NotifyOrderCreatedAsync(int orderId, int userId, decimal totalAmount)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyOrderCreated", orderId, userId, totalAmount);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error notifying order created: {ex.Message}");
+                }
+            }
+        }
+        public async Task NotifyOrderUpdatedAsync(int orderId, int userId, decimal totalAmount)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyOrderUpdated", orderId, userId, totalAmount);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error notifying order updated: {ex.Message}");
+                }
+            }
+        }
 
         // User notification methods (MainEcommerceService)
         public async Task NotifyUserCreatedAsync(string username)

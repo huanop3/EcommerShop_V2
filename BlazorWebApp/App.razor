@@ -7,7 +7,17 @@
         <Found Context="routeData">
             <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
                 <Authorizing>
-                    @* Để trống để không hiển thị gì *@
+                    <div class="auth-container">
+                        <div class="auth-box">
+                            <div class="auth-header">
+                                <div class="unauthorized-icon">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                </div>
+                                <h2>Đang xác thực...</h2>
+                                <p>Vui lòng chờ trong giây lát</p>
+                            </div>
+                        </div>
+                    </div>
                 </Authorizing>
                 <NotAuthorized>
                     @if (context.User.Identity?.IsAuthenticated != true)

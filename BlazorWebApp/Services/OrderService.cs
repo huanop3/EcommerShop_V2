@@ -164,17 +164,17 @@ namespace BlazorWebApp.Services
         /// <summary>
         /// Tạo đơn hàng với chi tiết
         /// </summary>
-        public async Task<bool> CreateOrderWithItemsAsync(CreateOrderRequest request)
+        public async Task<(bool Success, string OrderId)> CreateOrderWithItemsAsync(CreateOrderRequest request)
         {
-            if (request == null) return false;
+            if (request == null) return (false, null);
 
             await SetAuthorizationHeader();
             var response = await _httpClient.PostAsJsonAsync("https://localhost:7260/api/Order/CreateOrderWithItems", request);
 
-            if (!response.IsSuccessStatusCode) return false;
+            if (!response.IsSuccessStatusCode) return (false, null);
 
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<string>>();
-            return result?.Success ?? false;
+            return result?.Success == true ? (true, result.Data) : (false, null);
         }
 
         /// <summary>
@@ -237,6 +237,111 @@ namespace BlazorWebApp.Services
 
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<string>>();
             return result?.Success ?? false;
+        }
+        /// <summary>
+        /// Lấy tên trạng thái đơn hàng theo OrderId - Cải tiến với error handling
+        /// </summary>
+        public async Task<string> GetOrderStatusNameAsync(int orderId)
+        {
+            try
+            {
+                await SetAuthorizationHeader();
+                var response = await _httpClient.GetAsync($"https://localhost:7260/api/Order/GetOrderStatusNameByOrderId/{orderId}");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"❌ Error getting order status: {response.StatusCode}");
+                    return null;
+                }
+
+                var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<string>>();
+                if (result?.Success == true && !string.IsNullOrEmpty(result.Data))
+                {
+                    Console.WriteLine($"✅ Order {orderId} status: {result.Data}");
+                    return result.Data;
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Exception getting order status: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Hủy đơn hàng - Cải tiến với kiểm tra trạng thái
+        /// </summary>
+        public async Task<(bool Success, string Message)> CancelOrderAsync(int orderId, string reason = null)
+        {
+            try
+            {
+                
+                // Kiểm tra trạng thái hiện tại trước khi hủy
+                var currentStatus = await GetOrderStatusNameAsync(orderId);
+                if (string.IsNullOrEmpty(currentStatus))
+                {
+                    return (false, "Không thể lấy trạng thái đơn hàng");
+                }
+
+                // Chỉ cho phép hủy khi đơn hàng ở trạng thái Pending hoặc Confirmed
+                var allowedStatuses = new[] { "Pending", "Confirmed" };
+                if (!allowedStatuses.Contains(currentStatus, StringComparer.OrdinalIgnoreCase))
+                {
+                    return (false, $"Không thể hủy đơn hàng ở trạng thái '{currentStatus}'. Chỉ có thể hủy khi đơn hàng đang ở trạng thái 'Pending' hoặc 'Confirmed'.");
+                }
+
+                // Gọi API hủy đơn hàng
+                var cancelRequest = new { 
+                    Reason = reason ?? "Cancelled by customer",
+                    CancelledAt = DateTime.Now
+                };
+                
+                var response = await _httpClient.PutAsJsonAsync($"https://localhost:7260/api/Order/CancelOrder/{orderId}", orderId);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"❌ Cancel order failed: {response.StatusCode} - {errorContent}");
+                    return (false, "Không thể hủy đơn hàng. Vui lòng thử lại sau.");
+                }
+
+                var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<bool>>();
+                if (result?.Success == true)
+                {
+                    Console.WriteLine($"✅ Order {orderId} cancelled successfully");
+                    return (true, "Đơn hàng đã được hủy thành công");
+                }
+
+                return (false, result?.Message ?? "Không thể hủy đơn hàng");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Exception cancelling order: {ex.Message}");
+                return (false, "Có lỗi xảy ra khi hủy đơn hàng");
+            }
+        }
+
+        /// <summary>
+        /// Kiểm tra xem đơn hàng có thể hủy hay không
+        /// </summary>
+        public async Task<bool> CanCancelOrderAsync(int orderId)
+        {
+            try
+            {
+                var currentStatus = await GetOrderStatusNameAsync(orderId);
+                if (string.IsNullOrEmpty(currentStatus))
+                    return false;
+
+                var allowedStatuses = new[] { "Pending", "Confirmed" };
+                return allowedStatuses.Contains(currentStatus, StringComparer.OrdinalIgnoreCase);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Exception checking cancel permission: {ex.Message}");
+                return false;
+            }
         }
 
         #endregion

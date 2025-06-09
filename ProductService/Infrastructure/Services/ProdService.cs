@@ -20,6 +20,7 @@ public interface IProdService
     // Thêm method mới
     Task<HTTPResponseClient<IEnumerable<ProductVM>>> GetAllProductByPageAsync(int pageIndex, int pageSize);
     Task<HTTPResponseClient<ProductUpdateMessage>> ProcessOrderItems(OrderCreatedMessage orderMessage);
+    Task<HTTPResponseClient<string>> RestoreProductStockAsync(OrderCreatedMessage orderMessage);
 
 }
 
@@ -181,18 +182,18 @@ public class ProdService : IProdService
 
             // Lấy danh sách categoryIds bao gồm category hiện tại và các category con
             var categoryIds = new List<int> { categoryId };
-            
+
             // Kiểm tra xem category này có phải là category cha không (ParentCategoryId = NULL)
             // Nếu có thì lấy thêm tất cả category con
             var childCategories = await _unitOfWork._categoryRepository.Query()
                 .Where(c => c.ParentCategoryId == categoryId && c.IsDeleted == false)
                 .Select(c => c.CategoryId)
                 .ToListAsync();
-            
+
             if (childCategories.Any())
             {
                 categoryIds.AddRange(childCategories);
-                _logger.LogInformation("Found {ChildCount} child categories for parent category {CategoryId}", 
+                _logger.LogInformation("Found {ChildCount} child categories for parent category {CategoryId}",
                     childCategories.Count, categoryId);
             }
 
@@ -234,7 +235,7 @@ public class ProdService : IProdService
             response.Message = $"Lấy danh sách sản phẩm theo danh mục thành công (bao gồm {categoryIds.Count} danh mục)";
             response.DateTime = DateTime.Now;
 
-            _logger.LogInformation("Retrieved {ProductCount} products from {CategoryCount} categories (Parent: {ParentId})", 
+            _logger.LogInformation("Retrieved {ProductCount} products from {CategoryCount} categories (Parent: {ParentId})",
                 productVMs.Count, categoryIds.Count, categoryId);
         }
         catch (Exception ex)
@@ -320,12 +321,12 @@ public class ProdService : IProdService
         try
         {
             await _unitOfWork.BeginTransaction();
-            
+
             // 🔥 FIX: Gọi hàm lấy sellerId từ Kafka với proper error handling
             _logger.LogInformation("🔍 Getting seller info for userId: {UserId}", userId);
-            
+
             var sellerResponse = await _kafkaProducerService.GetSellerByUserIdAsync(userId, 15); // Tăng timeout lên 15s
-            
+
             if (!sellerResponse.Success)
             {
                 _logger.LogWarning("⚠️ Failed to get seller info: {ErrorMessage}", sellerResponse.ErrorMessage);
@@ -347,7 +348,7 @@ public class ProdService : IProdService
 
             // 🔥 FIX: Sử dụng Data.SellerId thay vì res.SellerId
             var sellerId = sellerResponse.Data.SellerId;
-            _logger.LogInformation("✅ Found seller: SellerId={SellerId}, StoreName={StoreName}", 
+            _logger.LogInformation("✅ Found seller: SellerId={SellerId}, StoreName={StoreName}",
                 sellerId, sellerResponse.Data.StoreName);
 
             var newProduct = new Product
@@ -369,16 +370,16 @@ public class ProdService : IProdService
             await _unitOfWork.CommitTransaction();
 
             // Xóa cache
-            await _cacheService.DeleteAsync("AllProducts");
-            await _cacheService.DeleteAsync($"ProductsByCategory_{product.CategoryId}");
-            await _cacheService.DeleteAsync($"ProductsBySeller_{sellerId}");
+            await _cacheService.DeleteByPatternAsync("AllProducts");
+            await _cacheService.DeleteByPatternAsync($"ProductsByCategory_{product.CategoryId}");
+            await _cacheService.DeleteByPatternAsync($"ProductsBySeller_{sellerId}");
             // Xóa cache phân trang
-            await _cacheService.DeleteAsync("PagedProducts_*");
+            await _cacheService.DeleteByPatternAsync("PagedProducts_*");
 
             // Gửi thông báo realtime qua SignalR
             await _hubContext.Clients.All.SendAsync("ProductCreated", newProduct.ProductId, newProduct.ProductName);
 
-            _logger.LogInformation("✅ Product created successfully: ProductId={ProductId}, SellerId={SellerId}", 
+            _logger.LogInformation("✅ Product created successfully: ProductId={ProductId}, SellerId={SellerId}",
                 newProduct.ProductId, sellerId);
 
             response.Success = true;
@@ -437,11 +438,11 @@ public class ProdService : IProdService
             await _unitOfWork.CommitTransaction();
 
             // Xóa cache
-            await _cacheService.DeleteAsync("AllProducts");
-            await _cacheService.DeleteAsync($"ProductsByCategory_{product.CategoryId}");
-            await _cacheService.DeleteAsync($"ProductsBySeller_{product.SellerId}");
+            await _cacheService.DeleteByPatternAsync("AllProducts");
+            await _cacheService.DeleteByPatternAsync($"ProductsByCategory_*");
+            await _cacheService.DeleteByPatternAsync($"ProductsBySeller_*");
             // Xóa cache phân trang
-            await _cacheService.DeleteAsync("PagedProducts_*");
+            await _cacheService.DeleteByPatternAsync("PagedProducts_*");
 
             // Gửi thông báo realtime qua SignalR
             await _hubContext.Clients.All.SendAsync("ProductUpdated", id, existingProduct.ProductName);
@@ -489,11 +490,11 @@ public class ProdService : IProdService
             await _unitOfWork.CommitTransaction();
 
             // Xóa cache
-            await _cacheService.DeleteAsync("AllProducts");
-            await _cacheService.DeleteAsync($"ProductsByCategory_{product.CategoryId}");
-            await _cacheService.DeleteAsync($"ProductsBySeller_{product.SellerId}");
+            await _cacheService.DeleteByPatternAsync("AllProducts");
+            await _cacheService.DeleteByPatternAsync($"ProductsByCategory_*");
+            await _cacheService.DeleteByPatternAsync($"ProductsBySeller_*");
             // Xóa cache phân trang
-            await _cacheService.DeleteAsync("PagedProducts_*");
+            await _cacheService.DeleteByPatternAsync("PagedProducts_*");
 
             // Gửi thông báo realtime qua SignalR
             await _hubContext.Clients.All.SendAsync("ProductDeleted", id);
@@ -542,13 +543,13 @@ public class ProdService : IProdService
                 // Xóa cache sản phẩm
                 foreach (var product in products)
                 {
-                    await _cacheService.DeleteAsync($"Product_{product.ProductId}");
+                    await _cacheService.DeleteByPatternAsync($"Product_*");
                 }
 
-                await _cacheService.DeleteAsync($"ProductsBySeller_{sellerId}");
-                await _cacheService.DeleteAsync("AllProducts");
+                await _cacheService.DeleteByPatternAsync($"ProductsBySeller_{sellerId}");
+                await _cacheService.DeleteByPatternAsync("AllProducts");
                 // Xóa cache phân trang
-                await _cacheService.DeleteAsync("PagedProducts_*");
+                await _cacheService.DeleteByPatternAsync("PagedProducts_*");
 
                 _logger.LogInformation("Successfully deleted {Count} products for seller {SellerId}", products.Count, sellerId);
             }
@@ -586,11 +587,11 @@ public class ProdService : IProdService
             await _unitOfWork.CommitTransaction();
 
             // Xóa cache
-            await _cacheService.DeleteAsync("AllProducts");
-            await _cacheService.DeleteAsync($"ProductsByCategory_{product.CategoryId}");
-            await _cacheService.DeleteAsync($"ProductsBySeller_{product.SellerId}");
+            await _cacheService.DeleteByPatternAsync("AllProducts");
+            await _cacheService.DeleteByPatternAsync($"ProductsByCategory_*");
+            await _cacheService.DeleteByPatternAsync($"ProductsBySeller_*");
             // Xóa cache phân trang
-            await _cacheService.DeleteAsync("PagedProducts_*");
+            await _cacheService.DeleteByPatternAsync("PagedProducts_*");
 
             // Gửi thông báo realtime qua SignalR
             await _hubContext.Clients.All.SendAsync("ProductQuantityUpdated", id, quantity);
@@ -757,11 +758,11 @@ public class ProdService : IProdService
         try
         {
             await _unitOfWork.BeginTransaction();
-            
+
             foreach (var item in orderMessage.OrderItems)
             {
                 var product = await _unitOfWork._prodRepository.GetByIdAsync(item.ProductId);
-                
+
                 if (product == null)
                 {
                     updateResult.Success = false;
@@ -794,6 +795,12 @@ public class ProdService : IProdService
             {
                 await _unitOfWork.SaveChangesAsync();
                 await _unitOfWork.CommitTransaction();
+                // Xóa cache
+                await _cacheService.DeleteByPatternAsync("AllProducts");
+                await _cacheService.DeleteByPatternAsync($"ProductsByCategory_*");
+                await _cacheService.DeleteByPatternAsync($"ProductsBySeller_*");
+                // Xóa cache phân trang
+                await _cacheService.DeleteByPatternAsync("PagedProducts_*");
             }
             else
             {
@@ -813,7 +820,7 @@ public class ProdService : IProdService
             await _unitOfWork.RollbackTransaction();
             updateResult.Success = false;
             updateResult.ErrorMessage = ex.Message;
-            
+
             return new HTTPResponseClient<ProductUpdateMessage>
             {
                 Data = updateResult,
@@ -821,5 +828,56 @@ public class ProdService : IProdService
                 StatusCode = 500
             };
         }
+    }
+    public async Task<HTTPResponseClient<string>> RestoreProductStockAsync(OrderCreatedMessage orderMessage)
+    {
+        var response = new HTTPResponseClient<string>();
+        try
+        {
+            await _unitOfWork.BeginTransaction();
+
+            foreach (var item in orderMessage.OrderItems)
+            {
+                var product = await _unitOfWork._prodRepository.GetByIdAsync(item.ProductId);
+                if (product == null)
+                {
+                    response.Success = false;
+                    response.StatusCode = 404;
+                    response.Message = $"Không tìm thấy sản phẩm với ID {item.ProductId}";
+                    return response;
+                }
+
+                // Thêm lại số lượng đã bán
+                product.Quantity += item.Quantity;
+                product.UpdatedAt = DateTime.UtcNow;
+
+                _unitOfWork._prodRepository.Update(product);
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransaction();
+
+            // Xóa cache
+            await _cacheService.DeleteByPatternAsync("AllProducts");
+            await _cacheService.DeleteByPatternAsync($"ProductsByCategory_*");
+            await _cacheService.DeleteByPatternAsync($"ProductsBySeller_*");
+            // Xóa cache phân trang
+            await _cacheService.DeleteByPatternAsync("PagedProducts_*");
+
+            response.Success = true;
+            response.StatusCode = 200;
+            response.Message = "Khôi phục số lượng sản phẩm thành công";
+            response.Data = "Khôi phục thành công";
+            response.DateTime = DateTime.Now;
+        }
+        catch (Exception ex)
+        {
+            await _unitOfWork.RollbackTransaction();
+            response.Success = false;
+            response.StatusCode = 500;
+            response.Message = $"Lỗi khi khôi phục số lượng sản phẩm: {ex.Message}";
+            response.DateTime = DateTime.Now;
+        }
+        return response;
     }
 }

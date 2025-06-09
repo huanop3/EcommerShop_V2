@@ -22,7 +22,6 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Lấy tất cả mã giảm giá - Chỉ Admin
         /// </summary>
-        [Authorize(Roles = "Admin")]
         [HttpGet("GetAllCoupons")]
         public async Task<IActionResult> GetAllCoupons()
         {
@@ -57,7 +56,6 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Lấy mã giảm giá theo mã code - Cho tất cả user đã đăng nhập
         /// </summary>
-        [Authorize]
         [HttpGet("GetCouponByCode/{couponCode}")]
         public async Task<IActionResult> GetCouponByCode(string couponCode)
         {
@@ -175,7 +173,6 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Lấy danh sách mã giảm giá đang hoạt động - Cho tất cả user đã đăng nhập
         /// </summary>
-        [Authorize]
         [HttpGet("GetActiveCoupons")]
         public async Task<IActionResult> GetActiveCoupons()
         {
@@ -193,11 +190,24 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Kiểm tra tính hợp lệ của mã giảm giá - Cho tất cả user đã đăng nhập
         /// </summary>
-        [Authorize]
         [HttpGet("ValidateCoupon/{couponCode}")]
         public async Task<IActionResult> ValidateCoupon(string couponCode)
         {
             var response = await _couponService.ValidateCoupon(couponCode);
+            if (response.Success)
+            {
+                return Ok(response);
+            }
+            else
+            {
+                return BadRequest(response);
+            }
+        }
+
+        [HttpPut("UpdateCouponUsageCount/{couponId}")]
+        public async Task<IActionResult> UpdateCouponUsageCountAsync([FromBody] int couponId)
+        {
+            var response = await _couponService.UpdateCouponUsageCount(couponId);
             if (response.Success)
             {
                 return Ok(response);

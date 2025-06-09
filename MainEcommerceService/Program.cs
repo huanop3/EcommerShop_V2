@@ -93,7 +93,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
 builder.Services.AddScoped<JwtAuthService>();
 // Thêm dịch vụ Authorization để hỗ trợ phân quyền người dùng
 builder.Services.AddAuthorization();
-builder.Services.AddScoped<IKafkaProducerService, KafkaProducerService>();
+builder.Services.AddSingleton<IKafkaProducerService, KafkaProducerService>();
 builder.Services.AddHostedService<KafkaConsumerService>();
 //DI Repository
 builder.Services.AddScoped<IUserRepository, UserRepository>();

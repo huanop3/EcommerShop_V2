@@ -377,7 +377,7 @@ public class OrderStatusService : IOrderStatusService
             $"OrderStatus_{statusId}"
         };
 
-        var tasks = cacheKeys.Select(key => _cacheService.DeleteAsync(key));
+        var tasks = cacheKeys.Select(key => _cacheService.DeleteByPatternAsync(key));
         await Task.WhenAll(tasks);
     }
 }

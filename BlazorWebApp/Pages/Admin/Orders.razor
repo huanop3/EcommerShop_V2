@@ -1,14 +1,59 @@
 @page "/admin/orders"
+@using BlazorWebApp.Pages.Admin.Dialogs
+@using Microsoft.AspNetCore.Authorization
 @using MudBlazor
+@using System.Security.Claims
+@using BlazorWebApp.Services
+@using ProductService.Models.ViewModel
+@using MainEcommerceService.Models.ViewModel
+@using MainEcommerceService.Models.dbMainEcommer
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject OrderService OrderService
+@inject UserService UserService
+@inject SellerProfileService SellerService
+@inject SellerProfileService SellerProfileService
+@inject ProdService ProdService // ✅ THÊM: Inject ProdService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject SignalRService SignalRService
 @layout _AdminLayout
+@attribute [Authorize(Roles = "Admin,Seller")]
+@implements IAsyncDisposable
 
 <PageTitle>Orders Management - Grabit</PageTitle>
 
 <MudGrid>
     <MudItem xs="12">
         <MudPaper Elevation="0" Class="d-flex align-center justify-space-between pa-4" Style="background-color: white; border-radius: 4px;">
-            <MudText Typo="Typo.h4">Orders</MudText>
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print">Export</MudButton>
+            <div>
+                <MudText Typo="Typo.h4">Orders</MudText>
+                <!-- Real-time Stats -->
+                <div class="d-flex align-center mt-2">
+                    <MudChip T="int?" Color="Color.Primary" Size="Size.Small" Class="mr-2">
+                        Total: @orders.Count
+                    </MudChip>
+                    @if (pendingOrdersCount > 0)
+                    {
+                        <MudChip T="int" Color="Color.Warning" Size="Size.Small" Class="mr-2">
+                            Pending: @pendingOrdersCount
+                        </MudChip>
+                    }
+                    @if (recentUpdates > 0)
+                    {
+                        <MudChip T="int" Color="Color.Info" Size="Size.Small" Class="mr-2">
+                            Recent Updates: @recentUpdates
+                        </MudChip>
+                    }
+                    @if (lastUpdateTime.HasValue)
+                    {
+                        <MudText Typo="Typo.caption" Class="text-muted">
+                            Last updated: @lastUpdateTime.Value.ToString("HH:mm:ss")
+                        </MudText>
+                    }
+                </div>
+            </div>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh" 
+                      OnClick="@RefreshOrders">Refresh</MudButton>
         </MudPaper>
     </MudItem>
 </MudGrid>
@@ -18,19 +63,19 @@
         <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
             <MudGrid>
                 <MudItem xs="12" md="6">
-                    <MudTextField @bind-Value="searchString" Placeholder="Search orders..." 
+                    <MudTextField Label="Search" @bind-Value="searchString" Placeholder="Search orders..." 
                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
-                                 Immediate="true" Class="mt-0" />
+                                 Immediate="true" Class="mt-0" @onkeyup="@SearchOrders" />
                 </MudItem>
                 <MudItem xs="12" md="6" Class="d-flex justify-end">
                     <MudDateRangePicker @bind-DateRange="dateRange" Label="Date Range" 
                                        Class="mr-2" Style="max-width: 300px;" />
-                    <MudSelect T="string" Label="Status" @bind-Value="selectedStatus">
-                        <MudSelectItem Value="@("")">All Statuses</MudSelectItem>
-                        <MudSelectItem Value="@("Delivered")">Delivered</MudSelectItem>
-                        <MudSelectItem Value="@("Processing")">Processing</MudSelectItem>
-                        <MudSelectItem Value="@("Shipped")">Shipped</MudSelectItem>
-                        <MudSelectItem Value="@("Cancelled")">Cancelled</MudSelectItem>
+                    <MudSelect T="string" Value="selectedStatus" Label="Status" ValueChanged="@FilterByStatus">
+                        <MudSelectItem T="string" Value="@("")">All Statuses</MudSelectItem>
+                        @foreach (var status in orderStatuses)
+                        {
+                            <MudSelectItem T="string" Value="@status.StatusName">@status.StatusName</MudSelectItem>
+                        }
                     </MudSelect>
                 </MudItem>
             </MudGrid>
@@ -39,37 +84,68 @@
                      Loading="@isLoading" LoadingProgressColor="Color.Primary" FixedHeader="true" Height="calc(100vh - 300px)"
                      Class="mt-3">
                 <HeaderContent>
-                    <MudTh Style="width: 100px">Order ID</MudTh>
+                    <MudTh Style="width: 120px">Order ID</MudTh>
                     <MudTh Style="width: 180px">Customer</MudTh>
                     <MudTh>Products</MudTh>
                     <MudTh Style="width: 120px">Date</MudTh>
-                    <MudTh Style="width: 100px">Amount</MudTh>
-                    <MudTh Style="width: 120px">Status</MudTh>
-                    <MudTh Style="width: 80px; text-align: center">Actions</MudTh>
+                    <MudTh Style="width: 120px">Amount</MudTh>
+
+                    <MudTh Style="width: 140px">Status</MudTh>
+                    <MudTh Style="width: 120px; text-align: center">Actions</MudTh>
                 </HeaderContent>
                 <RowTemplate>
-                    <MudTd DataLabel="Order ID">@context.OrderId</MudTd>
+                    <MudTd DataLabel="Order ID">#ORD-@context.OrderId</MudTd>
                     <MudTd DataLabel="Customer">
                         <div class="d-flex align-center">
-                            <MudAvatar Size="Size.Small" Class="mr-2" Image="@context.CustomerAvatarUrl"></MudAvatar>
-                            <MudText Typo="Typo.body1">@context.CustomerName</MudText>
+                            <MudAvatar Size="Size.Small" Class="mr-2" Color="Color.Primary">
+                                @GetCustomerInitials(context.UserId)
+                            </MudAvatar>
+                            <MudText Typo="Typo.body1">@GetCustomerName(context.UserId)</MudText>
                         </div>
                     </MudTd>
-                    <MudTd DataLabel="Products">@context.Products</MudTd>
-                    <MudTd DataLabel="Date">@context.Date</MudTd>
-                    <MudTd DataLabel="Amount">@context.Amount</MudTd>
+                    <MudTd DataLabel="Products">
+                        <div>
+                            @{
+                                var orderItems = GetOrderItems(context.OrderId);
+                                var itemCount = orderItems.Count();
+                            }
+                            @if (itemCount == 1)
+                            {
+                                <!-- ✅ SỬA: Sử dụng GetProductName method -->
+                                <MudText Typo="Typo.body2">@GetProductName(orderItems.First().ProductId)</MudText>
+                            }
+                            else if (itemCount > 1)
+                            {
+                                <!-- ✅ SỬA: Sử dụng GetProductName method -->
+                                <MudText Typo="Typo.body2">@GetProductName(orderItems.First().ProductId)</MudText>
+                                <MudText Typo="Typo.caption" Class="text-muted">+@(itemCount - 1) more items</MudText>
+                            }
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Date">@context.OrderDate.ToString("MMM dd, yyyy")</MudTd>
+                    <MudTd DataLabel="Amount">$@context.TotalAmount.ToString("F2")</MudTd>
+
                     <MudTd DataLabel="Status">
-                        <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small" 
+                        <MudChip T="string" Color="@GetStatusColor(GetOrderStatusName(context.OrderStatusId))" Size="Size.Small" 
                                 Variant="Variant.Filled">
-                            @context.Status
+                            @GetOrderStatusName(context.OrderStatusId)
                         </MudChip>
                     </MudTd>
                     <MudTd DataLabel="Actions">
-                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
-                            <MudMenuItem Icon="@Icons.Material.Filled.Visibility">View Details</MudMenuItem>
-                            <MudMenuItem Icon="@Icons.Material.Filled.Edit">Update Status</MudMenuItem>
-                            <MudMenuItem Icon="@Icons.Material.Filled.Print">Print Invoice</MudMenuItem>
-                        </MudMenu>
+                        <div class="d-flex align-center justify-center" style="gap: 8px;">
+                            @if (CanUpdateOrderStatus(context) && (userRole == "Seller"))
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Warning" 
+                                              OnClick="@(() => UpdateOrderStatus(context))" />
+                            }
+                            <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary" 
+                                          OnClick="@(() => ViewOrderDetails(context))" />
+                            @if (CanCancelOrder(context) && (userRole == "Seller"))
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" Color="Color.Error" 
+                                              OnClick="@(() => CancelOrder(context))" />
+                            }
+                        </div>
                     </MudTd>
                 </RowTemplate>
                 <PagerContent>
@@ -84,99 +160,624 @@
     private bool isLoading = false;
     private string searchString = "";
     private string selectedStatus = "";
-    private DateRange dateRange = new DateRange(DateTime.Now.AddMonths(-1), DateTime.Now);
+    // ✅ SỬA: Extend date range để bao gồm orders mới
+    private DateRange dateRange = new DateRange(DateTime.Today.AddMonths(-3), DateTime.Today.AddDays(1));
+    private string userRole = "";
+    private int userId = 0;
+    private int? sellerId = null;
+    private int recentUpdates = 0;
+    private int pendingOrdersCount = 0;
+    private DateTime? lastUpdateTime;
+    private Timer? cleanupTimer;
 
-    private List<OrderData> orders = new()
-    {
-        new OrderData
-        {
-            OrderId = "#ORD-7892",
-            CustomerName = "John Doe",
-            CustomerAvatarUrl = "/images/admin/avatar1.jpg",
-            Products = "Mixed Nuts Berries Pack",
-            Date = "May 1, 2023",
-            Amount = "$55.00",
-            Status = "Delivered"
-        },
-        new OrderData
-        {
-            OrderId = "#ORD-7891",
-            CustomerName = "Jane Smith",
-            CustomerAvatarUrl = "/images/admin/avatar2.jpg",
-            Products = "Multi Grain Combo Cookies",
-            Date = "April 30, 2023",
-            Amount = "$30.00",
-            Status = "Processing"
-        },
-        new OrderData
-        {
-            OrderId = "#ORD-7890",
-            CustomerName = "Robert Johnson",
-            CustomerAvatarUrl = "/images/admin/avatar3.jpg",
-            Products = "Fresh Mango Juice Pack",
-            Date = "April 30, 2023",
-            Amount = "$55.00",
-            Status = "Shipped"
-        },
-        new OrderData
-        {
-            OrderId = "#ORD-7889",
-            CustomerName = "Emily Davis",
-            CustomerAvatarUrl = "/images/admin/avatar4.jpg",
-            Products = "Dates Value Fresh Pouch",
-            Date = "April 29, 2023",
-            Amount = "$65.00",
-            Status = "Cancelled"
-        },
-        new OrderData
-        {
-            OrderId = "#ORD-7888",
-            CustomerName = "Michael Wilson",
-            CustomerAvatarUrl = "/images/admin/avatar5.jpg",
-            Products = "Organic Apples",
-            Date = "April 29, 2023",
-            Amount = "$12.00",
-            Status = "Delivered"
-        },
-        new OrderData
-        {
-            OrderId = "#ORD-7887",
-            CustomerName = "Sarah Taylor",
-            CustomerAvatarUrl = "/images/admin/avatar6.jpg",
-            Products = "Fresh Veggies Pack",
-            Date = "April 28, 2023",
-            Amount = "$38.50",
-            Status = "Processing"
-        }
-    };
+    private List<OrderVM> orders = new List<OrderVM>();
+    private List<OrderStatusVM> orderStatuses = new List<OrderStatusVM>();
+    private List<OrderItemVM> allOrderItems = new List<OrderItemVM>();
+    private List<ProfileVM> customerProfiles = new List<ProfileVM>();
+    private List<SellerProfileVM> sellers = new List<SellerProfileVM>();
+    private Dictionary<int, List<OrderItemVM>> orderItemsCache = new Dictionary<int, List<OrderItemVM>>();
+    
+    // ✅ THÊM: Cache cho product names
+    private Dictionary<int, string> productNamesCache = new Dictionary<int, string>();
 
-    private IEnumerable<OrderData> FilteredOrders => orders
+    private IEnumerable<OrderVM> FilteredOrders => orders
         .Where(o => string.IsNullOrWhiteSpace(searchString) || 
-                   o.OrderId.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
-                   o.CustomerName.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
-                   o.Products.Contains(searchString, StringComparison.OrdinalIgnoreCase))
-        .Where(o => string.IsNullOrWhiteSpace(selectedStatus) || o.Status == selectedStatus);
+                   o.OrderId.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+                   GetCustomerName(o.UserId).Contains(searchString, StringComparison.OrdinalIgnoreCase))
+        .Where(o => string.IsNullOrWhiteSpace(selectedStatus) || GetOrderStatusName(o.OrderStatusId) == selectedStatus)
+        // ✅ SỬA: Chỉ so sánh ngày, không so sánh time
+        .Where(o => dateRange?.Start == null || o.OrderDate.Date >= dateRange.Start.Value.Date)
+        .Where(o => dateRange?.End == null || o.OrderDate.Date <= dateRange.End.Value.Date);
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Initialize SignalR connection
+        await SignalRService.StartConnectionAsync();
+
+        // Subscribe to SignalR events
+        SignalRService.OrderCreated += OnOrderCreated;
+        SignalRService.OrderUpdated += OnOrderUpdated;
+        SignalRService.YourOrderStatusChanged += OnOrderStatusChanged;
+
+        // Initialize cleanup timer
+        cleanupTimer = new Timer(CleanupOldNotifications, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+
+        await GetUserInfo();
+        await LoadOrderStatuses();
+        await LoadSellers();
+        await LoadOrders();
+        await LoadCustomerProfiles();
+        
+        CalculatePendingOrdersCount();
+    }
+
+    #region SignalR Event Handlers
+    public async void OnOrderStatusChanged(int orderId, string statusName, string message)
+    {
+        
+        await InvokeAsync(async () =>
+        {
+            
+            Snackbar?.Add($"Trạng thái đơn hàng #ORD-{orderId} đã thay đổi: {statusName}", Severity.Info);
+            Snackbar.Add($"New Order Status Changed: #ORD-{orderId} - {message}: {statusName}", Severity.Success);
+            lastUpdateTime = DateTime.Now;
+            
+            await LoadOrders();
+            StateHasChanged();
+        });
+    }
+    private async void OnOrderCreated(int orderId, int userId, decimal totalAmount)
+    {
+        await InvokeAsync(async () =>
+        {
+            Snackbar.Add($"New Order Created: #ORD-{orderId} - ${totalAmount:F2}", Severity.Success);
+            
+            recentUpdates++;
+            lastUpdateTime = DateTime.Now;
+            
+            await LoadOrders();
+            CalculatePendingOrdersCount();
+            StateHasChanged();
+        });
+    }
+
+    private async void OnOrderUpdated(int orderId, int statusId, decimal totalAmount)
+    {
+        await InvokeAsync(async () =>
+        {
+            var statusName = GetOrderStatusName(statusId);
+            Snackbar.Add($"Order #ORD-{orderId} updated to {statusName}", Severity.Info);
+            
+            recentUpdates++;
+            lastUpdateTime = DateTime.Now;
+            
+            await LoadOrders();
+            CalculatePendingOrdersCount();
+            StateHasChanged();
+        });
+    }
+
+    private async void OnOrderStatusCreated(int statusId, string statusName)
+    {
+        await InvokeAsync(async () =>
+        {
+            Snackbar.Add($"New Order Status Created: {statusName}", Severity.Success);
+            lastUpdateTime = DateTime.Now;
+            
+            await LoadOrderStatuses();
+            StateHasChanged();
+        });
+    }
+
+    private async void OnOrderStatusUpdated(int statusId, string statusName)
+    {
+        await InvokeAsync(async () =>
+        {
+            Snackbar.Add($"Order Status Updated: {statusName}", Severity.Info);
+            lastUpdateTime = DateTime.Now;
+            
+            await LoadOrders();
+            StateHasChanged();
+        });
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private void CalculatePendingOrdersCount()
+    {
+        pendingOrdersCount = orders.Count(o => GetOrderStatusName(o.OrderStatusId) == "Pending");
+    }
+
+    private void CleanupOldNotifications(object state)
+    {
+        recentUpdates = 0;
+        InvokeAsync(StateHasChanged);
+    }
+
+    #endregion
+
+    #region Data Loading Methods
+
+    private async Task GetUserInfo()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        
+        if (user.Identity.IsAuthenticated)
+        {
+            userRole = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
+            var userIdClaim = user.Claims.FirstOrDefault(c => c.Type == "UserId");
+            int.TryParse(userIdClaim?.Value, out userId);
+
+            // Get seller ID if user is a seller
+            if (userRole == "Seller")
+            {
+                var sellerProfile = await SellerProfileService.GetSellerProfileByUserIdAsync(userId);
+                sellerId = sellerProfile?.SellerId;
+            }
+        }
+    }
+
+    private async Task LoadOrderStatuses()
+    {
+        try
+        {
+            var result = await OrderService.GetAllOrderStatusesAsync();
+            orderStatuses = result?.ToList() ?? new List<OrderStatusVM>();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Failed to load order statuses", Severity.Warning);
+        }
+    }
+
+    private async Task LoadSellers()
+    {
+        if (userRole == "Admin")
+        {
+            try
+            {
+                var result = await SellerProfileService.GetAllSellerProfilesAsync();
+                sellers = result ?? new List<SellerProfileVM>();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add("Failed to load sellers", Severity.Warning);
+            }
+        }
+    }
+
+    private async Task LoadOrders()
+{
+    try
+    {
+        isLoading = true;
+        StateHasChanged();
+        
+        if (userRole == "Admin")
+        {
+            var result = await OrderService.GetAllOrdersAsync();
+            orders = result?.ToList() ?? new List<OrderVM>();
+        }
+        else if (userRole == "Seller" && sellerId.HasValue)
+        {
+            var result = await ProdService.GetProductsBySellerAsync(sellerId.Value);
+            foreach (var product in result)
+            {
+                if (IsSellerProduct(product.ProductId))
+                {
+                    var ordersForProduct = await OrderService.GetOrderItemsByProductIdAsync(product.ProductId);
+                    if (ordersForProduct != null)
+                    {
+                        foreach (var orderItem in ordersForProduct)
+                        {
+                            var order = await OrderService.GetOrderByIdAsync(orderItem.OrderId);
+                            if (order != null && !orders.Any(o => o.OrderId == order.OrderId))
+                            {
+                                orders.Add(order);
+                            }
+                        }
+                    }
+                }
+                
+            }
+        }
+
+        await LoadOrderItems();
+    }
+    catch (Exception ex)
+    {
+        Snackbar.Add("Failed to load orders", Severity.Error);
+    }
+    finally
+    {
+        isLoading = false;
+        StateHasChanged();
+    }
+}
+
+    // ✅ THÊM: Method để load product names từ ProdService
+    private async Task LoadProductNames(IEnumerable<int> productIds)
+    {
+        try
+        {
+            var idsToLoad = productIds.Where(id => !productNamesCache.ContainsKey(id)).ToList();
+            
+            if (!idsToLoad.Any()) return;
+
+            var loadTasks = idsToLoad.Select(async productId =>
+            {
+                try
+                {
+                    var product = await ProdService.GetProductByIdAsync(productId);
+                    var productName = product?.ProductName ?? "Unknown Product";
+                    
+                    lock (productNamesCache)
+                    {
+                        productNamesCache[productId] = productName;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    lock (productNamesCache)
+                    {
+                        productNamesCache[productId] = "Error Loading Product";
+                    }
+                }
+            });
+
+            await Task.WhenAll(loadTasks);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            // Silent error handling
+        }
+    }
+
+    // ✅ SỬA: Cập nhật LoadOrderItems để load product names
+    private async Task LoadOrderItems()
+    {
+        orderItemsCache.Clear();
+        var allProductIds = new List<int>();
+        
+        foreach (var order in orders)
+        {
+            try
+            {
+                var items = await OrderService.GetOrderItemsByOrderIdAsync(order.OrderId);
+                var itemsList = items?.ToList() ?? new List<OrderItemVM>();
+                orderItemsCache[order.OrderId] = itemsList;
+                
+                allProductIds.AddRange(itemsList.Select(i => i.ProductId));
+            }
+            catch (Exception ex)
+            {
+                orderItemsCache[order.OrderId] = new List<OrderItemVM>();
+            }
+        }
+
+        await LoadProductNames(allProductIds.Distinct());
+    }
+
+    private async Task LoadCustomerProfiles()
+    {
+        try
+        {
+            var uniqueUserIds = orders.Select(o => o.UserId).Distinct();
+            customerProfiles = new List<ProfileVM>();
+
+            foreach (var userIdToLoad in uniqueUserIds)
+            {
+                try
+                {
+                    var profile = await UserService.GetProfileAsync(userIdToLoad);
+                    if (profile != null)
+                    {
+                        customerProfiles.Add(profile);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Silent error handling
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Silent error handling
+        }
+    }
+
+    private bool IsSellerProduct(int productId)
+    {
+        // This would need to be implemented based on your product-seller relationship
+        // For now, returning true as placeholder
+        return true;
+    }
+
+    #endregion
+
+    #region Event Handlers
+
+    private async Task RefreshOrders()
+    {
+        // ✅ THÊM: Clear product names cache để force reload
+        productNamesCache.Clear();
+        
+        await LoadOrders();
+        await LoadCustomerProfiles();
+        CalculatePendingOrdersCount();
+        Snackbar.Add("Orders refreshed", Severity.Success);
+    }
+
+    private async Task SearchOrders(KeyboardEventArgs e)
+    {
+        // The filtering is handled by FilteredOrders property
+        StateHasChanged();
+    }
+
+    private async Task FilterByStatus(string status)
+    {
+        selectedStatus = status;
+        StateHasChanged();
+    }
+
+    #endregion
+
+    #region Order Actions
+
+    private async Task ViewOrderDetails(OrderVM order)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("Order", order);
+        parameters.Add("OrderItems", GetOrderItems(order.OrderId));
+        parameters.Add("Customer", GetCustomerProfile(order.UserId));
+
+        var options = new DialogOptions() 
+        { 
+            MaxWidth = MaxWidth.Large, 
+            FullWidth = true, 
+            CloseButton = true
+        };
+
+        await DialogService.ShowAsync<OrderDetailsDialog>("Order Details", parameters, options);
+    }
+
+    private async Task UpdateOrderStatus(OrderVM order)
+    {
+        var currentStatus = GetOrderStatusName(order.OrderStatusId);
+        var availableStatuses = GetAvailableStatusUpdates(currentStatus);
+
+        var parameters = new DialogParameters();
+        parameters.Add("Order", order);
+        parameters.Add("CurrentStatus", currentStatus);
+        parameters.Add("AvailableStatuses", availableStatuses);
+        parameters.Add("UserRole", userRole);
+
+        var options = new DialogOptions() 
+        { 
+            MaxWidth = MaxWidth.Small, 
+            FullWidth = true, 
+            CloseButton = true
+        };
+
+        var dialog = await DialogService.ShowAsync<OrderStatusUpdateDialog>("Update Order Status", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data != null)
+        {
+            var newStatus = result.Data.ToString();
+            
+            try
+            {
+                var success = await OrderService.UpdateOrderStatusByNameAsync(order.OrderId, newStatus);
+                if (success)
+                {
+                    Snackbar.Add($"Order status updated to {newStatus}", Severity.Success);
+                    await LoadOrders();
+                    CalculatePendingOrdersCount();
+                }
+                else
+                {
+                    Snackbar.Add("Failed to update order status", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add("Error updating order status", Severity.Error);
+            }
+        }
+    }
+
+    private async Task CancelOrder(OrderVM order)
+    {
+        bool? result = await DialogService.ShowMessageBox(
+            "Cancel Order",
+            $"Are you sure you want to cancel Order #ORD-{order.OrderId}?",
+            yesText:"Cancel Order", cancelText:"Keep Order");
+
+        if (result == true)
+        {
+            try
+            {
+                var (success, message) = await OrderService.CancelOrderAsync(order.OrderId, "Cancelled by " + userRole);
+                if (success)
+                {
+                    Snackbar.Add("Order cancelled successfully", Severity.Success);
+                    await LoadOrders();
+                    CalculatePendingOrdersCount();
+                }
+                else
+                {
+                    Snackbar.Add(message, Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add("Error cancelling order", Severity.Error);
+            }
+        }
+    }
+
+    #endregion
+
+    #region Permission Checks
+
+    private bool CanUpdateOrderStatus(OrderVM order)
+    {
+        if (userRole == "Admin") return true;
+        
+        if (userRole == "Seller")
+        {
+            var currentStatus = GetOrderStatusName(order.OrderStatusId);
+            var allowedStatuses = new[] { "Confirmed", "Processing", "Shipped" };
+            return allowedStatuses.Contains(currentStatus);
+        }
+        
+        return false;
+    }
+
+    private bool CanCancelOrder(OrderVM order)
+    {
+        var currentStatus = GetOrderStatusName(order.OrderStatusId);
+        var allowedStatuses = new[] { "Pending", "Confirmed" };
+        return allowedStatuses.Contains(currentStatus);
+    }
+
+    private List<string> GetAvailableStatusUpdates(string currentStatus)
+    {
+        if (userRole == "Admin")
+        {
+            return orderStatuses.Select(s => s.StatusName).ToList();
+        }
+        
+        if (userRole == "Seller")
+        {
+            return currentStatus switch
+            {
+                "Confirmed" => new List<string> { "Processing", "Cancelled" },
+                "Processing" => new List<string> { "Shipped", "Cancelled" },
+                "Shipped" => new List<string> { "Delivered" },
+                _ => new List<string>()
+            };
+        }
+        
+        return new List<string>();
+    }
+
+    #endregion
+
+    #region Helper Methods for Display
+
+    private string GetOrderStatusName(int statusId)
+    {
+        var status = orderStatuses.FirstOrDefault(s => s.StatusId == statusId);
+        return status?.StatusName ?? "Unknown";
+    }
+
+    private string GetCustomerName(int userId)
+    {
+        var profile = customerProfiles.FirstOrDefault(p => p.Id == userId);
+        return profile != null ? $"{profile.FirstName} {profile.LastName}".Trim() : "Unknown Customer";
+    }
+
+    private string GetCustomerInitials(int userId)
+    {
+        var profile = customerProfiles.FirstOrDefault(p => p.Id == userId);
+        if (profile != null)
+        {
+            var initials = "";
+            if (!string.IsNullOrEmpty(profile.FirstName)) initials += profile.FirstName[0];
+            if (!string.IsNullOrEmpty(profile.LastName)) initials += profile.LastName[0];
+            return initials.ToUpper();
+        }
+        return "U";
+    }
+
+    private ProfileVM? GetCustomerProfile(int userId)
+    {
+        return customerProfiles.FirstOrDefault(p => p.Id == userId);
+    }
+
+    private IEnumerable<OrderItemVM> GetOrderItems(int orderId)
+    {
+        return orderItemsCache.TryGetValue(orderId, out var items) ? items : Enumerable.Empty<OrderItemVM>();
+    }
 
     private Color GetStatusColor(string status)
     {
         return status switch
         {
+            "Pending" => Color.Warning,
+            "Confirmed" => Color.Info,
+            "Processing" => Color.Primary,
+            "Shipped" => Color.Secondary,
             "Delivered" => Color.Success,
-            "Processing" => Color.Info,
-            "Shipped" => Color.Warning,
             "Cancelled" => Color.Error,
             _ => Color.Default
         };
     }
-    
-    private class OrderData
+
+    // ✅ THÊM: Method để lấy product name từ cache
+    private string GetProductName(int productId)
     {
-        public string OrderId { get; set; }
-        public string CustomerName { get; set; }
-        public string CustomerAvatarUrl { get; set; }
-        public string Products { get; set; }
-        public string Date { get; set; }
-        public string Amount { get; set; }
-        public string Status { get; set; }
+        if (productNamesCache.TryGetValue(productId, out var name))
+        {
+            return name;
+        }
+        
+        // ✅ THÊM: Nếu chưa có trong cache, load ngay
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var product = await ProdService.GetProductByIdAsync(productId);
+                var productName = product?.ProductName ?? "Unknown Product";
+                
+                lock (productNamesCache)
+                {
+                    productNamesCache[productId] = productName;
+                }
+
+                // Update UI
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception ex)
+            {
+                lock (productNamesCache)
+                {
+                    productNamesCache[productId] = "Error Loading";
+                }
+            }
+        });
+        
+        return "Loading...";
+    }
+
+    #endregion
+
+    // ✅ SỬA: Cập nhật dispose để clear cache
+    public async ValueTask DisposeAsync()
+    {
+        // Unsubscribe from SignalR events
+        SignalRService.OrderCreated -= OnOrderCreated;
+        SignalRService.OrderUpdated -= OnOrderUpdated;
+        SignalRService.OrderStatusCreated -= OnOrderStatusCreated;
+
+        // Dispose timer
+        cleanupTimer?.Dispose();
+
+        // ✅ THÊM: Clear cache
+        productNamesCache.Clear();
+
+        // Dispose SignalR service if needed
+        // Dispose SignalR service if needed
+        if (SignalRService != null)
+        {
+            await SignalRService.DisposeAsync();
+        }
     }
 }

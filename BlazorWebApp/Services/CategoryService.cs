@@ -33,7 +33,6 @@ namespace BlazorWebApp.Services
 
         public async Task<IEnumerable<CategoryVM>> GetAllCategoriesAsync()
         {
-            await SetAuthorizationHeader();
             var response = await _httpClient.GetAsync($"https://localhost:7252/api/Category/GetAllCategories");
             response.EnsureSuccessStatusCode();
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<IEnumerable<CategoryVM>>>();
@@ -46,7 +45,6 @@ namespace BlazorWebApp.Services
 
         public async Task<CategoryVM> GetCategoryByIdAsync(int id)
         {
-            await SetAuthorizationHeader();
             var response = await _httpClient.GetAsync($"https://localhost:7252/api/Category/GetCategoryById/{id}");
             response.EnsureSuccessStatusCode();
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<CategoryVM>>();

@@ -266,7 +266,32 @@ namespace MainEcommerceService.Controllers
                 return BadRequest(response);
             }
         }
-
+        [HttpGet("GetOrderStatusNameByOrderId/{orderId}")]
+        public async Task<IActionResult> GetOrderStatusNameByOrderId(int orderId)
+        {
+            var response = await _orderService.GetOrderStatusNameByOrderId(orderId);
+            if (response.Success)
+            {
+                return Ok(response);
+            }
+            else
+            {
+                return BadRequest(response);
+            }
+        }
+        [HttpPut("CancelOrder/{orderId}")]
+        public async Task<IActionResult> CancelOrder([FromBody] int orderId)
+        {
+            var response = await _orderService.CancelOrder(orderId);
+            if (response.Success)
+            {
+                return Ok(response);
+            }
+            else
+            {
+                return BadRequest(response);
+            }
+        }
         #endregion
 
         #region OrderItem Management

@@ -155,8 +155,8 @@ public class CategoryService : ICategoryService
             await _unitOfWork.CommitTransaction();
 
             // Xóa cache
-            await _cacheService.DeleteAsync("AllCategories");
-            await _cacheService.DeleteAsync("PagedCategories_*");
+            await _cacheService.DeleteByPatternAsync("AllCategories");
+            await _cacheService.DeleteByPatternAsync("PagedCategories_*");
 
             // Gửi thông báo realtime qua SignalR
             await _hubContext.Clients.All.SendAsync("CategoryCreated", newCategory.CategoryId, newCategory.CategoryName);
@@ -206,8 +206,8 @@ public class CategoryService : ICategoryService
             await _unitOfWork.CommitTransaction();
 
             // Xóa cache
-            await _cacheService.DeleteAsync("AllCategories");
-            await _cacheService.DeleteAsync("PagedCategories_*");
+            await _cacheService.DeleteByPatternAsync("AllCategories");
+            await _cacheService.DeleteByPatternAsync("PagedCategories_*");
 
             // Gửi thông báo realtime qua SignalR
             await _hubContext.Clients.All.SendAsync("CategoryUpdated", id, existingCategory.CategoryName);
@@ -255,8 +255,8 @@ public class CategoryService : ICategoryService
             await _unitOfWork.CommitTransaction();
 
             // Xóa cache
-            await _cacheService.DeleteAsync("AllCategories");
-            await _cacheService.DeleteAsync("PagedCategories_*");
+            await _cacheService.DeleteByPatternAsync("AllCategories");
+            await _cacheService.DeleteByPatternAsync("PagedCategories_*");
 
             // Gửi thông báo realtime qua SignalR
             await _hubContext.Clients.All.SendAsync("CategoryDeleted", id);

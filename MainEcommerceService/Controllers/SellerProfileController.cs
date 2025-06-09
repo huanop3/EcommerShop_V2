@@ -41,7 +41,6 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Lấy seller profile theo ID - Cho tất cả user đã đăng nhập
         /// </summary>
-        [Authorize]
         [HttpGet("GetSellerProfileById/{sellerId}")]
         public async Task<IActionResult> GetSellerProfileById(int sellerId)
         {
@@ -59,7 +58,6 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Lấy seller profile theo UserId - Cho tất cả user đã đăng nhập
         /// </summary>
-        [Authorize]
         [HttpGet("GetSellerProfileByUserId/{userId}")]
         public async Task<IActionResult> GetSellerProfileByUserId(int userId)
         {
@@ -77,7 +75,6 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Tạo seller profile mới - Cho tất cả user đã đăng nhập
         /// </summary>
-        [Authorize]
         [HttpPost("CreateSellerProfile")]
         public async Task<IActionResult> CreateSellerProfile([FromBody] SellerProfileVM sellerProfileVM)
         {
@@ -100,7 +97,7 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Cập nhật seller profile - Chỉ chủ sở hữu hoặc Admin
         /// </summary>
-        [Authorize]
+        [Authorize(Roles = "Seller,Admin")]
         [HttpPut("UpdateSellerProfile")]
         public async Task<IActionResult> UpdateSellerProfile([FromBody] SellerProfileVM sellerProfileVM)
         {
@@ -213,7 +210,6 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Kiểm tra user có seller profile hay không - Cho tất cả user đã đăng nhập
         /// </summary>
-        [Authorize]
         [HttpGet("CheckUserHasSellerProfile/{userId}")]
         public async Task<IActionResult> CheckUserHasSellerProfile(int userId)
         {

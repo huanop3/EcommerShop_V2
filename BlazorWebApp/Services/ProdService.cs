@@ -35,7 +35,6 @@ namespace BlazorWebApp.Services
 
         public async Task<IEnumerable<ProductVM>> GetAllProductsAsync()
         {
-            await SetAuthorizationHeader();
             var response = await _httpClient.GetAsync("https://localhost:7252/api/Product/GetAllProducts");
             
             if (!response.IsSuccessStatusCode)
@@ -55,7 +54,6 @@ namespace BlazorWebApp.Services
         }
         public async Task<HTTPResponseClient<IEnumerable<ProductVM>>> GetAllProductByPageAsync(int pageIndex, int pageSize)
         {
-            await SetAuthorizationHeader();
             var response = await _httpClient.GetAsync($"https://localhost:7252/api/Product/GetPagedProducts?pageIndex={pageIndex}&pageSize={pageSize}");
 
             if (!response.IsSuccessStatusCode)
@@ -73,7 +71,6 @@ namespace BlazorWebApp.Services
         }
         public async Task<ProductVM> GetProductByIdAsync(int id)
         {
-            await SetAuthorizationHeader();
             var response = await _httpClient.GetAsync($"https://localhost:7252/api/Product/GetProductById/{id}");
             
             if (!response.IsSuccessStatusCode)
@@ -91,7 +88,6 @@ namespace BlazorWebApp.Services
 
         public async Task<IEnumerable<ProductVM>> GetProductsByCategoryAsync(int categoryId)
         {
-            await SetAuthorizationHeader();
             var response = await _httpClient.GetAsync($"https://localhost:7252/api/Product/GetProductsByCategory/{categoryId}");
             
             if (!response.IsSuccessStatusCode)
@@ -111,7 +107,6 @@ namespace BlazorWebApp.Services
 
         public async Task<IEnumerable<ProductVM>> GetProductsBySellerAsync(int sellerId)
         {
-            await SetAuthorizationHeader();
             var response = await _httpClient.GetAsync($"https://localhost:7252/api/Product/GetProductsBySeller/{sellerId}");
             
             if (!response.IsSuccessStatusCode)
@@ -131,7 +126,6 @@ namespace BlazorWebApp.Services
 
         public async Task<IEnumerable<ProductVM>> SearchProductsAsync(string searchTerm)
         {
-            await SetAuthorizationHeader();
             var response = await _httpClient.GetAsync($"https://localhost:7252/api/Product/SearchProducts?searchTerm={Uri.EscapeDataString(searchTerm)}");
             
             if (!response.IsSuccessStatusCode)

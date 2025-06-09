@@ -41,7 +41,6 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Lấy thanh toán theo ID - Admin hoặc chủ sở hữu đơn hàng
         /// </summary>
-        [Authorize]
         [HttpGet("GetPaymentById/{paymentId}")]
         public async Task<IActionResult> GetPaymentById(int paymentId)
         {
@@ -59,7 +58,6 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Lấy thanh toán theo OrderId - Admin hoặc chủ sở hữu đơn hàng
         /// </summary>
-        [Authorize]
         [HttpGet("GetPaymentsByOrderId/{orderId}")]
         public async Task<IActionResult> GetPaymentsByOrderId(int orderId)
         {
@@ -95,7 +93,6 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Tạo thanh toán mới - Cho tất cả user đã đăng nhập
         /// </summary>
-        [Authorize]
         [HttpPost("CreatePayment")]
         public async Task<IActionResult> CreatePayment([FromBody] PaymentVM paymentVM)
         {
@@ -118,7 +115,6 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Cập nhật thanh toán - Admin hoặc chủ sở hữu đơn hàng
         /// </summary>
-        [Authorize]
         [HttpPut("UpdatePayment")]
         public async Task<IActionResult> UpdatePayment([FromBody] PaymentVM paymentVM)
         {
@@ -141,7 +137,6 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Cập nhật trạng thái thanh toán - Admin hoặc Payment Gateway
         /// </summary>
-        [Authorize]
         [HttpPut("UpdatePaymentStatus/{paymentId}")]
         public async Task<IActionResult> UpdatePaymentStatus(int paymentId, [FromBody] UpdatePaymentStatusRequest request)
         {

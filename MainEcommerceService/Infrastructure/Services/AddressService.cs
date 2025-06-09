@@ -431,15 +431,15 @@ public class AddressService : IAddressService
 
     private async Task ClearAddressCache(int userId)
     {
-        await _cacheService.DeleteAsync("AllAddresses");
-        await _cacheService.DeleteAsync($"UserAddresses_{userId}");
+        await _cacheService.DeleteByPatternAsync("AllAddresses");
+        await _cacheService.DeleteByPatternAsync($"UserAddresses_{userId}");
         
         // Xóa cache phân trang (có thể có nhiều trang)
         for (int i = 1; i <= 10; i++)
         {
-            await _cacheService.DeleteAsync($"PagedAddresses_{i}_10");
-            await _cacheService.DeleteAsync($"PagedAddresses_{i}_20");
-            await _cacheService.DeleteAsync($"PagedAddresses_{i}_50");
+            await _cacheService.DeleteByPatternAsync($"PagedAddresses_{i}_10");
+            await _cacheService.DeleteByPatternAsync($"PagedAddresses_{i}_20");
+            await _cacheService.DeleteByPatternAsync($"PagedAddresses_{i}_50");
         }
     }
 

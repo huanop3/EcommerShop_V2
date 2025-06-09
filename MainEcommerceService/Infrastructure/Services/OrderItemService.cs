@@ -453,7 +453,7 @@ public class OrderItemService : IOrderItemService
             $"OrderItemsTotal_{orderId}"
         };
 
-        var tasks = cacheKeys.Select(key => _cacheService.DeleteAsync(key));
+        var tasks = cacheKeys.Select(key => _cacheService.DeleteByPatternAsync(key));
         await Task.WhenAll(tasks);
     }
 }

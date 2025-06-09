@@ -67,7 +67,6 @@ namespace BlazorWebApp.Services
         /// </summary>
         public async Task<SellerProfileVM?> GetSellerProfileByIdAsync(int sellerId)
         {
-            await SetAuthorizationHeader();
             try
             {
                 var response = await _httpClient.GetAsync($"https://localhost:7260/api/SellerProfile/GetSellerProfileById/{sellerId}");
@@ -94,7 +93,6 @@ namespace BlazorWebApp.Services
         /// </summary>
         public async Task<SellerProfileVM?> GetSellerProfileByUserIdAsync(int userId)
         {
-            await SetAuthorizationHeader();
             try
             {
                 var response = await _httpClient.GetAsync($"https://localhost:7260/api/SellerProfile/GetSellerProfileByUserId/{userId}");
@@ -122,7 +120,6 @@ namespace BlazorWebApp.Services
         /// </summary>
         public async Task<bool> CreateSellerProfileAsync(SellerProfileVM sellerProfile)
         {
-            await SetAuthorizationHeader();
             try
             {
                 var json = JsonSerializer.Serialize(sellerProfile);
