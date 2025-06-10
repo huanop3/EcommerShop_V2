@@ -219,7 +219,7 @@
         {
             
             Snackbar?.Add($"Trạng thái đơn hàng #ORD-{orderId} đã thay đổi: {statusName}", Severity.Info);
-            Snackbar.Add($"New Order Status Changed: #ORD-{orderId} - {message}: {statusName}", Severity.Success);
+            Snackbar?.Add($"New Order Status Changed: #ORD-{orderId} - {message}: {statusName}", Severity.Success);
             lastUpdateTime = DateTime.Now;
             
             await LoadOrders();
@@ -340,7 +340,7 @@
             try
             {
                 var result = await SellerProfileService.GetAllSellerProfilesAsync();
-                sellers = result ?? new List<SellerProfileVM>();
+                sellers = result;
             }
             catch (Exception ex)
             {
@@ -359,37 +359,39 @@
         if (userRole == "Admin")
         {
             var result = await OrderService.GetAllOrdersAsync();
-            orders = result?.ToList() ?? new List<OrderVM>();
+            orders = result?.ToList();
         }
         else if (userRole == "Seller" && sellerId.HasValue)
         {
             var result = await ProdService.GetProductsBySellerAsync(sellerId.Value);
             foreach (var product in result)
             {
-                if (IsSellerProduct(product.ProductId))
+                var ordersForProduct = await OrderService.GetOrderItemsByProductIdAsync(product.ProductId);
+                if (ordersForProduct != null)
                 {
-                    var ordersForProduct = await OrderService.GetOrderItemsByProductIdAsync(product.ProductId);
-                    if (ordersForProduct != null)
+                    foreach (var orderItem in ordersForProduct)
                     {
-                        foreach (var orderItem in ordersForProduct)
+                        var order = await OrderService.GetOrderByIdAsync(orderItem.OrderId);
+                        if (order != null)
                         {
-                            var order = await OrderService.GetOrderByIdAsync(orderItem.OrderId);
-                            if (order != null && !orders.Any(o => o.OrderId == order.OrderId))
+                            if (!orders.Any(o => o.OrderId == order.OrderId))
                             {
                                 orders.Add(order);
                             }
+ 
                         }
+
                     }
                 }
-                
             }
         }
 
         await LoadOrderItems();
+        
     }
     catch (Exception ex)
     {
-        Snackbar.Add("Failed to load orders", Severity.Error);
+        Console.WriteLine($"❌ Error in LoadOrders: {ex.Message}");
     }
     finally
     {
@@ -489,13 +491,6 @@
         {
             // Silent error handling
         }
-    }
-
-    private bool IsSellerProduct(int productId)
-    {
-        // This would need to be implemented based on your product-seller relationship
-        // For now, returning true as placeholder
-        return true;
     }
 
     #endregion
@@ -651,7 +646,7 @@
     {
         if (userRole == "Admin")
         {
-            return orderStatuses.Select(s => s.StatusName).ToList();
+            return null ;
         }
         
         if (userRole == "Seller")
@@ -765,7 +760,7 @@
         // Unsubscribe from SignalR events
         SignalRService.OrderCreated -= OnOrderCreated;
         SignalRService.OrderUpdated -= OnOrderUpdated;
-        SignalRService.OrderStatusCreated -= OnOrderStatusCreated;
+        SignalRService.YourOrderStatusChanged -= OnOrderStatusChanged;
 
         // Dispose timer
         cleanupTimer?.Dispose();

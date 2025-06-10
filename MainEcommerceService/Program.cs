@@ -130,14 +130,7 @@ builder.Services.AddHttpClient();
 var redisConnectionString = builder.Configuration.GetConnectionString("RedisConnection");
 
 // Thêm SignalR với Redis Backplane
-builder.Services.AddSignalR(options =>
-{
-    options.EnableDetailedErrors = true;
-    options.MaximumReceiveMessageSize = 32 * 1024; // 32KB
-    options.HandshakeTimeout = TimeSpan.FromSeconds(15);
-    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
-    options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
-})
+builder.Services.AddSignalR()
     .AddStackExchangeRedis(redisConnectionString, options =>
     {
         options.Configuration.ChannelPrefix = "MainEcommerceService";

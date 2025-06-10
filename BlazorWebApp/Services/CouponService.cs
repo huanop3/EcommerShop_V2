@@ -158,7 +158,7 @@ namespace BlazorWebApp.Services
         {
             var response = await _httpClient.PutAsJsonAsync($"https://localhost:7260/api/Coupon/UpdateCouponUsageCount/{couponId}", couponId);
             response.EnsureSuccessStatusCode();
-            var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<string>>();
+            var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<bool>>();
             if (result != null)
             {
                 return result.Success;

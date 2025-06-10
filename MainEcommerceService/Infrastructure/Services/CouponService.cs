@@ -618,6 +618,7 @@ public class CouponService : ICouponService
         var response = new HTTPResponseClient<bool>();
         try
         {
+            await _unitOfWork.BeginTransaction();
             var coupon = await _unitOfWork._couponRepository.GetByIdAsync(couponId);
             if (coupon == null || coupon.IsDeleted == true)
             {
@@ -631,6 +632,11 @@ public class CouponService : ICouponService
             coupon.UsageCount++;
             _unitOfWork._couponRepository.Update(coupon);
             await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransaction();
+            // Xóa cache để đảm bảo dữ liệu mới nhất
+            await _cacheService.DeleteByPatternAsync("AllCoupons");
+            await _cacheService.DeleteByPatternAsync("PagedCoupons_*");
+            await _cacheService.DeleteByPatternAsync($"Coupon_{couponId}_*");
 
             response.Data = true;
             response.Success = true;

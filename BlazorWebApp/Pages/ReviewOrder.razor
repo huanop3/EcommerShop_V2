@@ -9,6 +9,7 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject AddressService AddressService
 @inject UserService UserService
+@inject ProdService ProdService
 @inject ToastService ToastService
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
@@ -24,7 +25,8 @@
     <div class="border-container">
         <div class="breadcrumb">
             <div class="container">
-                <a href="/">Home</a> / <a href="/cart">Cart</a> / <a href="/checkout">Checkout</a> / <a href="/payment">Payment</a> / <span>Review Order</span>
+                <a href="/">Home</a> / <a href="/cart">Cart</a> / <a href="/checkout">Checkout</a> / <a
+                    href="/payment">Payment</a> / <span>Review Order</span>
             </div>
         </div>
     </div>
@@ -79,7 +81,7 @@
                     <i class="fas fa-clipboard-check"></i>
                     Review Your Order
                 </h2>
-                
+
                 <div class="checkout-steps">
                     <div class="step completed">
                         <div class="step-number">
@@ -103,7 +105,7 @@
 
                 <div class="checkout-content">
                     <div class="checkout-step-content active">
-                        
+
                         <!-- Order Summary Review -->
                         <div class="form-section">
                             <div class="section-header">
@@ -112,7 +114,7 @@
                                     Order Items (@currentPricing.TotalQuantity items)
                                 </h3>
                             </div>
-                            
+
                             <div class="order-items-review">
                                 @foreach (var item in cartItems)
                                 {
@@ -150,7 +152,7 @@
                                     <i class="fas fa-edit"></i> Edit
                                 </a>
                             </div>
-                            
+
                             <div class="info-review-card">
                                 <div class="review-grid">
                                     <div class="review-row">
@@ -162,7 +164,8 @@
                                                 {
                                                     <p>@selectedAddress.AddressLine2</p>
                                                 }
-                                                <p>@selectedAddress?.City, @selectedAddress?.State @selectedAddress?.PostalCode</p>
+                                                <p>@selectedAddress?.City, @selectedAddress?.State
+                                                    @selectedAddress?.PostalCode</p>
                                                 <p>@selectedAddress?.Country</p>
                                             </div>
                                         </div>
@@ -193,7 +196,7 @@
                                     <i class="fas fa-edit"></i> Edit
                                 </a>
                             </div>
-                            
+
                             <div class="info-review-card">
                                 <div class="payment-method-review">
                                     <div class="payment-icon cash">
@@ -202,7 +205,8 @@
                                     <div class="payment-details">
                                         <h4>Cash on Delivery</h4>
                                         <p>Pay $@currentPricing.TotalAmount.ToString("F2") when your order arrives</p>
-                                        <small class="payment-note">Please have exact change ready for the delivery person</small>
+                                        <small class="payment-note">Please have exact change ready for the delivery
+                                            person</small>
                                     </div>
                                 </div>
                             </div>
@@ -216,14 +220,14 @@
                                     Pricing Breakdown
                                 </h3>
                             </div>
-                            
+
                             <div class="pricing-review-card">
                                 <div class="pricing-breakdown">
                                     <div class="pricing-row">
                                         <span>Subtotal (@currentPricing.TotalQuantity items)</span>
                                         <span>$@currentPricing.Subtotal.ToString("F2")</span>
                                     </div>
-                                    
+
                                     @if (appliedCoupon != null && currentPricing.CouponDiscount > 0)
                                     {
                                         <div class="pricing-row discount">
@@ -234,7 +238,7 @@
                                             <span>-$@currentPricing.CouponDiscount.ToString("F2")</span>
                                         </div>
                                     }
-                                    
+
                                     <div class="pricing-row">
                                         <span>Shipping</span>
                                         <span>
@@ -248,12 +252,12 @@
                                             }
                                         </span>
                                     </div>
-                                    
+
                                     <div class="pricing-row total">
                                         <span>Total Amount</span>
                                         <span>$@currentPricing.TotalAmount.ToString("F2")</span>
                                     </div>
-                                    
+
                                     @if (currentPricing.TotalSavings > 0)
                                     {
                                         <div class="savings-highlight">
@@ -273,7 +277,7 @@
                                     Final Confirmation
                                 </h3>
                             </div>
-                            
+
                             <div class="final-confirmation">
                                 <div class="confirmation-notice">
                                     <div class="notice-icon">
@@ -281,15 +285,14 @@
                                     </div>
                                     <div class="notice-content">
                                         <h4>Please Review Your Order</h4>
-                                        <p>By placing this order, you confirm that all information is correct and you agree to our terms and conditions.</p>
+                                        <p>By placing this order, you confirm that all information is correct and you agree
+                                            to our terms and conditions.</p>
                                     </div>
                                 </div>
-                                
+
                                 <div class="form-group checkbox-group">
                                     <label class="checkbox-label">
-                                        <input type="checkbox" 
-                                               @bind="finalConfirmation" 
-                                               required />
+                                        <input type="checkbox" @bind="finalConfirmation" required />
                                         <span class="checkmark"></span>
                                         <span class="checkbox-text">
                                             I have reviewed all order details and confirm that the information is accurate
@@ -298,18 +301,16 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Final Actions -->
                         <div class="checkout-actions">
                             <a href="/payment" class="btn btn-secondary">
                                 <i class="fas fa-arrow-left"></i>
                                 Back to Payment
                             </a>
-                            
-                            <button type="button" 
-                                    class="btn btn-success btn-place-order"
-                                    @onclick="ConfirmOrder"
-                                    disabled="@(!CanConfirmOrder() || isConfirmingOrder)">
+
+                            <button type="button" class="btn btn-success btn-place-order" @onclick="ConfirmOrder"
+                                disabled="@(!CanConfirmOrder() || isConfirmingOrder)">
                                 @if (isConfirmingOrder)
                                 {
                                     <i class="fas fa-spinner fa-spin"></i>
@@ -325,7 +326,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Order Summary Sidebar -->
             <div class="order-summary-sidebar">
                 <div class="order-summary-box">
@@ -333,13 +334,13 @@
                         <i class="fas fa-receipt"></i>
                         Order Summary
                     </h3>
-                    
+
                     <div class="summary-total">
                         <div class="summary-row">
                             <span>Items (@currentPricing.TotalQuantity)</span>
                             <span>$@currentPricing.Subtotal.ToString("F2")</span>
                         </div>
-                        
+
                         @if (appliedCoupon != null && currentPricing.CouponDiscount > 0)
                         {
                             <div class="summary-row discount">
@@ -350,7 +351,7 @@
                                 <span>-$@currentPricing.CouponDiscount.ToString("F2")</span>
                             </div>
                         }
-                        
+
                         <div class="summary-row">
                             <span>Shipping</span>
                             <span>
@@ -364,13 +365,13 @@
                                 }
                             </span>
                         </div>
-                        
+
                         <div class="summary-row order-total">
                             <span>Total</span>
                             <span>$@currentPricing.TotalAmount.ToString("F2")</span>
                         </div>
                     </div>
-                    
+
                     <div class="order-actions-summary">
                         <div class="security-notice">
                             <i class="fas fa-shield-alt"></i>
@@ -395,21 +396,22 @@
     private string selectedDeliveryOption = "standard";
     private string selectedPaymentMethod = "cash";
     private string deliveryInstructions = "";
-    
+
     // Form data
     private bool finalConfirmation = false;
     private bool isConfirmingOrder = false;
-    
+
     // Loading and validation state
     private bool isLoading = true;
     private bool isOrderDataComplete = false;
-    
-    // User ID
+    private List<int> SellerIdChecked = new(); // User ID
+    private List<ProductVM?> products = new();
     private int? currentUserId;
-    
+
     // Use static services for pricing and coupon management
     private CouponVM? appliedCoupon => CouponStateService.GetAppliedCoupon();
-    private PricingBreakdown currentPricing => CouponStateService.GetCurrentPricingBreakdown(cartItems, selectedDeliveryOption);
+    private PricingBreakdown currentPricing => CouponStateService.GetCurrentPricingBreakdown(cartItems,
+    selectedDeliveryOption);
 
     protected override async Task OnInitializedAsync()
     {
@@ -420,7 +422,7 @@
     {
         isLoading = true;
         StateHasChanged();
-        
+
         try
         {
             currentUserId = await GetCurrentUserIdAsync();
@@ -435,7 +437,7 @@
 
             // Load cart items
             cartItems = CartVM.GetAllCartItems();
-            
+
             // If cart is empty, redirect to cart page
             if (!cartItems.Any())
             {
@@ -457,18 +459,18 @@
             selectedDeliveryOption = checkoutData.SelectedDeliveryOption ?? "standard";
             selectedPaymentMethod = checkoutData.PaymentMethod ?? "cash";
             deliveryInstructions = checkoutData.DeliveryInstructions ?? "";
-            
+
             // Load selected address
             if (checkoutData.SelectedAddressId.HasValue)
             {
                 selectedAddress = await AddressService.GetAddressByIdAsync(checkoutData.SelectedAddressId.Value);
             }
-            
+
             // Final validation
-            isOrderDataComplete = selectedAddress != null && 
-                                !string.IsNullOrEmpty(selectedPaymentMethod) && 
-                                !string.IsNullOrEmpty(selectedDeliveryOption);
-                                
+            isOrderDataComplete = selectedAddress != null &&
+            !string.IsNullOrEmpty(selectedPaymentMethod) &&
+            !string.IsNullOrEmpty(selectedDeliveryOption);
+
             if (!isOrderDataComplete)
             {
                 ToastService.ShowWarning("Missing required order information. Please complete checkout.");
@@ -504,10 +506,10 @@
 
     private bool CanConfirmOrder()
     {
-        return finalConfirmation && 
-               isOrderDataComplete && 
-               cartItems.Any() && 
-               !isConfirmingOrder;
+        return finalConfirmation &&
+        isOrderDataComplete &&
+        cartItems.Any() &&
+        !isConfirmingOrder;
     }
 
     private async Task ConfirmOrder()
@@ -535,22 +537,62 @@
                     UnitPrice = item.UnitPrice
                 }).ToList()
             };
+            // Check cửa hàng sản phẩm để chia order theo cửa hàng
+            foreach (var item in createOrderRequest.OrderItems)
+            {
+                products.Add(await ProdService.GetProductByIdAsync(item.ProductId));
+            }
+            foreach (var product in products)
+            {
+                if (product != null && !SellerIdChecked.Contains(product.SellerId))
+                {
+                    SellerIdChecked.Add(product.SellerId);
+                }
+            }
+            if (SellerIdChecked.Count == 0)
+            {
+                ToastService.ShowError("No products found for the selected seller.");
+                return;
+            }
+            else if (SellerIdChecked.Count == 1)
+            {
+                // ✅ Gọi API để tạo order
+                var orderCreated = await OrderService.CreateOrderWithItemsAsync(createOrderRequest);
+                await SignalRService.NotifyOrderCreatedAsync(int.Parse(orderCreated.OrderId), currentUserId.Value,
+            currentPricing.TotalAmount);
+            }
+            else if (SellerIdChecked.Count > 1)
+            {
+                // ✅ Gọi API để tạo order cho từng seller
+                foreach (var sellerId in SellerIdChecked)
+                {
+                    var sellerOrderItems = createOrderRequest.OrderItems
+                    .Where(item => item.ProductId == products.FirstOrDefault(p => p?.SellerId == sellerId)?.ProductId)
+                    .ToList();
 
-            // ✅ Gọi API để tạo order
-            var orderCreated = await OrderService.CreateOrderWithItemsAsync(createOrderRequest);
-                // ✅ Clear cart and checkout data after successful order
-
-
-                // Show success message
-                ToastService.ShowSuccess("Order placed successfully! Redirecting to order confirmation...");
-
-                await CouponService.UpdateCouponUsageCount(appliedCoupon.CouponId);
-                CartVM.ClearCart();
-                CouponStateService.ClearAllData();
-                // Redirect to order confirmation page
-                await Task.Delay(1500);
-                Navigation.NavigateTo($"/order-detail/{orderCreated.OrderId}", true);
-                await SignalRService.NotifyOrderCreatedAsync(int.Parse(orderCreated.OrderId), currentUserId.Value, currentPricing.TotalAmount);
+                    if (sellerOrderItems.Any())
+                    {
+                        var sellerOrderRequest = new CreateOrderRequest
+                        {
+                            UserId = currentUserId.Value,
+                            ShippingAddressId = selectedAddress?.AddressId,
+                            CouponId = appliedCoupon.CouponId,
+                            OrderItems = sellerOrderItems
+                        };
+                        var orderCreated = await OrderService.CreateOrderWithItemsAsync(sellerOrderRequest);
+                        await SignalRService.NotifyOrderCreatedAsync(int.Parse(orderCreated.OrderId), currentUserId.Value,
+            currentPricing.TotalAmount);
+                    }
+                }
+            }
+            // ✅ Clear cart and checkout data after successful order
+            // Show success message
+            ToastService.ShowSuccess("Order placed successfully! Redirecting to order confirmation...");
+            await CouponService.UpdateCouponUsageCount(appliedCoupon.CouponId);
+            CartVM.ClearCart();
+            CouponStateService.ClearAllData();
+            // Redirect to order confirmation page
+            Navigation.NavigateTo($"/my-orders", true);
         }
         catch (Exception ex)
         {

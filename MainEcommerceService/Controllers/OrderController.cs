@@ -32,7 +32,7 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Lấy tất cả đơn hàng - Chỉ Admin
         /// </summary>
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Seller")]
         [HttpGet("GetAllOrders")]
         public async Task<IActionResult> GetAllOrders()
         {
@@ -86,7 +86,7 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Lấy đơn hàng theo trạng thái - Chỉ Admin
         /// </summary>
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Seller")]
         [HttpGet("GetOrdersByStatus/{statusId}")]
         public async Task<IActionResult> GetOrdersByStatus(int statusId)
         {
@@ -104,7 +104,7 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Lấy đơn hàng theo khoảng thời gian - Chỉ Admin
         /// </summary>
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Seller")]
         [HttpGet("GetOrdersByDateRange")]
         public async Task<IActionResult> GetOrdersByDateRange([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
@@ -206,7 +206,7 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Cập nhật trạng thái đơn hàng - Chỉ Admin
         /// </summary>
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Seller")]
         [HttpPut("UpdateOrderStatus/{orderId}")]
         public async Task<IActionResult> UpdateOrderStatus(int orderId, [FromBody] UpdateOrderStatusRequest request)
         {
@@ -229,7 +229,7 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Cập nhật trạng thái đơn hàng theo tên - Chỉ Admin
         /// </summary>
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Seller")]
         [HttpPut("UpdateOrderStatusByName/{orderId}")]
         public async Task<IActionResult> UpdateOrderStatusByName(int orderId, [FromBody] UpdateOrderStatusByNameRequest request)
         {
@@ -252,7 +252,7 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Xóa đơn hàng - Chỉ Admin
         /// </summary>
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Seller")]
         [HttpDelete("DeleteOrder/{orderId}")]
         public async Task<IActionResult> DeleteOrder(int orderId)
         {
@@ -299,7 +299,7 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Lấy tất cả chi tiết đơn hàng - Chỉ Admin
         /// </summary>
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Seller")]
         [HttpGet("OrderItems/GetAllOrderItems")]
         public async Task<IActionResult> GetAllOrderItems()
         {
@@ -353,7 +353,7 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Lấy chi tiết đơn hàng theo ProductId - Chỉ Admin
         /// </summary>
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Seller")]
         [HttpGet("OrderItems/GetOrderItemsByProductId/{productId}")]
         public async Task<IActionResult> GetOrderItemsByProductId(int productId)
         {
@@ -435,7 +435,7 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Xóa chi tiết đơn hàng - Chỉ Admin
         /// </summary>
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Seller")]
         [HttpDelete("OrderItems/DeleteOrderItem/{orderItemId}")]
         public async Task<IActionResult> DeleteOrderItem(int orderItemId)
         {
@@ -511,7 +511,7 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Tạo trạng thái đơn hàng mới - Chỉ Admin
         /// </summary>
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Seller")]
         [HttpPost("OrderStatus/CreateOrderStatus")]
         public async Task<IActionResult> CreateOrderStatus([FromBody] OrderStatusVM orderStatusVM)
         {
@@ -534,7 +534,7 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Cập nhật trạng thái đơn hàng - Chỉ Admin
         /// </summary>
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Seller")]
         [HttpPut("OrderStatus/UpdateOrderStatus")]
         public async Task<IActionResult> UpdateOrderStatus([FromBody] OrderStatusVM orderStatusVM)
         {
@@ -557,7 +557,7 @@ namespace MainEcommerceService.Controllers
         /// <summary>
         /// Xóa trạng thái đơn hàng - Chỉ Admin
         /// </summary>
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Seller")]
         [HttpDelete("OrderStatus/DeleteOrderStatus/{statusId}")]
         public async Task<IActionResult> DeleteOrderStatus(int statusId)
         {

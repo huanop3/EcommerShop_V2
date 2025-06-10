@@ -167,12 +167,6 @@ namespace BlazorWebApp.Services
                     options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
                     options.SkipNegotiation = true;
                 })
-                .WithAutomaticReconnect(new[] {
-                    TimeSpan.Zero,
-                    TimeSpan.FromSeconds(1),
-                    TimeSpan.FromSeconds(2),
-                    TimeSpan.FromSeconds(5)
-                })
                 .ConfigureLogging(logging =>
                 {
                     logging.SetMinimumLevel(LogLevel.Warning);
@@ -200,12 +194,6 @@ namespace BlazorWebApp.Services
                     };
                     options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
                     options.SkipNegotiation = true;
-                })
-                .WithAutomaticReconnect(new[] {
-                    TimeSpan.Zero,
-                    TimeSpan.FromSeconds(1),
-                    TimeSpan.FromSeconds(2),
-                    TimeSpan.FromSeconds(5)
                 })
                 .ConfigureLogging(logging =>
                 {
@@ -1098,79 +1086,5 @@ namespace BlazorWebApp.Services
                 await Task.WhenAll(disposeTasks);
             }
         }
-
-        // Thêm logging để check có nhận được signal không:
-
-        private async Task ConfigureMainHubConnection()
-        {
-            try
-            {
-                // ✅ THÊM: Log tất cả events với detailed info
-                _mainHubConnection.On<int>("OrderConfirmed", (orderId) =>
-                {
-                    Console.WriteLine($"🔔 SignalRService: Received OrderConfirmed signal - OrderId: {orderId}");
-                    _logger.LogInformation("📡 SignalRService: OrderConfirmed received for order {OrderId}", orderId);
-                    OrderConfirmed?.Invoke(orderId);
-                });
-
-                _mainHubConnection.On<int, string>("OrderCancelled", (orderId, reason) =>
-                {
-                    Console.WriteLine($"🔔 SignalRService: Received OrderCancelled signal - OrderId: {orderId}, Reason: {reason}");
-                    _logger.LogInformation("📡 SignalRService: OrderCancelled received for order {OrderId}: {Reason}", orderId, reason);
-                    OrderCancelled?.Invoke(orderId, reason);
-                });
-
-                _mainHubConnection.On<int, int, decimal>("OrderCreated", (orderId, userId, totalAmount) =>
-                {
-                    Console.WriteLine($"🔔 SignalRService: Received OrderCreated signal - OrderId: {orderId}, UserId: {userId}, Amount: {totalAmount}");
-                    _logger.LogInformation("📡 SignalRService: OrderCreated received - OrderId: {OrderId}, UserId: {UserId}", orderId, userId);
-                    OrderCreated?.Invoke(orderId, userId, totalAmount);
-                });
-
-                _mainHubConnection.On<int, string, string>("YourOrderStatusChanged", (orderId, statusName, message) =>
-                {
-                    Console.WriteLine($"🔔 SignalRService: Received YourOrderStatusChanged signal - OrderId: {orderId}, Status: {statusName}, Message: {message}");
-                    _logger.LogInformation("📡 SignalRService: YourOrderStatusChanged received - OrderId: {OrderId}, Status: {StatusName}", orderId, statusName);
-                    YourOrderStatusChanged?.Invoke(orderId, statusName, message);
-                });
-
-                // ✅ THÊM: Generic message handler để catch tất cả
-                _mainHubConnection.On<string, object>("GenericMessage", (eventName, data) =>
-                {
-                    Console.WriteLine($"🔔 SignalRService: Received generic message - Event: {eventName}, Data: {data}");
-                    _logger.LogInformation("📡 SignalRService: Generic message received - Event: {EventName}", eventName);
-                });
-
-                // ✅ THÊM: Log connection events
-                _mainHubConnection.Closed += async (error) =>
-                {
-                    Console.WriteLine($"❌ SignalRService: Connection closed - Error: {error?.Message}");
-                    _logger.LogWarning("SignalR connection closed: {Error}", error?.Message);
-                    await Task.Delay(Random.Shared.Next(0, 5) * 1000);
-                    await StartConnectionAsync();
-                };
-
-                _mainHubConnection.Reconnecting += error =>
-                {
-                    Console.WriteLine($"🔄 SignalRService: Reconnecting - Error: {error?.Message}");
-                    _logger.LogInformation("SignalR reconnecting: {Error}", error?.Message);
-                    return Task.CompletedTask;
-                };
-
-                _mainHubConnection.Reconnected += connectionId =>
-                {
-                    Console.WriteLine($"✅ SignalRService: Reconnected - ConnectionId: {connectionId}");
-                    _logger.LogInformation("SignalR reconnected: {ConnectionId}", connectionId);
-                    return Task.CompletedTask;
-                };
-
-                _logger.LogInformation("✅ SignalRService: Main hub connection configured with all event handlers");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "❌ SignalRService: Error configuring main hub connection");
-                throw;
-            }
-        }
-    }
+    } 
 }

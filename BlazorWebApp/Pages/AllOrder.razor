@@ -9,6 +9,7 @@
 @inject OrderService OrderService
 @inject UserService UserService
 @inject NavigationManager Navigation
+@inject SignalRService SignalRService
 @inject ToastService ToastService
 @attribute [Authorize]
 
@@ -345,7 +346,7 @@
     // Filters
     private string selectedStatusFilter = "";
     private string selectedDateFilter = "";
-    
+    public bool signalRConnected = false;
     // Cancel Dialog
     private bool showCancelDialog = false;
     private int orderToCancel = 0;
@@ -364,6 +365,7 @@
             }
 
             await LoadUserOrdersAsync();
+            await InitializeSignalRAsync();
         }
         catch (Exception ex)
         {
@@ -376,7 +378,7 @@
             StateHasChanged();
         }
     }
-
+    
     private async Task GetCurrentUserAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
@@ -507,7 +509,21 @@
         cancelReason = "";
         StateHasChanged();
     }
-
+    public async Task InitializeSignalRAsync()
+    {
+        await SignalRService.StartConnectionAsync();
+        SignalRService.YourOrderStatusChanged += OnOrderStatusChanged;
+    }
+    public async void OnOrderStatusChanged(int orderId, string statusName, string message)
+    {
+        
+        await InvokeAsync(async () =>
+        {
+            await LoadUserOrdersAsync(); // Refresh orders after status change
+            ToastService?.ShowInfo($"Trạng thái đơn hàng {orderId} đã cập nhật: {statusName}");
+            StateHasChanged();
+        });
+    }
     private async Task ConfirmCancelOrder()
     {
         if (orderToCancel == 0 || isCancelling) return;
@@ -638,5 +654,15 @@
             return "No orders match your current filters. Try adjusting your search criteria.";
         }
         return "You haven't placed any orders yet. Start shopping to see your orders here!";
+    }
+    // ✅ SỬA: Cập nhật dispose để clear cache
+    public async ValueTask DisposeAsync()
+    {
+        // Unsubscribe from SignalR events
+        SignalRService.YourOrderStatusChanged -= OnOrderStatusChanged;
+        if (SignalRService != null)
+        {
+            await SignalRService.DisposeAsync();
+        }
     }
 }
