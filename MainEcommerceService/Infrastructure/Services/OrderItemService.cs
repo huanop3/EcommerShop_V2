@@ -59,7 +59,6 @@ public class OrderItemService : IOrderItemService
 
             var orderItems = await _unitOfWork._orderItemRepository.Query()
                 .Where(oi => oi.IsDeleted == false)
-                .Include(oi => oi.Order)
                 .ToListAsync();
 
             if (orderItems == null || !orderItems.Any())
@@ -119,7 +118,6 @@ public class OrderItemService : IOrderItemService
             }
 
             var orderItem = await _unitOfWork._orderItemRepository.Query()
-                .Include(oi => oi.Order)
                 .FirstOrDefaultAsync(oi => oi.OrderItemId == orderItemId && oi.IsDeleted == false);
 
             if (orderItem == null)
@@ -232,7 +230,6 @@ public class OrderItemService : IOrderItemService
 
             var orderItems = await _unitOfWork._orderItemRepository.Query()
                 .Where(oi => oi.ProductId == productId && oi.IsDeleted == false)
-                .Include(oi => oi.Order)
                 .ToListAsync();
 
             var orderItemVMs = orderItems.Select(oi => new OrderItemVM

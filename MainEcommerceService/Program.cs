@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text;
 using MainEcommerceService.Hubs;
+using MainEcommerceService.Infrastructure.Services;
 using MainEcommerceService.Kafka;
 using MainEcommerceService.Models.dbMainEcommer;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -124,6 +125,7 @@ builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IOrderStatusService, OrderStatusService>();
 builder.Services.AddScoped<IOrderItemService, OrderItemService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddHttpClient();
 
 // Lấy chuỗi kết nối Redis từ cấu hình

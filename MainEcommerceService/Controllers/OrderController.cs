@@ -292,6 +292,37 @@ namespace MainEcommerceService.Controllers
                 return BadRequest(response);
             }
         }
+        [Authorize(Roles = "Seller")]
+        [HttpGet("GetOrdersBySellerWithDetails/{sellerId}")]
+        public async Task<IActionResult> GetOrdersBySellerWithDetails(int sellerId)
+        {
+            var response = await _orderService.GetOrdersBySellerWithDetails(sellerId);
+            if (response.Success)
+            {
+                return Ok(response);
+            }
+            else
+            {
+                return BadRequest(response);
+            }
+        }
+        /// <summary>
+        /// Lấy tất cả đơn hàng với đầy đủ thông tin cho Admin - CHỈ 1 API CALL
+        /// </summary>
+        [Authorize(Roles = "Admin")]
+        [HttpGet("GetAllOrdersWithCompleteDetails")]
+        public async Task<IActionResult> GetAllOrdersWithCompleteDetails()
+        {
+            var response = await _orderService.GetAllOrdersWithCompleteDetails();
+            if (response.Success)
+            {
+                return Ok(response);
+            }
+            else
+            {
+                return BadRequest(response);
+            }
+        }
         #endregion
 
         #region OrderItem Management

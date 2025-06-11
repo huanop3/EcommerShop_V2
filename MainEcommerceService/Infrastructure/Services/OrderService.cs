@@ -6,6 +6,7 @@ using MainEcommerceService.Models.ViewModel;
 using Microsoft.EntityFrameworkCore;
 using MainEcommerceService.Kafka;
 using MainEcommerceService.Models.Kafka;
+using ProductService.Models.ViewModel;
 
 public interface IOrderService
 {
@@ -22,6 +23,8 @@ public interface IOrderService
     Task<HTTPResponseClient<string>> UpdateOrderStatusByName(int orderId, string statusName);
     Task<HTTPResponseClient<string>> GetOrderStatusNameByOrderId(int orderId);
     Task<HTTPResponseClient<bool>> CancelOrder(int orderId);
+    Task<HTTPResponseClient<IEnumerable<OrderWithDetailsVM>>> GetOrdersBySellerWithDetails(int sellerId);
+    Task<HTTPResponseClient<AdminOrdersCompleteView>> GetAllOrdersWithCompleteDetails();
 }
 
 public class OrderService : IOrderService
@@ -30,6 +33,7 @@ public class OrderService : IOrderService
     private readonly RedisHelper _cacheService;
     private readonly IHubContext<NotificationHub> _hubContext;
     private readonly IKafkaProducerService _kafkaProducer;
+    private readonly HttpClient _httpClient;
     private readonly ILogger<OrderService> _logger;
 
     public OrderService(
@@ -37,12 +41,14 @@ public class OrderService : IOrderService
         RedisHelper cacheService,
         IHubContext<NotificationHub> hubContext,
         IKafkaProducerService kafkaProducer,
+        HttpClient httpClient,
         ILogger<OrderService> logger)
     {
         _unitOfWork = unitOfWork;
         _cacheService = cacheService;
         _hubContext = hubContext;
         _kafkaProducer = kafkaProducer;
+        _httpClient = httpClient;
         _logger = logger;
     }
 
@@ -65,8 +71,6 @@ public class OrderService : IOrderService
 
             var orders = await _unitOfWork._orderRepository.Query()
                 .Where(o => o.IsDeleted == false)
-                .Include(o => o.OrderStatus)
-                .Include(o => o.User)
                 .ToListAsync();
 
             if (orders == null || !orders.Any())
@@ -129,8 +133,6 @@ public class OrderService : IOrderService
             }
 
             var order = await _unitOfWork._orderRepository.Query()
-                .Include(o => o.OrderStatus)
-                .Include(o => o.User)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId && o.IsDeleted == false);
 
             if (order == null)
@@ -194,7 +196,6 @@ public class OrderService : IOrderService
 
             var orders = await _unitOfWork._orderRepository.Query()
                 .Where(o => o.UserId == userId && o.IsDeleted == false)
-                .Include(o => o.OrderStatus)
                 .OrderByDescending(o => o.OrderDate)
                 .ToListAsync();
 
@@ -518,8 +519,6 @@ public class OrderService : IOrderService
 
             var orders = await _unitOfWork._orderRepository.Query()
                 .Where(o => o.OrderStatusId == statusId && o.IsDeleted == false)
-                .Include(o => o.OrderStatus)
-                .Include(o => o.User)
                 .OrderByDescending(o => o.OrderDate)
                 .ToListAsync();
 
@@ -575,8 +574,6 @@ public class OrderService : IOrderService
 
             var orders = await _unitOfWork._orderRepository.Query()
                 .Where(o => o.OrderDate >= startDate && o.OrderDate <= endDate && o.IsDeleted == false)
-                .Include(o => o.OrderStatus)
-                .Include(o => o.User)
                 .OrderByDescending(o => o.OrderDate)
                 .ToListAsync();
 
@@ -955,6 +952,264 @@ public class OrderService : IOrderService
         }
         return response;
     }
+
+
+public async Task<HTTPResponseClient<IEnumerable<OrderWithDetailsVM>>> GetOrdersBySellerWithDetails(int sellerId)
+{
+    var response = new HTTPResponseClient<IEnumerable<OrderWithDetailsVM>>();
+    try
+    {
+        string cacheKey = $"OrdersBySellerWithDetails_{sellerId}";
+        var cachedOrders = await _cacheService.GetAsync<IEnumerable<OrderWithDetailsVM>>(cacheKey);
+        if (cachedOrders != null)
+        {
+            response.Data = cachedOrders;
+            response.Success = true;
+            response.StatusCode = 200;
+            response.Message = "Lấy đơn hàng theo seller từ cache thành công";
+            response.DateTime = DateTime.Now;
+            return response;
+        }
+
+        // 🔥 BƯỚC 1: Gọi Product service CHỈ 1 LẦN để lấy tất cả products của seller
+        var sellerProducts = await GetProductsBySellerFromProductService(sellerId);
+        var sellerProductIds = sellerProducts.Select(p => p.ProductId).ToHashSet();
+        
+        // 🔥 BƯỚC 2: Nếu seller không có product nào thì return empty
+        if (!sellerProductIds.Any())
+        {
+            response.Data = Enumerable.Empty<OrderWithDetailsVM>();
+            response.Success = true;
+            response.StatusCode = 200;
+            response.Message = "Seller không có sản phẩm nào";
+            response.DateTime = DateTime.Now;
+            return response;
+        }
+
+        // 🔥 BƯỚC 3: Query database với filter ProductId IN sellerProductIds
+        var ordersWithDetails = await _unitOfWork._orderRepository.Query()
+            .Where(o => o.IsDeleted == false)
+            .Join(_unitOfWork._orderItemRepository.Query().Where(oi => 
+                oi.IsDeleted == false && 
+                sellerProductIds.Contains(oi.ProductId)), // 🔥 Filter ngay trong JOIN
+                order => order.OrderId,
+                orderItem => orderItem.OrderId,
+                (order, orderItem) => new { Order = order, OrderItem = orderItem })
+            .GroupBy(joined => joined.Order)
+            .Select(group => new OrderWithDetailsVM
+            {
+                OrderId = group.Key.OrderId,
+                UserId = group.Key.UserId,
+                OrderStatusId = group.Key.OrderStatusId,
+                OrderDate = group.Key.OrderDate,
+                TotalAmount = group.Key.TotalAmount,
+                ShippingAddressId = group.Key.ShippingAddressId,
+                CouponId = group.Key.CouponId,
+                CreatedAt = group.Key.CreatedAt,
+                UpdatedAt = group.Key.UpdatedAt,
+                IsDeleted = group.Key.IsDeleted,
+                OrderItems = group.Select(g => new OrderItemWithProductVM
+                {
+                    OrderItemId = g.OrderItem.OrderItemId,
+                    OrderId = g.OrderItem.OrderId,
+                    ProductId = g.OrderItem.ProductId,
+                    Quantity = g.OrderItem.Quantity,
+                    UnitPrice = g.OrderItem.UnitPrice,
+                    TotalPrice = g.OrderItem.TotalPrice,
+                    CreatedAt = g.OrderItem.CreatedAt,
+                    UpdatedAt = g.OrderItem.UpdatedAt,
+                    IsDeleted = g.OrderItem.IsDeleted,
+                    SellerId = sellerId,
+                    ProductName = "Unknown Product" // Set default value, will be populated later
+                }).ToList()
+            })
+            .OrderByDescending(o => o.CreatedAt)
+            .ToListAsync();
+
+        // 🔥 BƯỚC 4: Populate product names after query execution
+        foreach (var order in ordersWithDetails)
+        {
+            foreach (var orderItem in order.OrderItems)
+            {
+                var product = sellerProducts.FirstOrDefault(p => p.ProductId == orderItem.ProductId);
+                orderItem.ProductName = product?.ProductName ?? "Unknown Product";
+            }
+        }
+
+        // 🔥 BƯỚC 4: Không cần vòng lặp để filter nữa vì đã filter trong query rồi!
+        
+        await _cacheService.SetAsync(cacheKey, ordersWithDetails, TimeSpan.FromMinutes(15));
+
+        response.Data = ordersWithDetails;
+        response.Success = true;
+        response.StatusCode = 200;
+        response.Message = "Lấy đơn hàng theo seller thành công";
+        response.DateTime = DateTime.Now;
+        
+        _logger.LogInformation("✅ Retrieved {Count} orders for seller {SellerId} with {ProductCount} products", 
+            ordersWithDetails.Count(), sellerId, sellerProductIds.Count);
+    }
+    catch (Exception ex)
+    {
+        response.Success = false;
+        response.StatusCode = 500;
+        response.Message = $"Lỗi khi lấy đơn hàng theo seller: {ex.Message}";
+        response.DateTime = DateTime.Now;
+        _logger.LogError(ex, "❌ Error getting orders by seller {SellerId}", sellerId);
+    }
+    return response;
+}
+    public async Task<HTTPResponseClient<AdminOrdersCompleteView>> GetAllOrdersWithCompleteDetails()
+    {
+        var response = new HTTPResponseClient<AdminOrdersCompleteView>();
+        try
+        {
+            string cacheKey = "AdminOrdersCompleteView";
+            var cachedData = await _cacheService.GetAsync<AdminOrdersCompleteView>(cacheKey);
+            if (cachedData != null)
+            {
+                response.Data = cachedData;
+                response.Success = true;
+                response.StatusCode = 200;
+                response.Message = "Lấy dữ liệu đơn hàng từ cache thành công";
+                response.DateTime = DateTime.Now;
+                return response;
+            }
+
+            // 🔥 SINGLE COMPLEX QUERY với tất cả joins
+            var ordersWithDetails = await _unitOfWork._orderRepository.Query()
+                .Where(o => o.IsDeleted == false)
+                .Include(o => o.OrderItems.Where(oi => oi.IsDeleted == false))
+                .Include(o => o.User)
+                .Include(o => o.OrderStatus)
+                .Select(o => new OrderWithCompleteDetailsVM
+                {
+                    // Order info
+                    OrderId = o.OrderId,
+                    UserId = o.UserId,
+                    OrderStatusId = o.OrderStatusId,
+                    OrderDate = o.OrderDate,
+                    TotalAmount = o.TotalAmount,
+                    ShippingAddressId = o.ShippingAddressId,
+                    CouponId = o.CouponId,
+                    CreatedAt = o.CreatedAt,
+                    UpdatedAt = o.UpdatedAt,
+                    IsDeleted = o.IsDeleted,
+
+                    // Order Status info
+                    OrderStatusName = o.OrderStatus.StatusName,
+
+                    // Customer info
+                    CustomerFirstName = o.User.FirstName,
+                    CustomerLastName = o.User.LastName,
+                    CustomerEmail = o.User.Email,
+                    CustomerPhone = o.User.PhoneNumber,
+
+                    // Order Items
+                    OrderItems = o.OrderItems.Select(oi => new OrderItemWithProductDetailsVM
+                    {
+                        OrderItemId = oi.OrderItemId,
+                        OrderId = oi.OrderId,
+                        ProductId = oi.ProductId,
+                        Quantity = oi.Quantity,
+                        UnitPrice = oi.UnitPrice,
+                        TotalPrice = oi.TotalPrice,
+                        CreatedAt = oi.CreatedAt,
+                        UpdatedAt = oi.UpdatedAt,
+                        IsDeleted = oi.IsDeleted
+                    }).ToList()
+                })
+                .OrderByDescending(o => o.CreatedAt)
+                .ToListAsync();
+
+            // 🔥 SINGLE BATCH CALL đến Product Service để lấy tất cả product info
+            var allProductIds = ordersWithDetails
+                .SelectMany(o => o.OrderItems.Select(oi => oi.ProductId))
+                .Distinct()
+                .ToList();
+
+            var productDetails = await GetAllProductsFromProductService();
+            var productDetailsDict = productDetails.ToDictionary(p => p.ProductId, p => p);
+            // 🔥 Populate product information từ dữ liệu đã có
+            foreach (var order in ordersWithDetails)
+            {
+                foreach (var item in order.OrderItems)
+                {
+                    if (productDetailsDict.TryGetValue(item.ProductId, out var productInfo))
+                    {
+                        item.ProductName = productInfo.ProductName;
+                        item.SellerStoreName = _unitOfWork._sellerProfileRepository
+                            .Query()
+                            .Where(sp => sp.SellerId == productInfo.SellerId && sp.IsDeleted == false)
+                            .Select(sp => sp.StoreName)
+                            .FirstOrDefault() ?? "Unknown Store";
+                        item.SellerId = productInfo.SellerId;
+                    }
+                    else
+                    {
+                        item.ProductName = "Unknown Product";
+                        item.SellerId = 0;
+                    }
+                }
+            }
+
+            var completeView = new AdminOrdersCompleteView
+            {
+                Orders = ordersWithDetails,
+                TotalOrders = ordersWithDetails.Count,
+                PendingOrders = ordersWithDetails.Count(o => o.OrderStatusName == "Pending"),
+                LoadedAt = DateTime.Now
+            };
+
+            // Cache for 10 minutes
+            await _cacheService.SetAsync(cacheKey, completeView, TimeSpan.FromMinutes(10));
+
+            response.Data = completeView;
+            response.Success = true;
+            response.StatusCode = 200;
+            response.Message = "Lấy dữ liệu đơn hàng thành công";
+            response.DateTime = DateTime.Now;
+
+            _logger.LogInformation("✅ Retrieved {OrderCount} orders with {ProductCount} products for Admin",
+                ordersWithDetails.Count, allProductIds.Count);
+        }
+        catch (Exception ex)
+        {
+            response.Success = false;
+            response.StatusCode = 500;
+            response.Message = $"Lỗi khi lấy dữ liệu đơn hàng: {ex.Message}";
+            response.DateTime = DateTime.Now;
+            _logger.LogError(ex, "❌ Error getting complete orders data for admin");
+        }
+        return response;
+    }
+    private async Task<IEnumerable<ProductVM>> GetAllProductsFromProductService()
+    {
+        var response = await _httpClient.GetAsync("https://localhost:7252/api/Product/GetAllProducts");
+            
+            // Call to Product service - you can inject HttpClient or use existing service
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<IEnumerable<ProductVM>>>();
+            return result?.Data ?? Enumerable.Empty<ProductVM>();
+        }
+
+        return Enumerable.Empty<ProductVM>();
+    
+}
+    private async Task<IEnumerable<ProductVM>> GetProductsBySellerFromProductService(int sellerId)
+    {
+        // Call to Product service - you can inject HttpClient or use existing service
+        var response = await _httpClient.GetAsync($"https://localhost:7252/api/Product/GetProductsBySeller/{sellerId}");
+
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<IEnumerable<ProductVM>>>();
+            return result?.Data ?? Enumerable.Empty<ProductVM>();
+        }
+
+        return Enumerable.Empty<ProductVM>();
+    }
     private async Task InvalidateAllOrderCaches(int orderId, int userId, int statusId)
     {
         var cacheKeys = new[]
@@ -965,10 +1220,13 @@ public class OrderService : IOrderService
             $"OrdersByStatus_{statusId}",
             $"OrderItemsByOrder_{orderId}",
             $"OrderStatus_{orderId}",
-            $"AllProducts"
+            $"AllProducts",
+            $"OrdersBySellerWithDetails_*",
+            $"AdminOrdersCompleteView"
         };
 
         var tasks = cacheKeys.Select(key => _cacheService.DeleteByPatternAsync(key));
         await Task.WhenAll(tasks);
     }
+    // ...existing code...
 }

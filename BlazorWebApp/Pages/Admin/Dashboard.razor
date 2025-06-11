@@ -1,455 +1,872 @@
 @page "/admin"
 @page "/admin/dashboard"
+@page "/seller/dashboard"
+@using Microsoft.AspNetCore.Authorization
 @using MudBlazor
-@using MudBlazor.Charts
+@using System.Security.Claims
+@using BlazorWebApp.Services
+@using MainEcommerceService.Models.ViewModel
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject DashboardService DashboardService
+@inject SellerProfileService SellerProfileService
+@inject SignalRService SignalRService
 @layout _AdminLayout
-@* @attribute [Authorize(Roles = "Seller")] *@
 @attribute [Authorize(Roles = "Admin,Seller")]
-<PageTitle>Admin Dashboard - Grabit</PageTitle>
+@implements IAsyncDisposable
 
-<MudText Typo="Typo.h4" Class="mb-4">Dashboard Overview</MudText>
+<PageTitle>Dashboard - Grabit</PageTitle>
 
-<!-- Stats Cards -->
-<MudGrid Spacing="2">
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="0" Class="pa-4" Style="height: 100%; background-color: white; border-radius: 4px;">
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Total Sales</MudText>
-            <MudText Typo="Typo.h5" Style="margin-top: 8px; margin-bottom: 8px;">$24,780</MudText>
-            <MudStack Row="true" AlignItems="AlignItems.Center">
-                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Success" Size="Size.Small" />
-                <MudText Typo="Typo.caption" Color="Color.Success">12.5% from last month</MudText>
-            </MudStack>
-            <div style="position: absolute; top: 20px; right: 20px;">
-                <MudAvatar Color="Color.Success" Size="Size.Medium" Style="background-color: #5CAF90;">
-                    <MudIcon Icon="@Icons.Material.Filled.AttachMoney" />
-                </MudAvatar>
-            </div>
-        </MudPaper>
-    </MudItem>
-    
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="0" Class="pa-4" Style="height: 100%; background-color: white; border-radius: 4px;">
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Total Orders</MudText>
-            <MudText Typo="Typo.h5" Style="margin-top: 8px; margin-bottom: 8px;">1,482</MudText>
-            <MudStack Row="true" AlignItems="AlignItems.Center">
-                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Success" Size="Size.Small" />
-                <MudText Typo="Typo.caption" Color="Color.Success">5.2% from last month</MudText>
-            </MudStack>
-            <div style="position: absolute; top: 20px; right: 20px;">
-                <MudAvatar Color="Color.Info" Size="Size.Medium" Style="background-color: #3498DB;">
-                    <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" />
-                </MudAvatar>
-            </div>
-        </MudPaper>
-    </MudItem>
-    
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="0" Class="pa-4" Style="height: 100%; background-color: white; border-radius: 4px;">
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Total Users</MudText>
-            <MudText Typo="Typo.h5" Style="margin-top: 8px; margin-bottom: 8px;">892</MudText>
-            <MudStack Row="true" AlignItems="AlignItems.Center">
-                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Success" Size="Size.Small" />
-                <MudText Typo="Typo.caption" Color="Color.Success">4.3% from last month</MudText>
-            </MudStack>
-            <div style="position: absolute; top: 20px; right: 20px;">
-                <MudAvatar Color="Color.Secondary" Size="Size.Medium" Style="background-color: #4B5966;">
-                    <MudIcon Icon="@Icons.Material.Filled.People" />
-                </MudAvatar>
-            </div>
-        </MudPaper>
-    </MudItem>
-    
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="0" Class="pa-4" Style="height: 100%; background-color: white; border-radius: 4px;">
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Total Products</MudText>
-            <MudText Typo="Typo.h5" Style="margin-top: 8px; margin-bottom: 8px;">154</MudText>
-            <MudStack Row="true" AlignItems="AlignItems.Center">
-                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Success" Size="Size.Small" />
-                <MudText Typo="Typo.caption" Color="Color.Success">2.1% from last month</MudText>
-            </MudStack>
-            <div style="position: absolute; top: 20px; right: 20px;">
-                <MudAvatar Color="Color.Warning" Size="Size.Medium" Style="background-color: #1ABC9C;">
-                    <MudIcon Icon="@Icons.Material.Filled.Inventory" />
-                </MudAvatar>
-            </div>
-        </MudPaper>
-    </MudItem>
-</MudGrid>
-
-<!-- Charts Section -->
-<MudGrid Class="mt-4">
-    <MudItem xs="12" md="8">
-        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
-            <MudGrid>
-                <MudItem xs="6">
-                    <MudText Typo="Typo.h6">Sales Analytics</MudText>
-                </MudItem>
-                <MudItem xs="6" Style="text-align: right;">
-                    <MudSelect T="int" Value="@_selectedSalesPeriodInt" ValueChanged="@(value => UpdateSalesChart(value))" 
-                              Label="Period" Dense="true" Style="max-width: 200px; display: inline-block; text-align: left;" 
-                              Margin="Margin.Dense" Class="mt-n1" FullWidth="false">
-                        <MudSelectItem Value="7">Last 7 Days</MudSelectItem>
-                        <MudSelectItem Value="30">Last 30 Days</MudSelectItem>
-                        <MudSelectItem Value="90">Last 90 Days</MudSelectItem>
-                        <MudSelectItem Value="365">This Year</MudSelectItem>
-                    </MudSelect>
-                </MudItem>
-            </MudGrid>
-            
-            <div style="height: 300px; margin-top: 12px;">
-                <MudChart ChartType="ChartType.Line" ChartSeries="@_salesChartSeries" XAxisLabels="@_salesChartLabels" 
-                          Width="100%" Height="300px" ChartOptions="@_chartOptions" />
-            </div>
-            <MudGrid Class="mt-3">
-                <MudItem xs="12" Style="text-align: center;">
-                    <MudStack Row="true" Justify="Justify.Center" AlignItems="AlignItems.Center">
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mx-2">
-                        </MudStack>
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mx-2">
-                            
-                        </MudStack>
-                    </MudStack>
-                </MudItem>
-            </MudGrid>
-        </MudPaper>
-    </MudItem>
-    
-    <MudItem xs="12" md="4">
-        <MudPaper Elevation="0" Class="pa-4" Style="height: 100%; background-color: white; border-radius: 4px;">
-            <MudGrid>
-                <MudItem xs="6">
-                    <MudText Typo="Typo.h6">Top Products</MudText>
-                </MudItem>
-                <MudItem xs="6" Style="text-align: right;">
-                    <MudSelect T="int" Value="@_selectedProductsPeriodInt" ValueChanged="@(value => UpdateProductsChart(value))" 
-                              Label="Period" Dense="true" Style="max-width: 200px; display: inline-block; text-align: left;" 
-                              Margin="Margin.Dense" Class="mt-n1" FullWidth="false">
-                        <MudSelectItem Value="7">Last 7 Days</MudSelectItem>
-                        <MudSelectItem Value="30">Last 30 Days</MudSelectItem>
-                        <MudSelectItem Value="90">Last 90 Days</MudSelectItem>
-                        <MudSelectItem Value="365">This Year</MudSelectItem>
-                    </MudSelect>
-                </MudItem>
-            </MudGrid>
-            
-            <div style="height: 300px; margin-top: 12px;">
-                <MudChart ChartType="ChartType.Donut" InputData="@_productsChartData" InputLabels="@_productsChartLabels" 
-                          Width="100%" Height="280px" />
-            </div>
-            <MudGrid Class="mt-3">
-                <MudItem xs="12">
-                    <MudStack Row="true" Justify="Justify.Center" AlignItems="AlignItems.Center" Wrap="@MudBlazor.Wrap.Wrap">
-                        @for (int i = 0; i < _productsChartLabels.Length; i++)
+<MudGrid>
+    <MudItem xs="12">
+        <MudPaper Elevation="0" Class="d-flex align-center justify-space-between pa-4" Style="background-color: white; border-radius: 4px;">
+            <div>
+                <MudText Typo="Typo.h4">
+                    @if (userRole == "Admin")
+                    {
+                        <text>Admin Dashboard</text>
+                    }
+                    else
+                    {
+                        <text>@(sellerDashboardData?.StoreName ?? "Your Store") Dashboard</text>
+                    }
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                    @if (userRole == "Admin")
+                    {
+                        <text>Welcome back! Here's what's happening with your platform.</text>
+                    }
+                    else
+                    {
+                        <text>Welcome back! Here's how your store is performing.</text>
+                        @if (sellerDashboardData?.IsVerified != true)
                         {
-                            var index = i;
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mx-2 mb-1">
-                                
-                            </MudStack>
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small" Class="ml-2">Pending Verification</MudChip>
                         }
-                    </MudStack>
-                </MudItem>
-            </MudGrid>
-        </MudPaper>
-    </MudItem>
-</MudGrid>
-
-<!-- Recent Orders Table -->
-<MudGrid Class="mt-4">
-    <MudItem xs="12">
-        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
-            <MudGrid>
-                <MudItem xs="6">
-                    <MudText Typo="Typo.h6">Recent Orders</MudText>
-                </MudItem>
-                <MudItem xs="6" Style="text-align: right;">
-                    <MudButton Variant="Variant.Text" Color="Color.Primary" EndIcon="@Icons.Material.Filled.KeyboardArrowRight"
-                              Href="/admin/orders" Class="mt-n1">
-                        VIEW ALL
-                    </MudButton>
-                </MudItem>
-            </MudGrid>
-            
-            <div style="margin-top: 16px;">
-                <MudTable Items="@_recentOrders" Hover="true" Striped="false" Bordered="false" Elevation="0" Dense="true">
-                    <HeaderContent>
-                        <MudTh Style="width: 100px">Order ID</MudTh>
-                        <MudTh Style="width: 180px">Customer</MudTh>
-                        <MudTh>Products</MudTh>
-                        <MudTh Style="width: 120px">Date</MudTh>
-                        <MudTh Style="width: 100px">Amount</MudTh>
-                        <MudTh Style="width: 120px">Status</MudTh>
-                        <MudTh Style="width: 60px"></MudTh>
-                    </HeaderContent>
-                    <RowTemplate>
-                        <MudTd DataLabel="Order ID">@context.OrderId</MudTd>
-                        <MudTd DataLabel="Customer">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                <MudAvatar Size="Size.Small" Image="@context.CustomerAvatarUrl" />
-                                <MudText Typo="Typo.body2">@context.CustomerName</MudText>
-                            </MudStack>
-                        </MudTd>
-                        <MudTd DataLabel="Products">@context.Products</MudTd>
-                        <MudTd DataLabel="Date">@context.Date</MudTd>
-                        <MudTd DataLabel="Amount">@context.Amount</MudTd>
-                        <MudTd DataLabel="Status">
-                            <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small" 
-                                    Variant="Variant.Filled" Style="min-width: 90px; justify-content: center;">
-                                @context.Status
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Class="ml-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Verified" Size="Size.Small" Class="mr-1" />
+                                Verified
                             </MudChip>
-                        </MudTd>
-                        <MudTd Style="width: 60px;">
-                            <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Default" />
-                        </MudTd>
-                    </RowTemplate>
-                </MudTable>
+                        }
+                    }
+                </MudText>
+            </div>
+            <div class="d-flex align-center">
+                @if (lastUpdateTime.HasValue)
+                {
+                    <MudText Typo="Typo.caption" Class="mr-3 text-muted">
+                        Last updated: @lastUpdateTime.Value.ToString("HH:mm:ss")
+                    </MudText>
+                }
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" 
+                          OnClick="RefreshDashboard" Disabled="@isLoading">
+                    Refresh
+                </MudButton>
             </div>
         </MudPaper>
     </MudItem>
 </MudGrid>
 
-<!-- Low Stock Products -->
-<MudGrid Class="mt-4 mb-4">
-    <MudItem xs="12">
-        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
-            <MudGrid>
-                <MudItem xs="6">
-                    <MudText Typo="Typo.h6">Low Stock Products</MudText>
-                </MudItem>
-                <MudItem xs="6" Style="text-align: right;">
-                    <MudButton Variant="Variant.Text" Color="Color.Primary" EndIcon="@Icons.Material.Filled.KeyboardArrowRight"
-                              Href="/admin/products" Class="mt-n1">
-                        VIEW ALL PRODUCTS
-                    </MudButton>
+@if (isLoading)
+{
+    <MudGrid Class="mt-4">
+        <MudItem xs="12">
+            <MudPaper Class="pa-6 text-center" Elevation="0">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                <MudText Class="mt-3">Loading dashboard data...</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+else
+{
+    @if (userRole == "Admin" && adminDashboardData != null)
+    {
+        @* ADMIN DASHBOARD *@
+        @if (adminDashboardData.LowStockProductsCount > 0 || adminDashboardData.PendingOrdersCount > 0 || adminDashboardData.VerificationPendingCount > 0)
+        {
+            <!-- Admin Alert Cards -->
+            <MudGrid Class="mt-4">
+                @if (adminDashboardData.LowStockProductsCount > 0)
+                {
+                    <MudItem xs="12" sm="4">
+                        <MudAlert Severity="Severity.Warning" Variant="Variant.Filled" Class="mb-0">
+                            <div class="d-flex align-center justify-space-between">
+                                <div>
+                                    <MudText Typo="Typo.body1" Class="font-weight-bold">@adminDashboardData.LowStockProductsCount Low Stock Products</MudText>
+                                    <MudText Typo="Typo.body2">Need immediate attention</MudText>
+                                </div>
+                                <MudIcon Icon="@Icons.Material.Filled.Warning" />
+                            </div>
+                        </MudAlert>
+                    </MudItem>
+                }
+
+                @if (adminDashboardData.PendingOrdersCount > 0)
+                {
+                    <MudItem xs="12" sm="4">
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="mb-0">
+                            <div class="d-flex align-center justify-space-between">
+                                <div>
+                                    <MudText Typo="Typo.body1" Class="font-weight-bold">@adminDashboardData.PendingOrdersCount Pending Orders</MudText>
+                                    <MudText Typo="Typo.body2">Awaiting confirmation</MudText>
+                                </div>
+                                <MudIcon Icon="@Icons.Material.Filled.HourglassEmpty" />
+                            </div>
+                        </MudAlert>
+                    </MudItem>
+                }
+
+                @if (adminDashboardData.VerificationPendingCount > 0)
+                {
+                    <MudItem xs="12" sm="4">
+                        <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="mb-0">
+                            <div class="d-flex align-center justify-space-between">
+                                <div>
+                                    <MudText Typo="Typo.body1" Class="font-weight-bold">@adminDashboardData.VerificationPendingCount Seller Applications</MudText>
+                                    <MudText Typo="Typo.body2">Pending verification</MudText>
+                                </div>
+                                <MudIcon Icon="@Icons.Material.Filled.PersonAdd" />
+                            </div>
+                        </MudAlert>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+
+        <!-- Admin Overview Stats Cards -->
+        <MudGrid Class="mt-4">
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="0" Class="pa-4" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px;">
+                    <div class="d-flex align-center justify-space-between">
+                        <div>
+                            <MudText Typo="Typo.h4" Class="font-weight-bold">@adminDashboardData.TotalUsers.ToString("N0")</MudText>
+                            <MudText Typo="Typo.body2">Total Users</MudText>
+                            @if (adminDashboardData.UsersGrowthPercentage != 0)
+                            {
+                                <div class="d-flex align-center mt-1">
+                                    <MudIcon Icon="@(adminDashboardData.UsersGrowthPercentage > 0 ? Icons.Material.Filled.TrendingUp : Icons.Material.Filled.TrendingDown)" 
+                                            Size="Size.Small" Class="mr-1" />
+                                    <MudText Typo="Typo.caption">@Math.Abs(adminDashboardData.UsersGrowthPercentage).ToString("F1")% vs last month</MudText>
+                                </div>
+                            }
+                        </div>
+                        <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Style="opacity: 0.7;" />
+                    </div>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="0" Class="pa-4" Style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border-radius: 12px;">
+                    <div class="d-flex align-center justify-space-between">
+                        <div>
+                            <MudText Typo="Typo.h4" Class="font-weight-bold">@adminDashboardData.TotalSellers.ToString("N0")</MudText>
+                            <MudText Typo="Typo.body2">Total Sellers</MudText>
+                            @if (adminDashboardData.SellersGrowthPercentage != 0)
+                            {
+                                <div class="d-flex align-center mt-1">
+                                    <MudIcon Icon="@(adminDashboardData.SellersGrowthPercentage > 0 ? Icons.Material.Filled.TrendingUp : Icons.Material.Filled.TrendingDown)" 
+                                            Size="Size.Small" Class="mr-1" />
+                                    <MudText Typo="Typo.caption">@Math.Abs(adminDashboardData.SellersGrowthPercentage).ToString("F1")% vs last month</MudText>
+                                </div>
+                            }
+                        </div>
+                        <MudIcon Icon="@Icons.Material.Filled.Store" Size="Size.Large" Style="opacity: 0.7;" />
+                    </div>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="0" Class="pa-4" Style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; border-radius: 12px;">
+                    <div class="d-flex align-center justify-space-between">
+                        <div>
+                            <MudText Typo="Typo.h4" Class="font-weight-bold">@adminDashboardData.TotalOrders.ToString("N0")</MudText>
+                            <MudText Typo="Typo.body2">Total Orders</MudText>
+                            @if (adminDashboardData.OrdersGrowthPercentage != 0)
+                            {
+                                <div class="d-flex align-center mt-1">
+                                    <MudIcon Icon="@(adminDashboardData.OrdersGrowthPercentage > 0 ? Icons.Material.Filled.TrendingUp : Icons.Material.Filled.TrendingDown)" 
+                                            Size="Size.Small" Class="mr-1" />
+                                    <MudText Typo="Typo.caption">@Math.Abs(adminDashboardData.OrdersGrowthPercentage).ToString("F1")% vs last month</MudText>
+                                </div>
+                            }
+                        </div>
+                        <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Size="Size.Large" Style="opacity: 0.7;" />
+                    </div>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="0" Class="pa-4" Style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; border-radius: 12px;">
+                    <div class="d-flex align-center justify-space-between">
+                        <div>
+                            <MudText Typo="Typo.h4" Class="font-weight-bold">$@adminDashboardData.TotalRevenue.ToString("N0")</MudText>
+                            <MudText Typo="Typo.body2">Total Revenue</MudText>
+                            @if (adminDashboardData.RevenueGrowthPercentage != 0)
+                            {
+                                <div class="d-flex align-center mt-1">
+                                    <MudIcon Icon="@(adminDashboardData.RevenueGrowthPercentage > 0 ? Icons.Material.Filled.TrendingUp : Icons.Material.Filled.TrendingDown)" 
+                                            Size="Size.Small" Class="mr-1" />
+                                    <MudText Typo="Typo.caption">@Math.Abs(adminDashboardData.RevenueGrowthPercentage).ToString("F1")% vs last month</MudText>
+                                </div>
+                            }
+                        </div>
+                        <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Large" Style="opacity: 0.7;" />
+                    </div>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+    else if (userRole == "Seller" && sellerDashboardData != null)
+    {
+        @* SELLER DASHBOARD *@
+        @if (sellerDashboardData.IsVerified != true)
+        {
+            <!-- Verification Alert -->
+            <MudGrid Class="mt-4">
+                <MudItem xs="12">
+                    <MudAlert Severity="Severity.Warning" Variant="Variant.Filled">
+                        <div class="d-flex align-center justify-space-between">
+                            <div>
+                                <MudText Typo="Typo.body1" Class="font-weight-bold">Store Verification Pending</MudText>
+                                <MudText Typo="Typo.body2">Your store is currently under review. Some features may be limited until verification is complete.</MudText>
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Filled.HourglassEmpty" Size="Size.Large" />
+                        </div>
+                    </MudAlert>
                 </MudItem>
             </MudGrid>
-            
-            <div style="margin-top: 16px;">
-                <MudTable Items="@_lowStockProducts" Hover="true" Striped="false" Bordered="false" Elevation="0" Dense="true">
-                    <HeaderContent>
-                        <MudTh Style="width: 100px">Product ID</MudTh>
-                        <MudTh>Product Name</MudTh>
-                        <MudTh Style="width: 120px">Category</MudTh>
-                        <MudTh Style="width: 80px">Price</MudTh>
-                        <MudTh Style="width: 100px">Stock Left</MudTh>
-                        <MudTh Style="width: 120px">Status</MudTh>
-                        <MudTh Style="width: 120px"></MudTh>
-                    </HeaderContent>
-                    <RowTemplate>
-                        <MudTd DataLabel="Product ID">@context.ProductId</MudTd>
-                        <MudTd DataLabel="Product Name">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                <MudAvatar Size="Size.Small" Square="true" Image="@context.ProductImageUrl" />
-                                <MudText Typo="Typo.body2">@context.ProductName</MudText>
-                            </MudStack>
-                        </MudTd>
-                        <MudTd DataLabel="Category">@context.Category</MudTd>
-                        <MudTd DataLabel="Price">@context.Price</MudTd>
-                        <MudTd DataLabel="Stock Left">@context.StockLeft</MudTd>
-                        <MudTd DataLabel="Status">
-                            <MudChip T="string" Color="@GetStockStatusColor(context.Status)" Size="Size.Small" 
-                                    Variant="Variant.Filled" Style="min-width: 90px; justify-content: center;">
-                                @context.Status
-                            </MudChip>
-                        </MudTd>
-                        <MudTd Style="width: 120px;">
-                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Default" />
-                            <MudIconButton Icon="@Icons.Material.Filled.AddCircle" Size="Size.Small" Color="Color.Success" />
-                        </MudTd>
-                    </RowTemplate>
-                </MudTable>
-            </div>
-        </MudPaper>
-    </MudItem>
-</MudGrid>
+        }
+
+        <!-- Seller Overview Stats Cards -->
+        <MudGrid Class="mt-4">
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="0" Class="pa-4" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px;">
+                    <div class="d-flex align-center justify-space-between">
+                        <div>
+                            <MudText Typo="Typo.h4" Class="font-weight-bold">@sellerDashboardData.TotalProducts.ToString("N0")</MudText>
+                            <MudText Typo="Typo.body2">Total Products</MudText>
+                            @if (sellerDashboardData.ProductsGrowthPercentage != 0)
+                            {
+                                <div class="d-flex align-center mt-1">
+                                    <MudIcon Icon="@(sellerDashboardData.ProductsGrowthPercentage > 0 ? Icons.Material.Filled.TrendingUp : Icons.Material.Filled.TrendingDown)" 
+                                            Size="Size.Small" Class="mr-1" />
+                                    <MudText Typo="Typo.caption">@Math.Abs(sellerDashboardData.ProductsGrowthPercentage).ToString("F1")% vs last month</MudText>
+                                </div>
+                            }
+                        </div>
+                        <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Large" Style="opacity: 0.7;" />
+                    </div>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="0" Class="pa-4" Style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border-radius: 12px;">
+                    <div class="d-flex align-center justify-space-between">
+                        <div>
+                            <MudText Typo="Typo.h4" Class="font-weight-bold">@sellerDashboardData.TotalOrders.ToString("N0")</MudText>
+                            <MudText Typo="Typo.body2">Total Orders</MudText>
+                            @if (sellerDashboardData.OrdersGrowthPercentage != 0)
+                            {
+                                <div class="d-flex align-center mt-1">
+                                    <MudIcon Icon="@(sellerDashboardData.OrdersGrowthPercentage > 0 ? Icons.Material.Filled.TrendingUp : Icons.Material.Filled.TrendingDown)" 
+                                            Size="Size.Small" Class="mr-1" />
+                                    <MudText Typo="Typo.caption">@Math.Abs(sellerDashboardData.OrdersGrowthPercentage).ToString("F1")% vs last month</MudText>
+                                </div>
+                            }
+                        </div>
+                        <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Size="Size.Large" Style="opacity: 0.7;" />
+                    </div>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="0" Class="pa-4" Style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; border-radius: 12px;">
+                    <div class="d-flex align-center justify-space-between">
+                        <div>
+                            <MudText Typo="Typo.h4" Class="font-weight-bold">$@sellerDashboardData.TotalRevenue.ToString("N0")</MudText>
+                            <MudText Typo="Typo.body2">Total Revenue</MudText>
+                            @if (sellerDashboardData.RevenueGrowthPercentage != 0)
+                            {
+                                <div class="d-flex align-center mt-1">
+                                    <MudIcon Icon="@(sellerDashboardData.RevenueGrowthPercentage > 0 ? Icons.Material.Filled.TrendingUp : Icons.Material.Filled.TrendingDown)" 
+                                            Size="Size.Small" Class="mr-1" />
+                                    <MudText Typo="Typo.caption">@Math.Abs(sellerDashboardData.RevenueGrowthPercentage).ToString("F1")% vs last month</MudText>
+                                </div>
+                            }
+                        </div>
+                        <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Large" Style="opacity: 0.7;" />
+                    </div>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="0" Class="pa-4" Style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; border-radius: 12px;">
+                    <div class="d-flex align-center justify-space-between">
+                        <div>
+                            <MudText Typo="Typo.h4" Class="font-weight-bold">$@sellerDashboardData.AverageOrderValue.ToString("N0")</MudText>
+                            <MudText Typo="Typo.body2">Avg Order Value</MudText>
+                            <div class="d-flex align-center mt-1">
+                                <MudIcon Icon="@Icons.Material.Filled.Analytics" Size="Size.Small" Class="mr-1" />
+                                <MudText Typo="Typo.caption">Per order average</MudText>
+                            </div>
+                        </div>
+                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Large" Style="opacity: 0.7;" />
+                    </div>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Seller Alert Cards -->
+        @if (sellerDashboardData.LowStockProductsCount > 0 || sellerDashboardData.PendingOrdersCount > 0)
+        {
+            <MudGrid Class="mt-4">
+                @if (sellerDashboardData.LowStockProductsCount > 0)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudAlert Severity="Severity.Warning" Variant="Variant.Filled" Class="mb-0">
+                            <div class="d-flex align-center justify-space-between">
+                                <div>
+                                    <MudText Typo="Typo.body1" Class="font-weight-bold">@sellerDashboardData.LowStockProductsCount Low Stock Products</MudText>
+                                    <MudText Typo="Typo.body2">Need to restock soon</MudText>
+                                </div>
+                                <MudIcon Icon="@Icons.Material.Filled.Warning" />
+                            </div>
+                        </MudAlert>
+                    </MudItem>
+                }
+
+                @if (sellerDashboardData.PendingOrdersCount > 0)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="mb-0">
+                            <div class="d-flex align-center justify-space-between">
+                                <div>
+                                    <MudText Typo="Typo.body1" Class="font-weight-bold">@sellerDashboardData.PendingOrdersCount Pending Orders</MudText>
+                                    <MudText Typo="Typo.body2">Need to process</MudText>
+                                </div>
+                                <MudIcon Icon="@Icons.Material.Filled.HourglassEmpty" />
+                            </div>
+                        </MudAlert>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    }
+
+    <!-- Charts Section - Common for both Admin and Seller -->
+    <MudGrid Class="mt-4">
+        <!-- Revenue Chart -->
+        <MudItem xs="12" md="8">
+            <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 8px;">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    @if (userRole == "Admin")
+                    {
+                        <text>Revenue Trend (Last 12 Months)</text>
+                    }
+                    else
+                    {
+                        <text>Sales Performance (Last 12 Months)</text>
+                    }
+                </MudText>
+                @if (monthlyStats.Any())
+                {
+                    <MudChart ChartType="ChartType.Line" 
+                             ChartSeries="@revenueChartSeries" 
+                             XAxisLabels="@revenueChartLabels" 
+                             Width="100%" Height="300px"
+                             ChartOptions="@revenueChartOptions" />
+                }
+                else
+                {
+                    <div class="d-flex justify-center align-center" style="height: 300px;">
+                        <MudText Class="text-muted">No revenue data available</MudText>
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <!-- Categories/Products Chart -->
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 8px;">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    @if (userRole == "Admin")
+                    {
+                        <text>Top Categories</text>
+                    }
+                    else
+                    {
+                        <text>Top Products by Revenue</text>
+                    }
+                </MudText>
+                @if (pieChartData.Any())
+                {
+                    <MudChart ChartType="@(userRole == "Admin" ? ChartType.Donut : ChartType.Pie)" 
+                             InputData="@pieChartData" 
+                             InputLabels="@pieChartLabels"
+                             Width="100%" Height="300px" />
+                }
+                else
+                {
+                    <div class="d-flex justify-center align-center" style="height: 300px;">
+                        <MudText Class="text-muted">No data available</MudText>
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Data Tables Section -->
+    <MudGrid Class="mt-4">
+        <!-- Recent Orders -->
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 8px;">
+                <MudText Typo="Typo.h6" Class="mb-3">Recent Orders</MudText>
+                @if (recentOrders.Any())
+                {
+                    <MudTable Items="@recentOrders" Dense="true" Hover="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Order</MudTh>
+                            <MudTh>Customer</MudTh>
+                            <MudTh>Amount</MudTh>
+                            <MudTh>Status</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>#ORD-@context.OrderId</MudTd>
+                            <MudTd>@context.CustomerName</MudTd>
+                            <MudTd>$@context.TotalAmount.ToString("F2")</MudTd>
+                            <MudTd>
+                                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                                    @context.Status
+                                </MudChip>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">No recent orders found</MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <!-- Top Products -->
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 8px;">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    @if (userRole == "Admin")
+                    {
+                        <text>Top Selling Products</text>
+                    }
+                    else
+                    {
+                        <text>Best Selling Products</text>
+                    }
+                </MudText>
+                @if (topProducts.Any())
+                {
+                    <MudTable Items="@topProducts.Take(5)" Dense="true" Hover="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Product</MudTh>
+                            <MudTh>Sold</MudTh>
+                            <MudTh>Revenue</MudTh>
+                            @if (userRole == "Seller")
+                            {
+                                <MudTh>Stock</MudTh>
+                            }
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>
+                                <div>
+                                    <MudText Typo="Typo.body2">@context.ProductName</MudText>
+                                    <MudText Typo="Typo.caption" Class="text-muted">@context.CategoryName</MudText>
+                                </div>
+                            </MudTd>
+                            <MudTd>@context.QuantitySold</MudTd>
+                            <MudTd>$@context.Revenue.ToString("F2")</MudTd>
+                            @if (userRole == "Seller")
+                            {
+                                <MudTd>
+                                    <MudChip T="int" Size="Size.Small" Color="@GetStockColor(context.Stock)">
+                                        @context.Stock
+                                    </MudChip>
+                                </MudTd>
+                            }
+                        </RowTemplate>
+                    </MudTable>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">No product sales data found</MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @if (userRole == "Admin")
+    {
+        <!-- Admin Additional Tables -->
+        <MudGrid Class="mt-4">
+            <!-- New Users -->
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 8px;">
+                    <MudText Typo="Typo.h6" Class="mb-3">New Users (Last 7 Days)</MudText>
+                    @if (adminDashboardData.NewUsers.Any())
+                    {
+                        <MudTable Items="@adminDashboardData.NewUsers" Dense="true" Hover="true" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>Name</MudTh>
+                                <MudTh>Email</MudTh>
+                                <MudTh>Role</MudTh>
+                                <MudTh>Joined</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.FullName</MudTd>
+                                <MudTd>@context.Email</MudTd>
+                                <MudTd>
+                                    <MudChip T="string" Size="Size.Small" Color="@GetRoleColor(context.Role)">
+                                        @context.Role
+                                    </MudChip>
+                                </MudTd>
+                                <MudTd>@context.JoinedDate.ToString("MMM dd")</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Info">No new users in the last 7 days</MudAlert>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <!-- Pending Sellers -->
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 8px;">
+                    <MudText Typo="Typo.h6" Class="mb-3">Pending Seller Applications</MudText>
+                    @if (adminDashboardData.PendingSellers.Any())
+                    {
+                        <MudTable Items="@adminDashboardData.PendingSellers" Dense="true" Hover="true" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>Store</MudTh>
+                                <MudTh>Owner</MudTh>
+                                <MudTh>Applied</MudTh>
+                                <MudTh>Products</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.StoreName</MudTd>
+                                <MudTd>@context.OwnerName</MudTd>
+                                <MudTd>@context.ApplicationDate.ToString("MMM dd")</MudTd>
+                                <MudTd>@context.ProductsCount</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Success">No pending applications</MudAlert>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+}
 
 @code {
-    // Sales Chart Data
-    private int _selectedSalesPeriodInt = 30;
-    private string _selectedSalesPeriod = "30";
-    private List<ChartSeries> _salesChartSeries = new();
-    private string[] _salesChartLabels = new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul" };
-    private ChartOptions _chartOptions = new() 
-    { 
-        YAxisFormat = "$#,##0",
-        InterpolationOption = InterpolationOption.Straight,
-        ChartPalette = new string[] { "#5CAF90", "#2ecc71" }
-    };
+    private bool isLoading = true;
+    private DateTime? lastUpdateTime;
+    private string userRole = "";
+    private int userId = 0;
+    private int sellerId = 0;
+
+    // Dashboard data
+    private AdminDashboardVM? adminDashboardData;
+    private SellerDashboardVM? sellerDashboardData;
+
+    // Common data for rendering
+    private List<DashboardOrderVM> recentOrders = new();
+    private List<ProductStatsVM> topProducts = new();
+    private List<MonthlyStatsVM> monthlyStats = new();
+
+    // Chart data
+    private List<ChartSeries> revenueChartSeries = new();
+    private string[] revenueChartLabels = Array.Empty<string>();
+    private ChartOptions revenueChartOptions = new();
     
-    // Products Chart Data
-    private int _selectedProductsPeriodInt = 30;
-    private string _selectedProductsPeriod = "30";
-    private string[] _productsChartLabels = new[] { "Dried Fruits", "Fresh Fruits", "Vegetables", "Cookies", "Others" };
-    private double[] _productsChartData = new double[] { 35, 25, 20, 15, 5 };
-    private List<ChartSeries> _productsDonutSeries = new();
-    private string[] _productColors = new[] { "#3498db", "#1abc9c", "#f1c40f", "#e67e22", "#34495e" };
-    
-    // Orders Data
-    private List<OrderData> _recentOrders = new()
+    private double[] pieChartData = Array.Empty<double>();
+    private string[] pieChartLabels = Array.Empty<string>();
+
+    protected override async Task OnInitializedAsync()
     {
-        new OrderData
+        await GetUserInfo();
+        await InitializeSignalRAsync();
+        await LoadDashboardData();
+        
+        // Setup chart options
+        revenueChartOptions.YAxisTicks = userRole == "Admin" ? 1000 : 500;
+        revenueChartOptions.YAxisFormat = "C0";
+    }
+
+    private async Task GetUserInfo()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        
+        if (user.Identity.IsAuthenticated)
         {
-            OrderId = "#ORD-7892",
-            CustomerName = "John Doe",
-            CustomerAvatarUrl = "/images/admin/avatar1.jpg",
-            Products = "Mixed Nuts Berries Pack",
-            Date = "May 1, 2023",
-            Amount = "$55.00",
-            Status = "Delivered"
-        },
-        new OrderData
-        {
-            OrderId = "#ORD-7891",
-            CustomerName = "Jane Smith",
-            CustomerAvatarUrl = "/images/admin/avatar2.jpg",
-            Products = "Multi Grain Combo Cookies",
-            Date = "April 30, 2023",
-            Amount = "$30.00",
-            Status = "Processing"
-        },
-        new OrderData
-        {
-            OrderId = "#ORD-7890",
-            CustomerName = "Robert Johnson",
-            CustomerAvatarUrl = "/images/admin/avatar3.jpg",
-            Products = "Fresh Mango Juice Pack",
-            Date = "April 30, 2023",
-            Amount = "$55.00",
-            Status = "Shipped"
-        },
-        new OrderData
-        {
-            OrderId = "#ORD-7889",
-            CustomerName = "Emily Davis",
-            CustomerAvatarUrl = "/images/admin/avatar4.jpg",
-            Products = "Dates Value Fresh Pouch",
-            Date = "April 29, 2023",
-            Amount = "$65.00",
-            Status = "Cancelled"
-        },
-        new OrderData
-        {
-            OrderId = "#ORD-7888",
-            CustomerName = "Michael Wilson",
-            CustomerAvatarUrl = "/images/admin/avatar5.jpg",
-            Products = "Organic Apples",
-            Date = "April 29, 2023",
-            Amount = "$12.00",
-            Status = "Delivered"
+            userRole = user.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
+            var userIdClaim = user.Claims.FirstOrDefault(c => c.Type == "UserId");
+            int.TryParse(userIdClaim?.Value, out userId);
+
+            if (userRole == "Seller" && userId > 0)
+            {
+                var sellerProfile = await SellerProfileService.GetSellerProfileByUserIdAsync(userId);
+                sellerId = sellerProfile.SellerId;
+            }
         }
-    };
-    
-    // Products Data
-    private List<ProductData> _lowStockProducts = new()
+    }
+
+    private async Task InitializeSignalRAsync()
     {
-        new ProductData
+        try
         {
-            ProductId = "#PRD-421",
-            ProductName = "Mixed Nuts Berries Pack",
-            ProductImageUrl = "/images/products/mixed-nuts.jpg",
-            Category = "Dried Fruits",
-            Price = "$45.00",
-            StockLeft = "5 units",
-            Status = "Low Stock"
-        },
-        new ProductData
-        {
-            ProductId = "#PRD-318",
-            ProductName = "Organic Apples",
-            ProductImageUrl = "/images/products/mango.jpg",
-            Category = "Fresh Fruits",
-            Price = "$12.00",
-            StockLeft = "8 units",
-            Status = "Low Stock"
-        },
-        new ProductData
-        {
-            ProductId = "#PRD-287",
-            ProductName = "Fresh Mango Juice Pack",
-            ProductImageUrl = "/images/products/mango-juice.jpg",
-            Category = "Drinks",
-            Price = "$46.00",
-            StockLeft = "3 units",
-            Status = "Critical Stock"
+            await SignalRService.StartConnectionAsync();
+            
+            // Subscribe to real-time updates
+            SignalRService.OrderCreated += OnOrderCreated;
+            SignalRService.OrderUpdated += OnOrderUpdated;
+            SignalRService.ProductCreated += OnProductCreated;
+            
+            if (userRole == "Admin")
+            {
+                SignalRService.SellerProfileCreated += OnSellerCreated;
+            }
+            else
+            {
+                SignalRService.YourOrderStatusChanged += OnOrderStatusChanged;
+                SignalRService.ProductUpdated += OnProductUpdated;
+            }
         }
-    };
-    
-    protected override void OnInitialized()
-    {
-        // Initialize sales chart data
-        _salesChartSeries = new List<ChartSeries>()
+        catch (Exception ex)
         {
-            new ChartSeries() { Name = "Revenue", Data = new double[] { 4500, 5900, 7000, 8100, 9500, 11000, 12000 } },
-            new ChartSeries() { Name = "Profit", Data = new double[] { 2100, 3000, 3500, 4100, 4800, 5500, 6300 } }
-        };
+            Console.WriteLine($"SignalR initialization error: {ex.Message}");
+        }
     }
-    
-    private void UpdateSalesChart(int value)
+
+    private async Task LoadDashboardData()
     {
-        _selectedSalesPeriodInt = value;
-        _selectedSalesPeriod = value.ToString();
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            if (userRole == "Admin")
+            {
+                adminDashboardData = await DashboardService.GetAdminDashboardAsync();
+                if (adminDashboardData != null)
+                {
+                    recentOrders = adminDashboardData.RecentOrders ?? new();
+                    topProducts = adminDashboardData.TopProducts ?? new();
+                    monthlyStats = adminDashboardData.MonthlyStats ?? new();
+                }
+            }
+            else if (userRole == "Seller" && sellerId > 0)
+            {
+                sellerDashboardData = await DashboardService.GetSellerDashboardAsync(sellerId);
+                if (sellerDashboardData != null)
+                {
+                    recentOrders = sellerDashboardData.RecentOrders ?? new();
+                    topProducts = sellerDashboardData.TopProducts ?? new();
+                    monthlyStats = sellerDashboardData.MonthlyStats ?? new();
+                }
+            }
+            else
+            {
+                Snackbar.Add("Unable to load dashboard data", Severity.Warning);
+                return;
+            }
+
+            lastUpdateTime = DateTime.Now;
+            PrepareChartData();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading dashboard: {ex.Message}");
+            Snackbar.Add("Error loading dashboard data", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
     }
-    
-    private void UpdateProductsChart(int value)
+
+    private void PrepareChartData()
     {
-        _selectedProductsPeriodInt = value;
-        _selectedProductsPeriod = value.ToString();
+        if (monthlyStats.Any())
+        {
+            // Revenue chart
+            revenueChartLabels = monthlyStats.Select(m => m.MonthName).ToArray();
+            revenueChartSeries = new List<ChartSeries>
+            {
+                new ChartSeries
+                {
+                    Name = "Revenue",
+                    Data = monthlyStats.Select(m => (double)m.Revenue).ToArray()
+                },
+                new ChartSeries
+                {
+                    Name = "Orders",
+                    Data = monthlyStats.Select(m => (double)m.OrdersCount * (userRole == "Admin" ? 100 : 50)).ToArray()
+                }
+            };
+        }
+
+        // Pie chart data
+        if (userRole == "Admin" && adminDashboardData?.TopCategories?.Any() == true)
+        {
+            pieChartData = adminDashboardData.TopCategories.Select(c => (double)c.Revenue).ToArray();
+            pieChartLabels = adminDashboardData.TopCategories.Select(c => c.CategoryName).ToArray();
+        }
+        else if (userRole == "Seller" && topProducts.Any())
+        {
+            pieChartData = topProducts.Take(5).Select(p => (double)p.Revenue).ToArray();
+            pieChartLabels = topProducts.Take(5).Select(p => p.ProductName.Length > 20 ? p.ProductName.Substring(0, 17) + "..." : p.ProductName).ToArray();
+        }
     }
-    
+
+    private async Task RefreshDashboard()
+    {
+        await LoadDashboardData();
+        Snackbar.Add("Dashboard refreshed", Severity.Success);
+    }
+
+    #region SignalR Event Handlers
+
+    private async void OnOrderCreated(int orderId, int userId, decimal totalAmount)
+    {
+        await InvokeAsync(async () =>
+        {
+            if (userRole == "Admin")
+            {
+                Snackbar.Add($"New order created: #ORD-{orderId}", Severity.Success);
+            }
+            else
+            {
+                // Check if this order contains seller's products
+                Snackbar.Add($"New order received: #ORD-{orderId}", Severity.Success);
+            }
+            await LoadDashboardData();
+        });
+    }
+
+    private async void OnOrderUpdated(int orderId, int statusId, decimal totalAmount)
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadDashboardData();
+        });
+    }
+
+    private async void OnProductCreated(int productId, string productName, string categoryName)
+    {
+        await InvokeAsync(async () =>
+        {
+            if (userRole == "Admin")
+            {
+                Snackbar.Add($"New product added: {productName}", Severity.Info);
+            }
+            await LoadDashboardData();
+        });
+    }
+
+    private async void OnSellerCreated(string storeName)
+    {
+        await InvokeAsync(async () =>
+        {
+            Snackbar.Add($"New seller application: {storeName}", Severity.Info);
+            await LoadDashboardData();
+        });
+    }
+
+    private async void OnOrderStatusChanged(int orderId, string statusName, string message)
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadDashboardData();
+            Snackbar.Add($"Order #ORD-{orderId} status changed to {statusName}", Severity.Info);
+        });
+    }
+
+    private async void OnProductUpdated(int productId, string productName, decimal price)
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadDashboardData();
+        });
+    }
+
+    #endregion
+
+    #region Helper Methods
+
     private Color GetStatusColor(string status)
     {
         return status switch
         {
+            "Pending" => Color.Warning,
+            "Confirmed" => Color.Info,
+            "Processing" => Color.Primary,
+            "Shipped" => Color.Secondary,
             "Delivered" => Color.Success,
-            "Processing" => Color.Info,
-            "Shipped" => Color.Warning,
             "Cancelled" => Color.Error,
             _ => Color.Default
         };
     }
-    
-    private Color GetStockStatusColor(string status)
+
+    private Color GetRoleColor(string role)
     {
-        return status switch
+        return role switch
         {
-            "Low Stock" => Color.Warning,
-            "Critical Stock" => Color.Error,
-            "In Stock" => Color.Success,
+            "Admin" => Color.Error,
+            "Seller" => Color.Warning,
+            "Customer" => Color.Info,
             _ => Color.Default
         };
     }
-    
-    private Color GetProductColor(int index)
+
+    private Color GetStockColor(int stock)
     {
-        return index switch
+        return stock switch
         {
-            0 => Color.Primary,
-            1 => Color.Info,
-            2 => Color.Warning,
-            3 => Color.Error,
-            _ => Color.Default
+            <= 5 => Color.Error,
+            <= 10 => Color.Warning,
+            _ => Color.Success
         };
     }
-    
-    // Data models
-    private class OrderData
+
+    #endregion
+
+    public async ValueTask DisposeAsync()
     {
-        public string OrderId { get; set; }
-        public string CustomerName { get; set; }
-        public string CustomerAvatarUrl { get; set; }
-        public string Products { get; set; }
-        public string Date { get; set; }
-        public string Amount { get; set; }
-        public string Status { get; set; }
-    }
-    
-    private class ProductData
-    {
-        public string ProductId { get; set; }
-        public string ProductName { get; set; }
-        public string ProductImageUrl { get; set; }
-        public string Category { get; set; }
-        public string Price { get; set; }
-        public string StockLeft { get; set; }
-        public string Status { get; set; }
+        // Unsubscribe from SignalR events
+        SignalRService.OrderCreated -= OnOrderCreated;
+        SignalRService.OrderUpdated -= OnOrderUpdated;
+        SignalRService.ProductCreated -= OnProductCreated;
+        
+        if (userRole == "Admin")
+        {
+            SignalRService.SellerProfileCreated -= OnSellerCreated;
+        }
+        else
+        {
+            SignalRService.YourOrderStatusChanged -= OnOrderStatusChanged;
+            SignalRService.ProductUpdated -= OnProductUpdated;
+        }
+
+        if (SignalRService != null)
+        {
+            await SignalRService.DisposeAsync();
+        }
     }
 }

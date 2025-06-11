@@ -277,7 +277,7 @@ namespace BlazorWebApp.Services
         {
             try
             {
-                
+
                 // Kiểm tra trạng thái hiện tại trước khi hủy
                 var currentStatus = await GetOrderStatusNameAsync(orderId);
                 if (string.IsNullOrEmpty(currentStatus))
@@ -293,11 +293,12 @@ namespace BlazorWebApp.Services
                 }
 
                 // Gọi API hủy đơn hàng
-                var cancelRequest = new { 
+                var cancelRequest = new
+                {
                     Reason = reason ?? "Cancelled by customer",
                     CancelledAt = DateTime.Now
                 };
-                
+
                 var response = await _httpClient.PutAsJsonAsync($"https://localhost:7260/api/Order/CancelOrder/{orderId}", orderId);
 
                 if (!response.IsSuccessStatusCode)
@@ -343,7 +344,53 @@ namespace BlazorWebApp.Services
                 return false;
             }
         }
+        public async Task<IEnumerable<OrderWithDetailsVM>> GetOrdersBySellerWithDetailsAsync(int sellerId)
+        {
+            await SetAuthorizationHeader();
+            var response = await _httpClient.GetAsync($"https://localhost:7260/api/Order/GetOrdersBySellerWithDetails/{sellerId}");
 
+            if (!response.IsSuccessStatusCode)
+            {
+                return Enumerable.Empty<OrderWithDetailsVM>();
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<IEnumerable<OrderWithDetailsVM>>>();
+
+            if (result?.Success == true && result.Data != null)
+            {
+                return result.Data;
+            }
+
+            return Enumerable.Empty<OrderWithDetailsVM>();
+        }
+        public async Task<AdminOrdersCompleteView> GetAllOrdersWithCompleteDetailsAsync()
+{
+    await SetAuthorizationHeader();
+    
+    try
+    {
+        var response = await _httpClient.GetAsync("https://localhost:7260/api/Order/GetAllOrdersWithCompleteDetails");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return new AdminOrdersCompleteView();
+        }
+
+        var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<AdminOrdersCompleteView>>();
+
+        if (result?.Success == true && result.Data != null)
+        {
+            return result.Data;
+        }
+    }
+    catch (Exception ex)
+    {
+        // Log error và return empty data
+        Console.WriteLine($"Error calling GetAllOrdersWithCompleteDetailsAsync: {ex.Message}");
+    }
+
+    return new AdminOrdersCompleteView();
+}
         #endregion
 
         #region OrderItem Management

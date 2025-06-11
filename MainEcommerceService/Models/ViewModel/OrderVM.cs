@@ -97,5 +97,14 @@ namespace MainEcommerceService.Models.ViewModel
     {
         public string StatusName { get; set; } = string.Empty;
     }
+    public class OrderWithDetailsVM : OrderVM
+    {
+        public List<OrderItemWithProductVM> OrderItems { get; set; } = new List<OrderItemWithProductVM>();
+    }
 
+    public class OrderItemWithProductVM : OrderItemVM
+    {
+        public int SellerId { get; set; }
+        public string? ProductName { get; set; }
+    }
 }

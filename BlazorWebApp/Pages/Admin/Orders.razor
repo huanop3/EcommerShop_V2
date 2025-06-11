@@ -205,8 +205,9 @@
         await GetUserInfo();
         await LoadOrderStatuses();
         await LoadSellers();
+        
+        // 🔥 CHỈ 1 METHOD CALL - TẤT CẢ DỮ LIỆU ĐƯỢC LOAD!
         await LoadOrders();
-        await LoadCustomerProfiles();
         
         CalculatePendingOrdersCount();
     }
@@ -349,7 +350,10 @@
         }
     }
 
-    private async Task LoadOrders()
+    // ...existing code...
+
+// ✅ CẬP NHẬT: LoadOrders method - TẤT CẢ DỮ LIỆU TRONG 1 LẦN
+private async Task LoadOrders()
 {
     try
     {
@@ -358,40 +362,153 @@
         
         if (userRole == "Admin")
         {
-            var result = await OrderService.GetAllOrdersAsync();
-            orders = result?.ToList();
+            // 🔥 CHỈ 1 API CALL cho Admin - ĐÃ CHỨA TẤT CẢ DỮ LIỆU!
+            var adminOrdersData = await OrderService.GetAllOrdersWithCompleteDetailsAsync();
+            
+            if (adminOrdersData != null && adminOrdersData.Orders.Any())
+            {
+                orders = adminOrdersData.Orders.Select(o => new OrderVM
+                {
+                    OrderId = o.OrderId,
+                    UserId = o.UserId,
+                    OrderStatusId = o.OrderStatusId,
+                    OrderDate = o.OrderDate,
+                    TotalAmount = o.TotalAmount,
+                    ShippingAddressId = o.ShippingAddressId,
+                    CouponId = o.CouponId,
+                    CreatedAt = o.CreatedAt,
+                    UpdatedAt = o.UpdatedAt,
+                    IsDeleted = o.IsDeleted
+                }).ToList();
+
+                // 🔥 Populate ALL caches từ dữ liệu ĐÃ CÓ SẴN - KHÔNG CẦN THÊM API!
+                orderItemsCache.Clear();
+                productNamesCache.Clear();
+                customerProfiles.Clear();
+
+                foreach (var orderWithDetails in adminOrdersData.Orders)
+                {
+                    // 🔥 Cache order items từ dữ liệu đã có
+                    orderItemsCache[orderWithDetails.OrderId] = orderWithDetails.OrderItems
+                        .Select(oi => new OrderItemVM
+                        {
+                            OrderItemId = oi.OrderItemId,
+                            OrderId = oi.OrderId,
+                            ProductId = oi.ProductId,
+                            Quantity = oi.Quantity,
+                            UnitPrice = oi.UnitPrice,
+                            TotalPrice = oi.TotalPrice,
+                            CreatedAt = oi.CreatedAt,
+                            UpdatedAt = oi.UpdatedAt,
+                            IsDeleted = oi.IsDeleted
+                        }).ToList();
+
+                    // 🔥 Cache product names từ dữ liệu đã có
+                    foreach (var item in orderWithDetails.OrderItems)
+                    {
+                        if (!string.IsNullOrEmpty(item.ProductName))
+                        {
+                            productNamesCache[item.ProductId] = item.ProductName;
+                        }
+                    }
+
+                    // 🔥 Cache customer profiles từ dữ liệu đã có
+                    if (!customerProfiles.Any(c => c.Id == orderWithDetails.UserId))
+                    {
+                        customerProfiles.Add(new ProfileVM
+                        {
+                            Id = orderWithDetails.UserId,
+                            FirstName = orderWithDetails.CustomerFirstName,
+                            LastName = orderWithDetails.CustomerLastName,
+                            Email = orderWithDetails.CustomerEmail,
+                            PhoneNumber = orderWithDetails.CustomerPhone
+                        });
+                    }
+                }
+
+                // 🔥 Update pending count từ server data
+                pendingOrdersCount = adminOrdersData.PendingOrders;
+                
+                Console.WriteLine($"✅ Admin: Loaded {orders.Count} orders, {orderItemsCache.Count} order caches, {productNamesCache.Count} products, {customerProfiles.Count} customers");
+            }
+            else
+            {
+                // 🔥 Fallback nếu API mới fail
+                Console.WriteLine("⚠️ GetAllOrdersWithCompleteDetailsAsync failed, using fallback");
+                var result = await OrderService.GetAllOrdersAsync();
+                orders = result?.ToList() ?? new List<OrderVM>();
+                
+                // 🔥 Chỉ khi fallback mới gọi các method cũ
+                await LoadOrderItemsFallback();
+                await LoadCustomerProfilesFallback();
+            }
         }
         else if (userRole == "Seller" && sellerId.HasValue)
         {
-            var result = await ProdService.GetProductsBySellerAsync(sellerId.Value);
-            foreach (var product in result)
+            // 🔥 CHỈ 1 API CALL cho Seller - ĐÃ CHỨA TẤT CẢ DỮ LIỆU!
+            var ordersWithDetails = await OrderService.GetOrdersBySellerWithDetailsAsync(sellerId.Value);
+            
+            if (ordersWithDetails != null && ordersWithDetails.Any())
             {
-                var ordersForProduct = await OrderService.GetOrderItemsByProductIdAsync(product.ProductId);
-                if (ordersForProduct != null)
+                orders = ordersWithDetails.Select(owd => new OrderVM
                 {
-                    foreach (var orderItem in ordersForProduct)
-                    {
-                        var order = await OrderService.GetOrderByIdAsync(orderItem.OrderId);
-                        if (order != null)
-                        {
-                            if (!orders.Any(o => o.OrderId == order.OrderId))
-                            {
-                                orders.Add(order);
-                            }
- 
-                        }
+                    OrderId = owd.OrderId,
+                    UserId = owd.UserId,
+                    OrderStatusId = owd.OrderStatusId,
+                    OrderDate = owd.OrderDate,
+                    TotalAmount = owd.TotalAmount,
+                    ShippingAddressId = owd.ShippingAddressId,
+                    CouponId = owd.CouponId,
+                    CreatedAt = owd.CreatedAt,
+                    UpdatedAt = owd.UpdatedAt,
+                    IsDeleted = owd.IsDeleted
+                }).ToList();
 
+                // 🔥 Populate caches từ dữ liệu đã có
+                orderItemsCache.Clear();
+                productNamesCache.Clear();
+
+                foreach (var orderWithDetails in ordersWithDetails)
+                {
+                    orderItemsCache[orderWithDetails.OrderId] = orderWithDetails.OrderItems
+                        .Select(oi => new OrderItemVM
+                        {
+                            OrderItemId = oi.OrderItemId,
+                            OrderId = oi.OrderId,
+                            ProductId = oi.ProductId,
+                            Quantity = oi.Quantity,
+                            UnitPrice = oi.UnitPrice,
+                            TotalPrice = oi.TotalPrice,
+                            CreatedAt = oi.CreatedAt,
+                            UpdatedAt = oi.UpdatedAt,
+                            IsDeleted = oi.IsDeleted
+                        }).ToList();
+
+                    foreach (var item in orderWithDetails.OrderItems)
+                    {
+                        if (!string.IsNullOrEmpty(item.ProductName))
+                        {
+                            productNamesCache[item.ProductId] = item.ProductName;
+                        }
                     }
                 }
+
+                // 🔥 CHỈ load customer profiles cho Seller (vì Seller API không include customer info)
+                await LoadCustomerProfilesFallback();
+                
+                Console.WriteLine($"✅ Seller: Loaded {orders.Count} orders, {orderItemsCache.Count} order caches, {productNamesCache.Count} products");
+            }
+            else
+            {
+                orders = new List<OrderVM>();
             }
         }
-
-        await LoadOrderItems();
         
     }
     catch (Exception ex)
     {
         Console.WriteLine($"❌ Error in LoadOrders: {ex.Message}");
+        Snackbar?.Add("Error loading orders", Severity.Error);
     }
     finally
     {
@@ -400,16 +517,68 @@
     }
 }
 
-    // ✅ THÊM: Method để load product names từ ProdService
-    private async Task LoadProductNames(IEnumerable<int> productIds)
+// ✅ ĐỔI TÊN: LoadOrderItems thành LoadOrderItemsFallback - CHỈ DÙNG KHI FALLBACK
+private async Task LoadOrderItemsFallback()
+{
+    Console.WriteLine("⚠️ Using LoadOrderItemsFallback - this should rarely happen");
+    orderItemsCache.Clear();
+    var allProductIds = new List<int>();
+    
+    foreach (var order in orders)
     {
         try
         {
-            var idsToLoad = productIds.Where(id => !productNamesCache.ContainsKey(id)).ToList();
+            var items = await OrderService.GetOrderItemsByOrderIdAsync(order.OrderId);
+            var itemsList = items?.ToList() ?? new List<OrderItemVM>();
+            orderItemsCache[order.OrderId] = itemsList;
             
-            if (!idsToLoad.Any()) return;
+            allProductIds.AddRange(itemsList.Select(i => i.ProductId));
+        }
+        catch (Exception ex)
+        {
+            orderItemsCache[order.OrderId] = new List<OrderItemVM>();
+        }
+    }
 
-            var loadTasks = idsToLoad.Select(async productId =>
+    await LoadProductNamesFallback(allProductIds.Distinct());
+}
+
+// ✅ ĐỔI TÊN: LoadProductNames thành LoadProductNamesFallback - CHỈ DÙNG KHI FALLBACK
+private async Task LoadProductNamesFallback(IEnumerable<int> productIds)
+{
+    Console.WriteLine("⚠️ Using LoadProductNamesFallback - this should rarely happen");
+    try
+    {
+        var idsToLoad = productIds.Where(id => !productNamesCache.ContainsKey(id)).ToList();
+        
+        if (!idsToLoad.Any()) return;
+
+        // 🔥 Vẫn tận dụng GetAllProducts thay vì gọi từng product
+        var allProducts = await ProdService.GetAllProductsAsync();
+        
+        if (allProducts != null && allProducts.Any())
+        {
+            var relevantProducts = allProducts.Where(p => idsToLoad.Contains(p.ProductId));
+            
+            foreach (var product in relevantProducts)
+            {
+                productNamesCache[product.ProductId] = product.ProductName;
+            }
+            
+            // Set default cho products không tìm thấy
+            foreach (var productId in idsToLoad)
+            {
+                if (!productNamesCache.ContainsKey(productId))
+                {
+                    productNamesCache[productId] = "Product Not Found";
+                }
+            }
+        }
+        else
+        {
+            // Last resort: individual calls (limited)
+            var limitedIds = idsToLoad.Take(20); // Limit to prevent overload
+            var loadTasks = limitedIds.Select(async productId =>
             {
                 try
                 {
@@ -431,82 +600,82 @@
             });
 
             await Task.WhenAll(loadTasks);
-            StateHasChanged();
         }
-        catch (Exception ex)
-        {
-            // Silent error handling
-        }
-    }
 
-    // ✅ SỬA: Cập nhật LoadOrderItems để load product names
-    private async Task LoadOrderItems()
+        StateHasChanged();
+    }
+    catch (Exception ex)
     {
-        orderItemsCache.Clear();
-        var allProductIds = new List<int>();
-        
-        foreach (var order in orders)
+        Console.WriteLine($"Error in LoadProductNamesFallback: {ex.Message}");
+    }
+}
+
+    private async Task LoadCustomerProfilesFallback()
+{
+    try
+    {
+        var uniqueUserIds = orders.Select(o => o.UserId).Distinct()
+            .Where(userId => !customerProfiles.Any(c => c.Id == userId))
+            .ToList();
+
+        if (!uniqueUserIds.Any()) return;
+
+        Console.WriteLine($"🔄 Loading {uniqueUserIds.Count} customer profiles as fallback");
+
+        foreach (var userIdToLoad in uniqueUserIds)
         {
             try
             {
-                var items = await OrderService.GetOrderItemsByOrderIdAsync(order.OrderId);
-                var itemsList = items?.ToList() ?? new List<OrderItemVM>();
-                orderItemsCache[order.OrderId] = itemsList;
-                
-                allProductIds.AddRange(itemsList.Select(i => i.ProductId));
+                var profile = await UserService.GetProfileAsync(userIdToLoad);
+                if (profile != null)
+                {
+                    customerProfiles.Add(profile);
+                }
             }
             catch (Exception ex)
             {
-                orderItemsCache[order.OrderId] = new List<OrderItemVM>();
+                Console.WriteLine($"Error loading profile for user {userIdToLoad}: {ex.Message}");
             }
         }
-
-        await LoadProductNames(allProductIds.Distinct());
     }
-
-    private async Task LoadCustomerProfiles()
+    catch (Exception ex)
     {
-        try
-        {
-            var uniqueUserIds = orders.Select(o => o.UserId).Distinct();
-            customerProfiles = new List<ProfileVM>();
-
-            foreach (var userIdToLoad in uniqueUserIds)
-            {
-                try
-                {
-                    var profile = await UserService.GetProfileAsync(userIdToLoad);
-                    if (profile != null)
-                    {
-                        customerProfiles.Add(profile);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // Silent error handling
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            // Silent error handling
-        }
+        Console.WriteLine($"Error in LoadCustomerProfilesFallback: {ex.Message}");
     }
+}
 
     #endregion
 
     #region Event Handlers
 
-    private async Task RefreshOrders()
+private async Task RefreshOrders()
+{
+    try
     {
-        // ✅ THÊM: Clear product names cache để force reload
-        productNamesCache.Clear();
+        isLoading = true;
         
+        // Clear all caches để force reload từ server
+        productNamesCache.Clear();
+        orderItemsCache.Clear();
+        customerProfiles.Clear();
+        
+        // 🔥 CHỈ 1 method call - tất cả dữ liệu sẽ được load
         await LoadOrders();
-        await LoadCustomerProfiles();
+        
         CalculatePendingOrdersCount();
         Snackbar.Add("Orders refreshed", Severity.Success);
     }
+    catch (Exception ex)
+    {
+        Snackbar.Add("Error refreshing orders", Severity.Error);
+        Console.WriteLine($"Error in RefreshOrders: {ex.Message}");
+    }
+    finally
+    {
+        isLoading = false;
+        StateHasChanged();
+    }
+}
 
     private async Task SearchOrders(KeyboardEventArgs e)
     {
@@ -717,40 +886,16 @@
     }
 
     // ✅ THÊM: Method để lấy product name từ cache
-    private string GetProductName(int productId)
+   private string GetProductName(int productId)
+{
+    if (productNamesCache.TryGetValue(productId, out var name))
     {
-        if (productNamesCache.TryGetValue(productId, out var name))
-        {
-            return name;
-        }
-        
-        // ✅ THÊM: Nếu chưa có trong cache, load ngay
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                var product = await ProdService.GetProductByIdAsync(productId);
-                var productName = product?.ProductName ?? "Unknown Product";
-                
-                lock (productNamesCache)
-                {
-                    productNamesCache[productId] = productName;
-                }
-
-                // Update UI
-                await InvokeAsync(StateHasChanged);
-            }
-            catch (Exception ex)
-            {
-                lock (productNamesCache)
-                {
-                    productNamesCache[productId] = "Error Loading";
-                }
-            }
-        });
-        
-        return "Loading...";
+        return name;
     }
+    
+    // 🔥 KHÔNG gọi API riêng lẻ nữa - tất cả đã có trong cache từ LoadOrders
+    return "Product Not Found";
+}
 
     #endregion
 

@@ -133,7 +133,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("CorsPolicy", builder =>
         builder
-            .WithOrigins("http://localhost:5093", "https://localhost:7257") // Thêm tất cả domain client của bạn
+            .WithOrigins("http://localhost:5093", "https://localhost:7257","https://localhost:7260") // Thêm tất cả domain client của bạn
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials()); // Quan trọng cho SignalR

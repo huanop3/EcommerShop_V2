@@ -69,16 +69,26 @@ namespace MainEcommerceService.Models.ViewModel
     }
     public class OrderStatusVM
     {
-    public int StatusId { get; set; }
+        public int StatusId { get; set; }
 
-    public string StatusName { get; set; } = null!;
+        public string StatusName { get; set; } = null!;
 
-    public string? Description { get; set; }
+        public string? Description { get; set; }
 
-    public DateTime? CreatedAt { get; set; }
+        public DateTime? CreatedAt { get; set; }
 
-    public DateTime? UpdatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
 
-    public bool? IsDeleted { get; set; }
+        public bool? IsDeleted { get; set; }
+    }
+    public class OrderWithDetailsVM : OrderVM
+    {
+        public List<OrderItemWithProductVM> OrderItems { get; set; } = new List<OrderItemWithProductVM>();
+    }
+
+    public class OrderItemWithProductVM : OrderItemVM
+    {
+        public int SellerId { get; set; }
+        public string? ProductName { get; set; }
     }
 }
