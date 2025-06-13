@@ -5,6 +5,7 @@ public interface IUnitOfWork : IAsyncDisposable
 {
     public ICategoryRepository _categoryRepository { get; }
     public IProductRepository _prodRepository { get; }
+    public IProductImageRepository _productImageRepository { get; }
     Task BeginTransaction();
     Task CommitTransaction();
     Task RollbackTransaction();
@@ -17,12 +18,14 @@ public class UnitOfWork : IUnitOfWork
     private readonly ProductDBContext _context;
     public ICategoryRepository _categoryRepository { get; }
     public IProductRepository _prodRepository { get; }
+    public IProductImageRepository _productImageRepository { get; }
 
-    public UnitOfWork(ProductDBContext context, ICategoryRepository categoryRepository, IProductRepository prodRepository)
+    public UnitOfWork(ProductDBContext context, ICategoryRepository categoryRepository, IProductRepository prodRepository, IProductImageRepository productImageRepository)
     {
         _context = context;
         _categoryRepository = categoryRepository;
         _prodRepository = prodRepository;
+        _productImageRepository = productImageRepository;
     }
     public async Task BeginTransaction()
     {

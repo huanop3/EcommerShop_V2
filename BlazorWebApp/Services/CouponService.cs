@@ -31,7 +31,7 @@ namespace BlazorWebApp.Services
         }
         public async Task<IEnumerable<CouponVM>> GetAllCouponsAsync()
         {
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/Coupon/GetAllCoupons");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/Coupon/GetAllCoupons");
             response.EnsureSuccessStatusCode();
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<IEnumerable<CouponVM>>>();
             if (result != null)
@@ -44,7 +44,7 @@ namespace BlazorWebApp.Services
         public async Task<CouponVM> GetCouponByIdAsync(int couponId)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/Coupon/GetCouponById/{couponId}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/Coupon/GetCouponById/{couponId}");
             response.EnsureSuccessStatusCode();
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<CouponVM>>();
             if (result != null)
@@ -56,7 +56,7 @@ namespace BlazorWebApp.Services
 
         public async Task<CouponVM> GetCouponByCodeAsync(string couponCode)
         {
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/Coupon/GetCouponByCode/{couponCode}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/Coupon/GetCouponByCode/{couponCode}");
             response.EnsureSuccessStatusCode();
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<CouponVM>>();
             if (result != null)
@@ -69,7 +69,7 @@ namespace BlazorWebApp.Services
         public async Task<bool> CreateCouponAsync(CouponVM coupon)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.PostAsJsonAsync($"https://localhost:7260/api/Coupon/CreateCoupon", coupon);
+            var response = await _httpClient.PostAsJsonAsync($"http://localhost:5282/main/api/Coupon/CreateCoupon", coupon);
             response.EnsureSuccessStatusCode();
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<string>>();
             if (result != null)
@@ -82,7 +82,7 @@ namespace BlazorWebApp.Services
         public async Task<bool> UpdateCouponAsync(CouponVM coupon)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.PutAsJsonAsync($"https://localhost:7260/api/Coupon/UpdateCoupon", coupon);
+            var response = await _httpClient.PutAsJsonAsync($"http://localhost:5282/main/api/Coupon/UpdateCoupon", coupon);
             response.EnsureSuccessStatusCode();
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<string>>();
             if (result != null)
@@ -95,7 +95,7 @@ namespace BlazorWebApp.Services
         public async Task<bool> DeleteCouponAsync(int couponId)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.DeleteAsync($"https://localhost:7260/api/Coupon/DeleteCoupon/{couponId}");
+            var response = await _httpClient.DeleteAsync($"http://localhost:5282/main/api/Coupon/DeleteCoupon/{couponId}");
             response.EnsureSuccessStatusCode();
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<string>>();
             if (result != null)
@@ -108,7 +108,7 @@ namespace BlazorWebApp.Services
         public async Task<bool> ActivateCouponAsync(int couponId)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.PutAsync($"https://localhost:7260/api/Coupon/ActivateCoupon/{couponId}", null);
+            var response = await _httpClient.PutAsync($"http://localhost:5282/main/api/Coupon/ActivateCoupon/{couponId}", null);
             response.EnsureSuccessStatusCode();
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<string>>();
             if (result != null)
@@ -121,7 +121,7 @@ namespace BlazorWebApp.Services
         public async Task<bool> DeactivateCouponAsync(int couponId)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.PutAsync($"https://localhost:7260/api/Coupon/DeactivateCoupon/{couponId}", null);
+            var response = await _httpClient.PutAsync($"http://localhost:5282/main/api/Coupon/DeactivateCoupon/{couponId}", null);
             response.EnsureSuccessStatusCode();
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<string>>();
             if (result != null)
@@ -133,7 +133,7 @@ namespace BlazorWebApp.Services
 
         public async Task<IEnumerable<CouponVM>> GetActiveCouponsAsync()
         {
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/Coupon/GetActiveCoupons");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/Coupon/GetActiveCoupons");
             response.EnsureSuccessStatusCode();
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<IEnumerable<CouponVM>>>();
             if (result != null)
@@ -145,7 +145,7 @@ namespace BlazorWebApp.Services
 
         public async Task<CouponVM> ValidateCouponAsync(string couponCode)
         {
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/Coupon/ValidateCoupon/{couponCode}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/Coupon/ValidateCoupon/{couponCode}");
             response.EnsureSuccessStatusCode();
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<CouponVM>>();
             if (result != null)
@@ -156,7 +156,7 @@ namespace BlazorWebApp.Services
         }
         public async Task<bool> UpdateCouponUsageCount(int couponId)
         {
-            var response = await _httpClient.PutAsJsonAsync($"https://localhost:7260/api/Coupon/UpdateCouponUsageCount/{couponId}", couponId);
+            var response = await _httpClient.PutAsJsonAsync($"http://localhost:5282/main/api/Coupon/UpdateCouponUsageCount/{couponId}", couponId);
             response.EnsureSuccessStatusCode();
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<bool>>();
             if (result != null)

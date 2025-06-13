@@ -39,7 +39,9 @@ public partial class User
 
     public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 
-    public virtual SellerProfile? SellerProfile { get; set; }
+    public virtual ICollection<SellerProfile> SellerProfiles { get; set; } = new List<SellerProfile>();
+
+    public virtual ICollection<ShipperProfile> ShipperProfiles { get; set; } = new List<ShipperProfile>();
 
     public virtual ICollection<UserCoupon> UserCoupons { get; set; } = new List<UserCoupon>();
 

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text;
+using Infrastructure.Interfaces;
 using MainEcommerceService.Hubs;
 using MainEcommerceService.Infrastructure.Services;
 using MainEcommerceService.Kafka;
@@ -111,6 +112,8 @@ builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<IOrderStatusRepository, OrderStatusRepository>();
 builder.Services.AddScoped<IOrderItemRepository, OrderItemRepository>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddScoped<IShipperProfileRepository, ShipperProfileRepository>();
+builder.Services.AddScoped<IShipmentRepository, ShipmentRepository>();
 
 //DI UnitOfWork
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -126,6 +129,8 @@ builder.Services.AddScoped<IOrderStatusService, OrderStatusService>();
 builder.Services.AddScoped<IOrderItemService, OrderItemService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IShipperProfileService, ShipperProfileService>();
+builder.Services.AddScoped<IShipmentService, ShipmentService>();
 builder.Services.AddHttpClient();
 
 // Lấy chuỗi kết nối Redis từ cấu hình
@@ -160,7 +165,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("CorsPolicy", builder =>
         builder
-            .WithOrigins("http://localhost:5093", "https://localhost:7257") // Thêm tất cả domain client của bạn
+            .WithOrigins("http://localhost:5093", "https://localhost:7257", "http://localhost:5282") // Thêm tất cả domain client của bạn
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials()); // Quan trọng cho SignalR

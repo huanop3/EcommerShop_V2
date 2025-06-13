@@ -875,12 +875,15 @@ private async Task RefreshOrders()
     {
         return status switch
         {
-            "Pending" => Color.Warning,
-            "Confirmed" => Color.Info,
-            "Processing" => Color.Primary,
-            "Shipped" => Color.Secondary,
-            "Delivered" => Color.Success,
-            "Cancelled" => Color.Error,
+            "Pending" => Color.Tertiary,    // Pending
+            "Confirmed" => Color.Secondary,  // Confirmed
+            "Processing" => Color.Surface,       // Processing
+            "Shipped" => Color.Primary,    // Shipped
+            "In Transit" => Color.Info,       // In Transit
+            "Out for Delivery" => Color.Warning,    // Out for Delivery
+            "Delivered" => Color.Success,    // Delivered
+            "Returned" => Color.Error,      // Returned
+            "Refunded" => Color.Error,      // Refunded
             _ => Color.Default
         };
     }

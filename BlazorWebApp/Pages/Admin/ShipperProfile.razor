@@ -1,0 +1,814 @@
+@page "/admin/shippers"
+@using BlazorWebApp.Pages.Admin.Dialogs
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using System.ComponentModel.DataAnnotations
+@using BlazorWebApp.Services
+@using MainEcommerceService.Models.ViewModel
+@using MainEcommerceService.Models.dbMainEcommer
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject ShipperProfileService ShipperProfileService
+@inject UserService UserService
+@inject SignalRService SignalRService
+@layout _AdminLayout
+@attribute [Authorize(Roles = "Admin")]
+@implements IDisposable
+
+<PageTitle>Shipper Management - Grabit</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12">
+        <MudPaper Elevation="0" Class="d-flex align-center justify-space-between pa-4"
+            Style="background-color: white; border-radius: 4px;">
+            <MudText Typo="Typo.h4">Shipper Management</MudText>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" OnClick="RefreshData">
+                Refresh
+            </MudButton>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<!-- Statistics Cards -->
+<MudGrid Class="mt-4">
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Color="Color.Success" Size="Size.Large" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="mud-text-secondary">Active Shippers</MudText>
+                    <MudText Typo="Typo.h4" Color="Color.Success">@activeShippers.Count</MudText>
+                </div>
+            </div>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.PauseCircle" Color="Color.Warning" Size="Size.Large" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="mud-text-secondary">Inactive Shippers</MudText>
+                    <MudText Typo="Typo.h4" Color="Color.Warning">@inactiveShippers.Count</MudText>
+                </div>
+            </div>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.People" Color="Color.Primary" Size="Size.Large" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="mud-text-secondary">Total Shippers</MudText>
+                    <MudText Typo="Typo.h4" Color="Color.Primary">@(activeShippers.Count + inactiveShippers.Count)</MudText>
+                </div>
+            </div>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Info" Size="Size.Large" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="mud-text-secondary">New This Month</MudText>
+                    <MudText Typo="Typo.h4" Color="Color.Info">@GetNewShippersThisMonth()</MudText>
+                </div>
+            </div>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<!-- Inactive Shippers Table -->
+<MudGrid Class="mt-6">
+    <MudItem xs="12">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
+            <MudGrid>
+                <MudItem xs="12" md="8">
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.PauseCircle" Color="Color.Warning" Class="mr-2" />
+                        <MudText Typo="Typo.h5">Inactive Shippers</MudText>
+                        @if (inactiveShippers.Any())
+                        {
+                            <MudChip T="int" Color="Color.Warning" Size="Size.Small" Class="ml-2">@inactiveShippers.Count</MudChip>
+                        }
+                    </div>
+                </MudItem>
+                <MudItem xs="12" md="4" Class="d-flex justify-end">
+                    <MudTextField @bind-Value="inactiveSearchString" Placeholder="Search inactive shippers..." 
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                                  Immediate="true" Class="mt-0" />
+                </MudItem>
+            </MudGrid>
+
+            <MudTable Items="@FilteredInactiveShippers" Dense="false" Hover="true" Bordered="false" Striped="false"
+                Loading="@isLoadingInactive" LoadingProgressColor="Color.Warning" FixedHeader="false" Elevation="0" Class="mt-3"
+                Breakpoint="Breakpoint.Sm" @bind-RowsPerPage="inactivePageSize">
+                <HeaderContent>
+                    <MudTh Style="width: 80px">Shipper ID</MudTh>
+                    <MudTh Style="width: 180px">Shipper Name</MudTh>
+                    <MudTh>Email</MudTh>
+                    <MudTh Style="width: 120px">Phone Number</MudTh>
+                    <MudTh Style="width: 120px">Registration Date</MudTh>
+                    <MudTh Style="width: 120px">Last Updated</MudTh>
+                    <MudTh Style="width: 80px; text-align: center">Status</MudTh>
+                    <MudTh Style="width: 150px; text-align: center">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Shipper ID">@context.ShipperId</MudTd>
+                    <MudTd DataLabel="Shipper Name">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Color="Color.Warning" Size="Size.Small" Class="mr-2" />
+                            <div>
+                                <MudText Typo="Typo.body1" Style="font-weight: 600;">@GetShipperFullName(context)</MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.Username</MudText>
+                            </div>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Email">@GetShipperEmail(context)</MudTd>
+                    <MudTd DataLabel="Phone Number">@GetShipperPhoneNumber(context)</MudTd>
+                    <MudTd DataLabel="Registration Date">@(context.CreatedAt?.ToString("MMM dd, yyyy") ?? "N/A")</MudTd>
+                    <MudTd DataLabel="Last Updated">@(context.UpdatedAt?.ToString("MMM dd, yyyy") ?? "Never")</MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Filled">
+                            <MudIcon Icon="@Icons.Material.Filled.PauseCircle" Size="Size.Small" Class="mr-1" />
+                            Inactive
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <div class="d-flex gap-1">
+                            <MudTooltip Text="Activate Shipper">
+                                <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" 
+                                             Color="Color.Success" Size="Size.Small"
+                                             OnClick="@(() => ActivateShipper(context))" />
+                            </MudTooltip>
+                            <MudTooltip Text="View Details">
+                                <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                                             Color="Color.Primary" Size="Size.Small"
+                                             OnClick="@(() => ViewShipperDetails(context))" />
+                            </MudTooltip>
+                            <MudTooltip Text="Delete Shipper">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                             Color="Color.Error" Size="Size.Small"
+                                             OnClick="@(() => DeleteShipper(context))" />
+                            </MudTooltip>
+                        </div>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 5, 10, 25 }" />
+                </PagerContent>
+                <NoRecordsContent>
+                    <MudAlert Severity="Severity.Info" Class="mt-4">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" />
+                            <MudText>No inactive shippers found.</MudText>
+                        </div>
+                    </MudAlert>
+                </NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<!-- Active Shippers Table -->
+<MudGrid Class="mt-6">
+    <MudItem xs="12">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
+            <MudGrid>
+                <MudItem xs="12" md="8">
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Color="Color.Success" Class="mr-2" />
+                        <MudText Typo="Typo.h5">Active Shippers</MudText>
+                        @if (activeShippers.Any())
+                        {
+                            <MudChip T="int" Color="Color.Success" Size="Size.Small" Class="ml-2">@activeShippers.Count</MudChip>
+                        }
+                    </div>
+                </MudItem>
+                <MudItem xs="12" md="4" Class="d-flex justify-end">
+                    <MudTextField @bind-Value="activeSearchString" Placeholder="Search active shippers..." 
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                                  Immediate="true" Class="mt-0" />
+                </MudItem>
+            </MudGrid>
+
+            <MudTable Items="@FilteredActiveShippers" Dense="false" Hover="true" Bordered="false" Striped="false"
+                Loading="@isLoadingActive" LoadingProgressColor="Color.Success" FixedHeader="false" Elevation="0" Class="mt-3"
+                Breakpoint="Breakpoint.Sm" @bind-RowsPerPage="activePageSize">
+                <HeaderContent>
+                    <MudTh Style="width: 80px">Shipper ID</MudTh>
+                    <MudTh Style="width: 180px">Shipper Name</MudTh>
+                    <MudTh>Email</MudTh>
+                    <MudTh Style="width: 120px">Phone Number</MudTh>
+                    <MudTh Style="width: 120px">Registration Date</MudTh>
+                    <MudTh Style="width: 120px">Last Updated</MudTh>
+                    <MudTh Style="width: 80px; text-align: center">Status</MudTh>
+                    <MudTh Style="width: 150px; text-align: center">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Shipper ID">@context.ShipperId</MudTd>
+                    <MudTd DataLabel="Shipper Name">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Color="Color.Success" Size="Size.Small" Class="mr-2" />
+                            <div>
+                                <MudText Typo="Typo.body1" Style="font-weight: 600;">@GetShipperFullName(context)</MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.Username</MudText>
+                            </div>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Email">@GetShipperEmail(context)</MudTd>
+                    <MudTd DataLabel="Phone Number">@GetShipperPhoneNumber(context)</MudTd>
+                    <MudTd DataLabel="Registration Date">@(context.CreatedAt?.ToString("MMM dd, yyyy") ?? "N/A")</MudTd>
+                    <MudTd DataLabel="Last Updated">@(context.UpdatedAt?.ToString("MMM dd, yyyy") ?? "Never")</MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="mr-1" />
+                            Active
+                        </MudChip>
+                    </MudTd>
+
+                    <MudTd DataLabel="Actions">
+                        <div class="d-flex gap-1">
+                            <MudTooltip Text="View Details">
+                                <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                                             Color="Color.Primary" Size="Size.Small"
+                                             OnClick="@(() => ViewShipperDetails(context))" />
+                            </MudTooltip>
+                            <MudTooltip Text="Edit Shipper">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                             Color="Color.Secondary" Size="Size.Small"
+                                             OnClick="@(() => EditShipper(context))" />
+                            </MudTooltip>
+                            <MudTooltip Text="Deactivate Shipper">
+                                <MudIconButton Icon="@Icons.Material.Filled.Pause" 
+                                             Color="Color.Warning" Size="Size.Small"
+                                             OnClick="@(() => DeactivateShipper(context))" />
+                            </MudTooltip>
+                            <MudTooltip Text="Delete Shipper">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                             Color="Color.Error" Size="Size.Small"
+                                             OnClick="@(() => DeleteShipper(context))" />
+                            </MudTooltip>
+                        </div>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 5, 10, 25 }" />
+                </PagerContent>
+                <NoRecordsContent>
+                    <MudAlert Severity="Severity.Info" Class="mt-4">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" />
+                            <MudText>No active shippers found.</MudText>
+                        </div>
+                    </MudAlert>
+                </NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private bool isLoadingInactive = true;
+    private bool isLoadingActive = true;
+    private string inactiveSearchString = "";
+    private string activeSearchString = "";
+    private int inactivePageSize = 5;
+    private int activePageSize = 10;
+
+    private List<ShipperProfileVM> inactiveShippers = new();
+    private List<ShipperProfileVM> activeShippers = new();
+    private List<UserVM> allUsers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await InitializeSignalRAsync();
+        await LoadAllData();
+    }
+
+    private async Task InitializeSignalRAsync()
+    {
+        try
+        {
+            Console.WriteLine("🔔 Admin ShipperProfile - Initializing SignalR...");
+            
+            // Subscribe to SignalR events for shipper profile changes
+            SignalRService.ShipperProfileCreated += OnShipperProfileCreated;
+            SignalRService.ShipperProfileUpdated += OnShipperProfileUpdated;
+            SignalRService.ShipperProfileDeleted += OnShipperProfileDeleted;
+            SignalRService.ShipperProfileActivated += OnShipperProfileActivated;
+            SignalRService.ShipperProfileDeactivated += OnShipperProfileDeactivated;
+
+            // Start connection if not already connected
+            if (!SignalRService.IsMainHubConnected)
+            {
+                Console.WriteLine("🔔 Starting SignalR connection...");
+                await SignalRService.StartConnectionAsync();
+            }
+
+            Console.WriteLine($"🔔 SignalR connection status: {SignalRService.IsMainHubConnected}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error initializing SignalR: {ex.Message}");
+        }
+    }
+
+    private async Task LoadAllData()
+    {
+        Console.WriteLine("🔄 LoadAllData started");
+        
+        await Task.WhenAll(
+            LoadInactiveShippers(),
+            LoadActiveShippers(),
+            LoadUsers()
+        );
+        
+        Console.WriteLine($"🔄 LoadAllData completed - Active: {activeShippers.Count}, Inactive: {inactiveShippers.Count}");
+    }
+
+    private async Task LoadInactiveShippers()
+    {
+        try
+        {
+            Console.WriteLine("🔄 Loading inactive shippers...");
+            isLoadingInactive = true;
+            var inactiveProfiles = await ShipperProfileService.GetInactiveShipperProfilesAsync();
+            inactiveShippers = inactiveProfiles?.ToList() ?? new List<ShipperProfileVM>();
+            Console.WriteLine($"🔄 Loaded {inactiveShippers.Count} inactive shippers");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading inactive shippers: {ex.Message}");
+            Snackbar.Add($"Error loading inactive shippers: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoadingInactive = false;
+        }
+    }
+
+    private async Task LoadActiveShippers()
+    {
+        try
+        {
+            Console.WriteLine("🔄 Loading active shippers...");
+            isLoadingActive = true;
+            var activeProfiles = await ShipperProfileService.GetActiveShipperProfilesAsync();
+            activeShippers = activeProfiles?.ToList() ?? new List<ShipperProfileVM>();
+            Console.WriteLine($"🔄 Loaded {activeShippers.Count} active shippers");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading active shippers: {ex.Message}");
+            Snackbar.Add($"Error loading active shippers: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoadingActive = false;
+        }
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            var users = await UserService.GetAllUserAsync();
+            allUsers = users?.ToList() ?? new List<UserVM>();
+            Console.WriteLine($"🔄 Loaded {allUsers.Count} users");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading users: {ex.Message}");
+        }
+    }
+
+    private async Task RefreshData()
+    {
+        Console.WriteLine("🔄 Manual refresh triggered");
+        await LoadAllData();
+        Snackbar.Add("Data refreshed successfully", Severity.Success);
+    }
+
+    // 🔥 SignalR Event Handlers với full data synchronization
+    private async void OnShipperProfileCreated(string shipperName)
+    {
+        Console.WriteLine($"🔔 Admin received ShipperProfileCreated: {shipperName}");
+        
+        await InvokeAsync(async () =>
+        {
+            // Reload inactive shippers để có data mới nhất (mặc định shipper mới là inactive)
+            await LoadInactiveShippers();
+            Snackbar.Add($"New shipper registered: {shipperName}", Severity.Info);
+            StateHasChanged();
+        });
+    }
+
+    private async void OnShipperProfileUpdated(int shipperId, string shipperName)
+    {
+        Console.WriteLine($"🔔 Admin received ShipperProfileUpdated: ShipperId={shipperId}, ShipperName={shipperName}");
+        
+        await InvokeAsync(async () =>
+        {
+            try
+            {
+                // 🔥 Fetch updated shipper profile từ server để có full data
+                var updatedShipper = await ShipperProfileService.GetShipperProfileByIdAsync(shipperId);
+                if (updatedShipper != null)
+                {
+                    Console.WriteLine($"🔔 Fetched updated shipper data: {updatedShipper.FullName}");
+                    
+                    // Update trong inactive list
+                    var inactiveIndex = inactiveShippers.FindIndex(s => s.ShipperId == shipperId);
+                    if (inactiveIndex >= 0)
+                    {
+                        inactiveShippers[inactiveIndex] = updatedShipper;
+                        Console.WriteLine($"🔔 Updated shipper in inactive list: {updatedShipper.FullName}");
+                    }
+                    
+                    // Update trong active list
+                    var activeIndex = activeShippers.FindIndex(s => s.ShipperId == shipperId);
+                    if (activeIndex >= 0)
+                    {
+                        activeShippers[activeIndex] = updatedShipper;
+                        Console.WriteLine($"🔔 Updated shipper in active list: {updatedShipper.FullName}");
+                    }
+                    
+                    if (inactiveIndex >= 0 || activeIndex >= 0)
+                    {
+                        Snackbar.Add($"Shipper profile updated: {updatedShipper.FullName}", Severity.Info);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"🔔 Shipper {shipperId} not found in local lists, doing full reload");
+                        await LoadAllData();
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"🔔 Could not fetch updated shipper {shipperId}, doing full reload");
+                    await LoadAllData();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error in OnShipperProfileUpdated: {ex.Message}");
+                // Fallback: reload toàn bộ data
+                await LoadAllData();
+            }
+            
+            StateHasChanged();
+        });
+    }
+
+    private async void OnShipperProfileDeleted(int shipperId)
+    {
+        Console.WriteLine($"🔔 Admin received ShipperProfileDeleted: ShipperId={shipperId}");
+        
+        await InvokeAsync(() =>
+        {
+            // 🔥 XỬ LÝ LOCAL: Xóa shipper khỏi cả 2 list
+            var removedFromInactive = inactiveShippers.RemoveAll(s => s.ShipperId == shipperId);
+            var removedFromActive = activeShippers.RemoveAll(s => s.ShipperId == shipperId);
+            
+            Console.WriteLine($"🔔 Removed {removedFromInactive} from inactive, {removedFromActive} from active");
+            
+            if (removedFromInactive > 0 || removedFromActive > 0)
+            {
+                Snackbar.Add("A shipper profile was deleted", Severity.Warning);
+            }
+            
+            StateHasChanged();
+            return Task.CompletedTask;
+        });
+    }
+
+    private async void OnShipperProfileActivated(int shipperId)
+    {
+        Console.WriteLine($"🔔 Admin received ShipperProfileActivated: ShipperId={shipperId}");
+        
+        await InvokeAsync(async () =>
+        {
+            try
+            {
+                // 🔥 Fetch fresh data từ server để đảm bảo accuracy
+                var activatedShipper = await ShipperProfileService.GetShipperProfileByIdAsync(shipperId);
+                if (activatedShipper != null && activatedShipper.IsActive == true)
+                {
+                    // Tìm và xóa khỏi inactive list
+                    var inactiveShipper = inactiveShippers.FirstOrDefault(s => s.ShipperId == shipperId);
+                    if (inactiveShipper != null)
+                    {
+                        inactiveShippers.Remove(inactiveShipper);
+                        Console.WriteLine($"🔔 Removed shipper {activatedShipper.FullName} from inactive list");
+                    }
+                    
+                    // Thêm vào active list (hoặc update nếu đã có)
+                    var existingActive = activeShippers.FirstOrDefault(s => s.ShipperId == shipperId);
+                    if (existingActive != null)
+                    {
+                        var index = activeShippers.IndexOf(existingActive);
+                        activeShippers[index] = activatedShipper;
+                        Console.WriteLine($"🔔 Updated existing shipper in active list: {activatedShipper.FullName}");
+                    }
+                    else
+                    {
+                        activeShippers.Insert(0, activatedShipper); // Thêm vào đầu list
+                        Console.WriteLine($"🔔 Added shipper {activatedShipper.FullName} to active list");
+                    }
+                    
+                    Snackbar.Add($"Shipper activated: {activatedShipper.FullName}", Severity.Success);
+                }
+                else
+                {
+                    Console.WriteLine($"🔔 Could not fetch activated shipper {shipperId} or active status incorrect, reloading data");
+                    await LoadAllData();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error in OnShipperProfileActivated: {ex.Message}");
+                await LoadAllData();
+            }
+            
+            StateHasChanged();
+        });
+    }
+
+    private async void OnShipperProfileDeactivated(int shipperId)
+    {
+        Console.WriteLine($"🔔 Admin received ShipperProfileDeactivated: ShipperId={shipperId}");
+        
+        await InvokeAsync(async () =>
+        {
+            try
+            {
+                // 🔥 Fetch fresh data từ server
+                var deactivatedShipper = await ShipperProfileService.GetShipperProfileByIdAsync(shipperId);
+                if (deactivatedShipper != null && deactivatedShipper.IsActive != true)
+                {
+                    // Tìm và xóa khỏi active list
+                    var activeShipper = activeShippers.FirstOrDefault(s => s.ShipperId == shipperId);
+                    if (activeShipper != null)
+                    {
+                        activeShippers.Remove(activeShipper);
+                        Console.WriteLine($"🔔 Removed shipper {deactivatedShipper.FullName} from active list");
+                    }
+                    
+                    // Thêm vào inactive list (hoặc update nếu đã có)
+                    var existingInactive = inactiveShippers.FirstOrDefault(s => s.ShipperId == shipperId);
+                    if (existingInactive != null)
+                    {
+                        var index = inactiveShippers.IndexOf(existingInactive);
+                        inactiveShippers[index] = deactivatedShipper;
+                        Console.WriteLine($"🔔 Updated existing shipper in inactive list: {deactivatedShipper.FullName}");
+                    }
+                    else
+                    {
+                        inactiveShippers.Insert(0, deactivatedShipper); // Thêm vào đầu list
+                        Console.WriteLine($"🔔 Added shipper {deactivatedShipper.FullName} to inactive list");
+                    }
+                    
+                    Snackbar.Add($"Shipper deactivated: {deactivatedShipper.FullName}", Severity.Warning);
+                }
+                else
+                {
+                    Console.WriteLine($"🔔 Could not fetch deactivated shipper {shipperId} or active status incorrect, reloading data");
+                    await LoadAllData();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error in OnShipperProfileDeactivated: {ex.Message}");
+                await LoadAllData();
+            }
+            
+            StateHasChanged();
+        });
+    }
+
+    // Filtering
+    private IEnumerable<ShipperProfileVM> FilteredInactiveShippers => inactiveShippers
+        .Where(s => string.IsNullOrWhiteSpace(inactiveSearchString) ||
+            GetShipperFullName(s).Contains(inactiveSearchString, StringComparison.OrdinalIgnoreCase) ||
+            GetShipperEmail(s).Contains(inactiveSearchString, StringComparison.OrdinalIgnoreCase) ||
+            GetShipperPhoneNumber(s).Contains(inactiveSearchString, StringComparison.OrdinalIgnoreCase) ||
+            s.ShipperId.ToString().Contains(inactiveSearchString, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<ShipperProfileVM> FilteredActiveShippers => activeShippers
+        .Where(s => string.IsNullOrWhiteSpace(activeSearchString) ||
+            GetShipperFullName(s).Contains(activeSearchString, StringComparison.OrdinalIgnoreCase) ||
+            GetShipperEmail(s).Contains(activeSearchString, StringComparison.OrdinalIgnoreCase) ||
+            GetShipperPhoneNumber(s).Contains(activeSearchString, StringComparison.OrdinalIgnoreCase) ||
+            s.ShipperId.ToString().Contains(activeSearchString, StringComparison.OrdinalIgnoreCase));
+
+    // Helper Methods
+    private string GetShipperFullName(ShipperProfileVM shipper)
+    {
+        return !string.IsNullOrEmpty(shipper.FullName) ? shipper.FullName : "Unknown";
+    }
+
+    private string GetShipperEmail(ShipperProfileVM shipper)
+    {
+        return shipper.Email ?? "Unknown";
+    }
+
+    private string GetShipperPhoneNumber(ShipperProfileVM shipper)
+    {
+        return shipper.PhoneNumber ?? "N/A";
+    }
+
+    private int GetNewShippersThisMonth()
+    {
+        var thisMonth = DateTime.Now.Month;
+        var thisYear = DateTime.Now.Year;
+        
+        return (activeShippers.Count(s => s.CreatedAt?.Month == thisMonth && s.CreatedAt?.Year == thisYear) +
+                inactiveShippers.Count(s => s.CreatedAt?.Month == thisMonth && s.CreatedAt?.Year == thisYear));
+    }
+
+    // Action Methods
+    private async Task ActivateShipper(ShipperProfileVM shipper)
+    {
+        try
+        {
+            Console.WriteLine($"🔄 Activating shipper {shipper.ShipperId} - {shipper.FullName}");
+            
+            var parameters = new DialogParameters
+            {
+                ["ContentText"] = $"Are you sure you want to activate the shipper '{shipper.FullName}'? They will be able to receive delivery assignments.",
+                ["ButtonText"] = "Activate",
+                ["Color"] = Color.Success
+            };
+            var dialog = await DialogService.ShowAsync<ConfirmDialog>("Activate Shipper Profile", parameters);
+            var result = await dialog.Result;
+            if (result.Canceled)
+            {
+                Console.WriteLine("🔄 Shipper activation canceled by user");
+                return;
+            }
+            
+            var success = await ShipperProfileService.ActivateShipperProfileAsync(shipper.ShipperId);
+            if (success)
+            {
+                Snackbar.Add($"Shipper '{shipper.FullName}' activated successfully!", Severity.Success);
+                
+                // 🔥 Gửi SignalR notification
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await SignalRService.NotifyShipperProfileActivatedAsync(shipper.ShipperId);
+                        Console.WriteLine($"🔔 Sent SignalR activation notification for {shipper.FullName}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"❌ SignalR notification failed: {ex.Message}");
+                    }
+                });
+            }
+            else
+            {
+                Snackbar.Add("Failed to activate shipper", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error activating shipper: {ex.Message}");
+            Snackbar.Add($"Error activating shipper: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeactivateShipper(ShipperProfileVM shipper)
+    {
+        var parameters = new DialogParameters
+        {
+            ["ContentText"] = $"Are you sure you want to deactivate '{shipper.FullName}'? The shipper will no longer receive delivery assignments.",
+            ["ButtonText"] = "Deactivate",
+            ["Color"] = Color.Warning
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Deactivate Shipper Profile", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                Console.WriteLine($"🔄 Deactivating shipper {shipper.ShipperId} - {shipper.FullName}");
+                var success = await ShipperProfileService.DeactivateShipperProfileAsync(shipper.ShipperId);
+                if (success)
+                {
+                    Snackbar.Add($"Shipper '{shipper.FullName}' deactivated", Severity.Warning);
+                    
+                    // 🔥 Gửi SignalR notification
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await SignalRService.NotifyShipperProfileDeactivatedAsync(shipper.ShipperId);
+                            Console.WriteLine($"🔔 Sent SignalR deactivation notification for {shipper.FullName}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"❌ SignalR notification failed: {ex.Message}");
+                        }
+                    });
+                }
+                else
+                {
+                    Snackbar.Add("Failed to deactivate shipper", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error deactivating shipper: {ex.Message}");
+                Snackbar.Add($"Error deactivating shipper: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeleteShipper(ShipperProfileVM shipper)
+    {
+        var parameters = new DialogParameters
+        {
+            ["ContentText"] = $"Are you sure you want to permanently delete the shipper profile for '{shipper.FullName}'? This action cannot be undone.",
+            ["ButtonText"] = "Delete",
+            ["Color"] = Color.Error
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Shipper Profile", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                Console.WriteLine($"🔄 Deleting shipper {shipper.ShipperId} - {shipper.FullName}");
+                var success = await ShipperProfileService.DeleteShipperProfileAsync(shipper.ShipperId);
+                if (success)
+                {
+                    Snackbar.Add($"Shipper profile '{shipper.FullName}' deleted permanently", Severity.Error);
+                    
+                    // 🔥 Gửi SignalR notification
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await SignalRService.NotifyShipperProfileDeletedAsync(shipper.ShipperId);
+                            Console.WriteLine($"🔔 Sent SignalR deletion notification for shipper {shipper.ShipperId}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"❌ SignalR notification failed: {ex.Message}");
+                        }
+                    });
+                }
+                else
+                {
+                    Snackbar.Add("Failed to delete shipper profile", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error deleting shipper: {ex.Message}");
+                Snackbar.Add($"Error deleting shipper: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ViewShipperDetails(ShipperProfileVM shipper)
+    {
+        var message = $"Shipper ID: {shipper.ShipperId}\n" +
+                     $"Full Name: {shipper.FullName}\n" +
+                     $"Username: {shipper.Username}\n" +
+                     $"Email: {shipper.Email}\n" +
+                     $"Phone: {shipper.PhoneNumber ?? "N/A"}\n" +
+                     $"Registration: {shipper.CreatedAt?.ToString("MMMM dd, yyyy") ?? "Unknown"}\n" +
+                     $"Last Updated: {shipper.UpdatedAt?.ToString("MMMM dd, yyyy") ?? "Never"}\n" +
+                     $"Status: {(shipper.IsActive == true ? "Active" : "Inactive")}";
+        
+        var parameters = new DialogParameters
+        {
+            ["ContentText"] = message,
+            ["ButtonText"] = "Close",
+            ["Color"] = Color.Primary
+        };
+
+        await DialogService.ShowAsync<ConfirmDialog>($"Shipper Details - {shipper.FullName}", parameters);
+    }
+
+    private async Task EditShipper(ShipperProfileVM shipper)
+    {
+        Snackbar.Add("Edit shipper functionality coming soon", Severity.Info);
+    }
+
+    public void Dispose()
+    {
+        // Unsubscribe from SignalR events
+        SignalRService.ShipperProfileCreated -= OnShipperProfileCreated;
+        SignalRService.ShipperProfileUpdated -= OnShipperProfileUpdated;
+        SignalRService.ShipperProfileDeleted -= OnShipperProfileDeleted;
+        SignalRService.ShipperProfileActivated -= OnShipperProfileActivated;
+        SignalRService.ShipperProfileDeactivated -= OnShipperProfileDeactivated;
+    }
+}

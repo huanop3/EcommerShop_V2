@@ -932,6 +932,90 @@ header {
     transform: rotate(180deg);
 }
 
+/* Mobile responsive styles - dưới 994px */
+@media (max-width: 994px) {
+    /* Search container mobile */
+    .search-bar-container {
+        position: relative;
+        z-index: 200; /* Giảm z-index của search */
+    }
+
+    .search-results-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--white, #FFFFFF);
+        border: 1px solid #EEEEEE;
+        border-radius: 0 0 8px 8px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        z-index: 250; /* Giảm z-index */
+        max-height: 300px; /* Giảm height cho mobile */
+        overflow-y: auto;
+    }
+
+    /* User menu mobile - tăng z-index */
+    .user-dropdown {
+        position: relative;
+        z-index: 350; /* Tăng z-index cao hơn search */
+    }
+
+    .user-menu {
+        position: absolute;
+        top: calc(100% + 5px);
+        right: 0;
+        background: var(--white, #FFFFFF);
+        border: 1px solid #EEEEEE;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        min-width: 180px; /* Giảm width cho mobile */
+        z-index: 400; /* Z-index cao nhất */
+        padding: 8px 0;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-10px);
+        transition: all 0.3s ease;
+    }
+
+    .user-menu.active {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
+
+    /* Đảm bảo user actions có z-index cao */
+    .user-actions {
+        position: relative;
+        z-index: 350;
+    }
+
+    /* Hide search results khi user menu mở trên mobile */
+    .user-dropdown.active ~ .search-bar-container .search-results-dropdown,
+    .user-menu.active ~ .search-bar-container .search-results-dropdown {
+        display: none !important;
+    }
+}
+
+/* Tablet responsive - 768px to 994px */
+@media (max-width: 994px) and (min-width: 768px) {
+    .user-menu {
+        min-width: 200px;
+    }
+}
+
+/* Mobile phone - dưới 768px */
+@media (max-width: 767px) {
+    .search-results-dropdown {
+        max-height: 250px;
+        font-size: 14px;
+    }
+
+    .user-menu {
+        min-width: 160px;
+        right: -10px; /* Adjust position cho screen nhỏ */
+    }
+}
+
 /* Responsive Design */
 @media (max-width: 1199.98px) {
     .search-bar-container {

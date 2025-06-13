@@ -636,7 +636,6 @@
     private string GetStoreName(int sellerId)
     {
         var seller = sellers?.FirstOrDefault(s => s.SellerId == sellerId);
-        Console.WriteLine($"Getting store name for sellerId: {sellerId} : {seller?.StoreName}");
 
         return seller?.StoreName ?? "Unknown Store";   
     }

@@ -42,7 +42,7 @@ namespace BlazorWebApp.Services
             await SetAuthorizationHeader();
             try
             {
-                var response = await _httpClient.GetAsync($"https://localhost:7260/api/SellerProfile/GetAllSellerProfiles");
+                var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/SellerProfile/GetAllSellerProfiles");
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -69,7 +69,7 @@ namespace BlazorWebApp.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync($"https://localhost:7260/api/SellerProfile/GetSellerProfileById/{sellerId}");
+                var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/SellerProfile/GetSellerProfileById/{sellerId}");
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -95,7 +95,7 @@ namespace BlazorWebApp.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync($"https://localhost:7260/api/SellerProfile/GetSellerProfileByUserId/{userId}");
+                var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/SellerProfile/GetSellerProfileByUserId/{userId}");
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -125,7 +125,7 @@ namespace BlazorWebApp.Services
                 var json = JsonSerializer.Serialize(sellerProfile);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var response = await _httpClient.PostAsync($"https://localhost:7260/api/SellerProfile/CreateSellerProfile", content);
+                var response = await _httpClient.PostAsync($"http://localhost:5282/main/api/SellerProfile/CreateSellerProfile", content);
                 return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
@@ -146,7 +146,7 @@ namespace BlazorWebApp.Services
                 var json = JsonSerializer.Serialize(sellerProfile);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var response = await _httpClient.PutAsync($"https://localhost:7260/api/SellerProfile/UpdateSellerProfile", content);
+                var response = await _httpClient.PutAsync($"http://localhost:5282/main/api/SellerProfile/UpdateSellerProfile", content);
                 return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
@@ -164,7 +164,7 @@ namespace BlazorWebApp.Services
             await SetAuthorizationHeader();
             try
             {
-                var response = await _httpClient.DeleteAsync($"https://localhost:7260/api/SellerProfile/DeleteSellerProfile/{sellerId}");
+                var response = await _httpClient.DeleteAsync($"http://localhost:5282/main/api/SellerProfile/DeleteSellerProfile/{sellerId}");
                 return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
@@ -186,7 +186,7 @@ namespace BlazorWebApp.Services
             await SetAuthorizationHeader();
             try
             {
-                var response = await _httpClient.PutAsync($"https://localhost:7260/api/SellerProfile/VerifySellerProfile/{sellerId}", null);
+                var response = await _httpClient.PutAsync($"http://localhost:5282/main/api/SellerProfile/VerifySellerProfile/{sellerId}", null);
                 return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
@@ -204,7 +204,7 @@ namespace BlazorWebApp.Services
             await SetAuthorizationHeader();
             try
             {
-                var response = await _httpClient.PutAsync($"https://localhost:7260/api/SellerProfile/UnverifySellerProfile/{sellerId}", null);
+                var response = await _httpClient.PutAsync($"http://localhost:5282/main/api/SellerProfile/UnverifySellerProfile/{sellerId}", null);
                 return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
@@ -226,7 +226,7 @@ namespace BlazorWebApp.Services
             await SetAuthorizationHeader();
             try
             {
-                var response = await _httpClient.GetAsync($"https://localhost:7260/api/SellerProfile/GetVerifiedSellerProfiles");
+                var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/SellerProfile/GetVerifiedSellerProfiles");
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -254,7 +254,7 @@ namespace BlazorWebApp.Services
             await SetAuthorizationHeader();
             try
             {
-                var response = await _httpClient.GetAsync($"https://localhost:7260/api/SellerProfile/GetPendingVerificationProfiles");
+                var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/SellerProfile/GetPendingVerificationProfiles");
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -281,7 +281,7 @@ namespace BlazorWebApp.Services
             await SetAuthorizationHeader();
             try
             {
-                var response = await _httpClient.GetAsync($"https://localhost:7260/api/SellerProfile/CheckUserHasSellerProfile/{userId}");
+                var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/SellerProfile/CheckUserHasSellerProfile/{userId}");
 
                 if (response.IsSuccessStatusCode)
                 {

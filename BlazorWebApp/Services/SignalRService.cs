@@ -27,6 +27,7 @@ namespace BlazorWebApp.Services
         public event Action<int, string>? UserUpdated;
         public event Action<int>? UserDeleted;
         public event Action<int, string>? UserStatusChanged;
+        public event Action<int, string, string>? UserRoleUpdated; // ✅ BỔ SUNG Event thiếu
 
         // Events cho category management (ProductService)
         public event Action<string>? CategoryCreated;
@@ -69,11 +70,19 @@ namespace BlazorWebApp.Services
         public event Action<int, string>? SellerProfileVerified;
         public event Action<int, string>? SellerProfileUnverified;
 
+        // ✅ BỔ SUNG: Shipper Profile events (MainEcommerceService)
+        public event Action<string>? ShipperProfileCreated;
+        public event Action<int, string>? ShipperProfileUpdated;
+        public event Action<int>? ShipperProfileDeleted;
+        public event Action<int>? ShipperProfileActivated;
+        public event Action<int>? ShipperProfileDeactivated;
+
         // ✅ Thêm Events cho Order Management
         public event Action<int, int, decimal>? OrderCreated;
         public event Action<int, int, decimal>? OrderUpdated;
         public event Action<int>? OrderDeleted;
         public event Action<int, int, int, string>? OrderStatusChanged;
+        public event Action<int, int, int>? OrderAssignedToShipper; // ✅ BỔ SUNG Event thiếu
 
         // ✅ Thêm Events cho OrderItem Management
         public event Action<int, int, int, int>? OrderItemCreated;
@@ -101,6 +110,26 @@ namespace BlazorWebApp.Services
         public event Action<int, decimal>? YourOrderUpdated;
         public event Action<int, string, string>? YourOrderStatusChanged;
         public event Action<int, string>? YourPaymentStatusChanged;
+        public event Action<int>? YourOrderAssignedToShipper; // ✅ BỔ SUNG Event thiếu
+
+        // ✅ BỔ SUNG: Shipment events (MainEcommerceService)
+        public event Action<int, int, int>? ShipmentCreated;
+        public event Action<int, int, string>? ShipmentUpdated;
+        public event Action<int>? ShipmentDeleted;
+        public event Action<int, int, string>? ShipmentStatusUpdated;
+        public event Action<int, int>? ShipperAssigned;
+        public event Action<int, string>? TrackingNumberUpdated;
+        public event Action<int, int>? ShipmentDelivered;
+        public event Action<int, int>? ShipmentPickedUp;
+        public event Action<int, int>? ShipmentInTransit;
+        public event Action<int, int>? ShipmentOutForDelivery;
+        public event Action<int, int, string>? ShipmentFailedDelivery;
+
+        // ✅ BỔ SUNG: Private Shipment Notifications
+        public event Action<int, string, string>? YourShipmentStatusChanged;
+        public event Action<int, string>? YourShipmentAssigned;
+        public event Action<int, string>? YourShipmentDelivered;
+        public event Action<int, string>? NewDeliveryAssignment;
 
         public bool IsMainHubConnected => _mainHubConnection?.State == HubConnectionState.Connected;
         public bool IsProductHubConnected => _productHubConnection?.State == HubConnectionState.Connected;
@@ -154,7 +183,7 @@ namespace BlazorWebApp.Services
             if (_mainHubConnection != null && IsMainHubConnected)
                 return;
 
-            string mainHubUrl = "https://localhost:7260/notificationHub";
+            string mainHubUrl = "http://localhost:5282/main/notificationHub";
 
             _mainHubConnection = new HubConnectionBuilder()
                 .WithUrl(mainHubUrl, options =>
@@ -182,7 +211,7 @@ namespace BlazorWebApp.Services
             if (_productHubConnection != null && IsProductHubConnected)
                 return;
 
-            string productHubUrl = "https://localhost:7252/notificationHub"; // Sửa từ 7262 thành 7252
+            string productHubUrl = "http://localhost:5282/product/notificationHub"; // Sửa từ 7262 thành 7252
 
             _productHubConnection = new HubConnectionBuilder()
                 .WithUrl(productHubUrl, options =>
@@ -228,6 +257,12 @@ namespace BlazorWebApp.Services
             _mainHubConnection.On<int, string>("UserStatusChanged", async (userId, status) =>
             {
                 await Task.Run(() => UserStatusChanged?.Invoke(userId, status));
+            });
+
+            // ✅ BỔ SUNG: User Role Updated Event Handler
+            _mainHubConnection.On<int, string, string>("UserRoleUpdated", async (userId, username, newRole) =>
+            {
+                await Task.Run(() => UserRoleUpdated?.Invoke(userId, username, newRole));
             });
 
             // Notification events
@@ -320,6 +355,32 @@ namespace BlazorWebApp.Services
                 await Task.Run(() => SellerProfileUnverified?.Invoke(sellerId, storeName));
             });
 
+            // ✅ BỔ SUNG: Shipper Profile management events
+            _mainHubConnection.On<string>("ShipperProfileCreated", async (shipperName) =>
+            {
+                await Task.Run(() => ShipperProfileCreated?.Invoke(shipperName));
+            });
+
+            _mainHubConnection.On<int, string>("ShipperProfileUpdated", async (shipperId, shipperName) =>
+            {
+                await Task.Run(() => ShipperProfileUpdated?.Invoke(shipperId, shipperName));
+            });
+
+            _mainHubConnection.On<int>("ShipperProfileDeleted", async (shipperId) =>
+            {
+                await Task.Run(() => ShipperProfileDeleted?.Invoke(shipperId));
+            });
+
+            _mainHubConnection.On<int>("ShipperProfileActivated", async (shipperId) =>
+            {
+                await Task.Run(() => ShipperProfileActivated?.Invoke(shipperId));
+            });
+
+            _mainHubConnection.On<int>("ShipperProfileDeactivated", async (shipperId) =>
+            {
+                await Task.Run(() => ShipperProfileDeactivated?.Invoke(shipperId));
+            });
+
             // ✅ Order Management Events
             _mainHubConnection.On<int, int, decimal>("OrderCreated", async (orderId, userId, totalAmount) =>
             {
@@ -339,6 +400,12 @@ namespace BlazorWebApp.Services
             _mainHubConnection.On<int, int, int, string>("OrderStatusChanged", async (orderId, userId, statusId, statusName) =>
             {
                 await Task.Run(() => OrderStatusChanged?.Invoke(orderId, userId, statusId, statusName));
+            });
+
+            // ✅ BỔ SUNG: Order Assigned to Shipper Event
+            _mainHubConnection.On<int, int, int>("OrderAssignedToShipper", async (orderId, shipperId, customerId) =>
+            {
+                await Task.Run(() => OrderAssignedToShipper?.Invoke(orderId, shipperId, customerId));
             });
 
             // ✅ OrderItem Management Events
@@ -367,6 +434,36 @@ namespace BlazorWebApp.Services
             {
                 Console.WriteLine($"🔔 SignalR: Order {orderId} cancelled: {reason}");
                 OrderCancelled?.Invoke(orderId, reason);
+            });
+
+            // ✅ BỔ SUNG: Your Order Confirmed Event
+            _mainHubConnection.On<int, string>("YourOrderConfirmed", async (orderId, message) =>
+            {
+                await Task.Run(() =>
+                {
+                    YourOrderConfirmed?.Invoke(orderId, message);
+                    _snackbar.Add($"Order #{orderId} confirmed: {message}", Severity.Success);
+                });
+            });
+
+            // ✅ BỔ SUNG: Your Order Cancelled Event
+            _mainHubConnection.On<int, string, string>("YourOrderCancelled", async (orderId, reason, message) =>
+            {
+                await Task.Run(() =>
+                {
+                    YourOrderCancelled?.Invoke(orderId, reason, message);
+                    _snackbar.Add($"Order #{orderId} cancelled: {reason}", Severity.Warning);
+                });
+            });
+
+            // ✅ BỔ SUNG: Your Order Assigned to Shipper Event
+            _mainHubConnection.On<int>("YourOrderAssignedToShipper", async (orderId) =>
+            {
+                await Task.Run(() =>
+                {
+                    YourOrderAssignedToShipper?.Invoke(orderId);
+                    _snackbar.Add($"Order #{orderId} has been assigned to a shipper!", Severity.Info);
+                });
             });
 
             // ✅ OrderStatus Management Events
@@ -442,6 +539,92 @@ namespace BlazorWebApp.Services
                     _snackbar.Add($"Payment status updated: {status}", Severity.Info);
                 });
             });
+
+            // ✅ BỔ SUNG: Shipment events (MainEcommerceService)
+            _mainHubConnection.On<int, int, int>("ShipmentCreated", async (shipmentId, orderId, userId) =>
+            {
+                await Task.Run(() => ShipmentCreated?.Invoke(shipmentId, orderId, userId));
+            });
+
+            _mainHubConnection.On<int, int, string>("ShipmentUpdated", async (shipmentId, orderId, status) =>
+            {
+                await Task.Run(() => ShipmentUpdated?.Invoke(shipmentId, orderId, status));
+            });
+
+            _mainHubConnection.On<int>("ShipmentDeleted", async (shipmentId) =>
+            {
+                await Task.Run(() => ShipmentDeleted?.Invoke(shipmentId));
+            });
+
+            _mainHubConnection.On<int, int, string>("ShipmentStatusUpdated", async (shipmentId, orderId, status) =>
+            {
+                await Task.Run(() => ShipmentStatusUpdated?.Invoke(shipmentId, orderId, status));
+            });
+
+            _mainHubConnection.On<int, int>("ShipperAssigned", async (shipmentId, shipperId) =>
+            {
+                await Task.Run(() => ShipperAssigned?.Invoke(shipmentId, shipperId));
+            });
+
+            _mainHubConnection.On<int, string>("TrackingNumberUpdated", async (shipmentId, trackingNumber) =>
+            {
+                await Task.Run(() => TrackingNumberUpdated?.Invoke(shipmentId, trackingNumber));
+            });
+
+            _mainHubConnection.On<int, int>("ShipmentDelivered", async (shipmentId, orderId) =>
+            {
+                await Task.Run(() => ShipmentDelivered?.Invoke(shipmentId, orderId));
+            });
+
+            _mainHubConnection.On<int, int>("ShipmentPickedUp", async (shipmentId, orderId) =>
+            {
+                await Task.Run(() => ShipmentPickedUp?.Invoke(shipmentId, orderId));
+            });
+
+            _mainHubConnection.On<int, int>("ShipmentInTransit", async (shipmentId, orderId) =>
+            {
+                await Task.Run(() => ShipmentInTransit?.Invoke(shipmentId, orderId));
+            });
+
+            _mainHubConnection.On<int, int>("ShipmentOutForDelivery", async (shipmentId, orderId) =>
+            {
+                await Task.Run(() => ShipmentOutForDelivery?.Invoke(shipmentId, orderId));
+            });
+
+            _mainHubConnection.On<int, int, string>("ShipmentFailedDelivery", async (shipmentId, orderId, reason) =>
+            {
+                await Task.Run(() => ShipmentFailedDelivery?.Invoke(shipmentId, orderId, reason));
+            });
+
+            // ✅ BỔ SUNG: Private Shipment Notifications
+            _mainHubConnection.On<int, string, string>("YourShipmentStatusChanged", async (shipmentId, status, message) =>
+            {
+                await Task.Run(() =>
+                {
+                    YourShipmentStatusChanged?.Invoke(shipmentId, status, message);
+                    _snackbar.Add($"Shipment #{shipmentId} status changed to {status}: {message}", Severity.Info);
+                });
+            });
+
+            _mainHubConnection.On<int, string>("YourShipmentAssigned", async (shipmentId, shipperName) =>
+            {
+                await Task.Run(() =>
+                {
+                    YourShipmentAssigned?.Invoke(shipmentId, shipperName);
+                    _snackbar.Add($"Shipment #{shipmentId} has been assigned to {shipperName}", Severity.Info);
+                });
+            });
+
+            _mainHubConnection.On<int, string>("YourShipmentDelivered", async (shipmentId, deliveryInfo) =>
+            {
+                await Task.Run(() =>
+                {
+                    YourShipmentDelivered?.Invoke(shipmentId, deliveryInfo);
+                    _snackbar.Add($"Shipment #{shipmentId} delivered: {deliveryInfo}", Severity.Success);
+                });
+            });
+
+            // Register other events as needed
         }
 
         private void RegisterProductHubEventHandlers()
@@ -548,6 +731,70 @@ namespace BlazorWebApp.Services
             }
         }
 
+        // ✅ BỔ SUNG: Register Seller Connection
+        public async Task RegisterSellerConnectionAsync(int sellerId, int userId)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("RegisterSellerConnection", sellerId, userId);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error registering seller connection: {ex.Message}");
+                }
+            }
+        }
+
+        // ✅ BỔ SUNG: Unregister Seller Connection
+        public async Task UnregisterSellerConnectionAsync(int sellerId, int userId)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("UnregisterSellerConnection", sellerId, userId);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error unregistering seller connection: {ex.Message}");
+                }
+            }
+        }
+
+        // ✅ BỔ SUNG: Register Shipper Connection
+        public async Task RegisterShipperConnectionAsync(int shipperId, int userId)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("RegisterShipperConnection", shipperId, userId);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error registering shipper connection: {ex.Message}");
+                }
+            }
+        }
+
+        // ✅ BỔ SUNG: Unregister Shipper Connection
+        public async Task UnregisterShipperConnectionAsync(int shipperId, int userId)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("UnregisterShipperConnection", shipperId, userId);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error unregistering shipper connection: {ex.Message}");
+                }
+            }
+        }
+
         // Main Hub methods (MainEcommerceService)
         public async Task SendMessageAsync(string user, string message)
         {
@@ -563,6 +810,23 @@ namespace BlazorWebApp.Services
                 }
             }
         }
+
+        // ✅ BỔ SUNG: Send Private Message
+        public async Task SendPrivateMessageAsync(string targetUserId, string message)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("SendPrivateMessage", targetUserId, message);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error sending private message: {ex.Message}");
+                }
+            }
+        }
+
         //Order notification methods (MainEcommerceService)
         public async Task NotifyOrderCreatedAsync(int orderId, int userId, decimal totalAmount)
         {
@@ -589,6 +853,54 @@ namespace BlazorWebApp.Services
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Error notifying order updated: {ex.Message}");
+                }
+            }
+        }
+
+        // ✅ BỔ SUNG: Notify Order Deleted
+        public async Task NotifyOrderDeletedAsync(int orderId)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyOrderDeleted", orderId);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error notifying order deleted: {ex.Message}");
+                }
+            }
+        }
+
+        // ✅ BỔ SUNG: Notify Order Status Changed
+        public async Task NotifyOrderStatusChangedAsync(int orderId, int customerId, int statusId, string statusName)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyOrderStatusChanged", orderId, customerId, statusId, statusName);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error notifying order status changed: {ex.Message}");
+                }
+            }
+        }
+
+        // ✅ BỔ SUNG: Notify Order Assigned to Shipper
+        public async Task NotifyOrderAssignedToShipperAsync(int orderId, int shipperId, int customerId)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyOrderAssignedToShipper", orderId, shipperId, customerId);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error notifying order assigned to shipper: {ex.Message}");
                 }
             }
         }
@@ -1028,6 +1340,82 @@ namespace BlazorWebApp.Services
             }
         }
 
+        // ✅ BỔ SUNG: Shipper Profile notification methods (MainEcommerceService)
+        public async Task NotifyShipperProfileCreatedAsync(string shipperName)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyShipperProfileCreated", shipperName);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error notifying shipper profile created: {ex.Message}");
+                }
+            }
+        }
+
+        public async Task NotifyShipperProfileUpdatedAsync(int shipperId, string shipperName)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyShipperProfileUpdated", shipperId, shipperName);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error notifying shipper profile updated: {ex.Message}");
+                }
+            }
+        }
+
+        public async Task NotifyShipperProfileDeletedAsync(int shipperId)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyShipperProfileDeleted", shipperId);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error notifying shipper profile deleted: {ex.Message}");
+                }
+            }
+        }
+
+        public async Task NotifyShipperProfileActivatedAsync(int shipperId)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyShipperProfileActivated", shipperId);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error notifying shipper profile activated: {ex.Message}");
+                }
+            }
+        }
+
+        public async Task NotifyShipperProfileDeactivatedAsync(int shipperId)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyShipperProfileDeactivated", shipperId);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error notifying shipper profile deactivated: {ex.Message}");
+                }
+            }
+        }
+
         public async Task NotifyUserRoleUpdatedAsync(int userId, string username, string newRole)
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
@@ -1042,7 +1430,184 @@ namespace BlazorWebApp.Services
                 }
             }
         }
+        // Thêm vào cuối file (trước DisposeAsync method)
 
+        // ✅ BỔ SUNG: Shipment notification methods (MainEcommerceService)
+        public async Task NotifyShipmentCreatedAsync(int shipmentId, int orderId, int shipperId)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyShipmentCreated", shipmentId, orderId, shipperId);
+                    Console.WriteLine($"✅ Shipment created notification sent: {shipmentId}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error sending shipment created notification: {ex.Message}");
+                }
+            }
+        }
+
+        public async Task NotifyShipmentUpdatedAsync(int shipmentId, int orderId, string status)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyShipmentUpdated", shipmentId, orderId, status);
+                    Console.WriteLine($"✅ Shipment updated notification sent: {shipmentId}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error sending shipment updated notification: {ex.Message}");
+                }
+            }
+        }
+
+        public async Task NotifyShipmentDeletedAsync(int shipmentId)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyShipmentDeleted", shipmentId);
+                    Console.WriteLine($"✅ Shipment deleted notification sent: {shipmentId}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error sending shipment deleted notification: {ex.Message}");
+                }
+            }
+        }
+
+        public async Task NotifyShipmentStatusUpdatedAsync(int shipmentId, int orderId, string status)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyShipmentStatusUpdated", shipmentId, orderId, status);
+                    Console.WriteLine($"✅ Shipment status updated notification sent: {shipmentId} - {status}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error sending shipment status notification: {ex.Message}");
+                }
+            }
+        }
+
+        public async Task NotifyShipperAssignedAsync(int orderId, int shipperId)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyShipperAssigned", orderId, shipperId);
+                    Console.WriteLine($"✅ Shipper assigned notification sent: Order {orderId} -> Shipper {shipperId}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error sending shipper assigned notification: {ex.Message}");
+                }
+            }
+        }
+
+        public async Task NotifyTrackingNumberUpdatedAsync(int shipmentId, string trackingNumber)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyTrackingNumberUpdated", shipmentId, trackingNumber);
+                    Console.WriteLine($"✅ Tracking number updated notification sent: {shipmentId} - {trackingNumber}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error sending tracking number notification: {ex.Message}");
+                }
+            }
+        }
+
+        public async Task NotifyShipmentDeliveredAsync(int shipmentId, int orderId)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyShipmentDelivered", shipmentId, orderId);
+                    Console.WriteLine($"✅ Shipment delivered notification sent: {shipmentId}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error sending shipment delivered notification: {ex.Message}");
+                }
+            }
+        }
+
+        public async Task NotifyShipmentPickedUpAsync(int shipmentId, int orderId)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyShipmentPickedUp", shipmentId, orderId);
+                    Console.WriteLine($"✅ Shipment picked up notification sent: {shipmentId}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error sending shipment picked up notification: {ex.Message}");
+                }
+            }
+        }
+
+        public async Task NotifyShipmentInTransitAsync(int shipmentId, int orderId)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyShipmentInTransit", shipmentId, orderId);
+                    Console.WriteLine($"✅ Shipment in transit notification sent: {shipmentId}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error sending shipment in transit notification: {ex.Message}");
+                }
+            }
+        }
+
+        public async Task NotifyShipmentOutForDeliveryAsync(int shipmentId, int orderId)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyShipmentOutForDelivery", shipmentId, orderId);
+                    Console.WriteLine($"✅ Shipment out for delivery notification sent: {shipmentId}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error sending shipment out for delivery notification: {ex.Message}");
+                }
+            }
+        }
+
+        public async Task NotifyShipmentFailedDeliveryAsync(int shipmentId, int orderId, string reason)
+        {
+            if (_mainHubConnection is not null && IsMainHubConnected)
+            {
+                try
+                {
+                    await _mainHubConnection.SendAsync("NotifyShipmentFailedDelivery", shipmentId, orderId, reason);
+                    Console.WriteLine($"✅ Shipment failed delivery notification sent: {shipmentId} - {reason}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error sending shipment failed delivery notification: {ex.Message}");
+                }
+            }
+        }
         public async ValueTask DisposeAsync()
         {
             _connectionSemaphore?.Dispose();

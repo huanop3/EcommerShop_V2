@@ -133,7 +133,7 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
                 RefreshToken = CleanToken(refreshToken)
             };
 
-            var response = await _httpClient.PostAsJsonAsync("https://localhost:7260/api/UserLogin/refresh-Token", loginCheck);
+            var response = await _httpClient.PostAsJsonAsync("http://localhost:5282/main/api/UserLogin/refresh-Token", loginCheck);
 
             if (response.IsSuccessStatusCode)
             {

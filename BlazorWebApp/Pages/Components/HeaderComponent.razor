@@ -96,6 +96,11 @@
                                         <a href="/admin" class="action-item">Dashboard</a>
                                     </Authorized>
                                 </AuthorizeView>
+                                <AuthorizeView Roles="Shipper" Context="innerContext">
+                                    <Authorized>
+                                        <a href="/shipper/dashboard" class="action-item">Dashboard</a>
+                                    </Authorized>
+                                </AuthorizeView>
                                 <a href="/profile">My Profile</a>
                                 <a href="javascript:void(0)" @onclick="Logout">Logout</a>
                             </div>
@@ -228,14 +233,7 @@
                 <div class="nav-item-wrapper">
                     <a href="/my-orders" class="nav-item">My Orders</a>
                 </div>
-                <div class="nav-item-wrapper">
-                    <a href="#" class="nav-item">Pages <i class="fas fa-chevron-down" style="color: #4B5966; font-size: 10px; margin-left: 5px;"></i></a>
-                    <div class="nav-submenu">
-                        <a href="/about" class="nav-submenu-item">About Us</a>
-                        <a href="/contact" class="nav-submenu-item">Contact</a>
-                        <a href="/faq" class="nav-submenu-item">FAQ</a>
-                    </div>
-                </div>
+                
             </div>
         </div>
     </div>
@@ -248,64 +246,11 @@
             </a>
             <button class="mobile-menu-close" @onclick="ToggleMobileMenu">×</button>
         </div>
-
-        <div class="mobile-search-container">
-            <div class="mobile-search-bar">
-                <input type="text" 
-                       placeholder="Search Products..." 
-                       @bind="mobileSearchQuery"
-                       @onkeypress="OnMobileSearchKeyPress" />
-                <button type="button" @onclick="PerformMobileSearch">
-                    <i class="fas fa-search" title="Search" style="color: white; font-size: 16px;"></i>
-                </button>
-            </div>
-        </div>
-
         <div class="mobile-nav-links">
             <a href="/" class="mobile-nav-item">Home</a>
-            
-            <a href="#" class="mobile-nav-item" @onclick="@(() => ToggleSubmenu("categories"))">
-                Categories
-                <i class="fas fa-chevron-down @(_openSubmenu == "categories" ? "rotate" : "")" style="color: #4B5966; font-size: 12px;"></i>
-            </a>
-            <div class="mobile-submenu @(_openSubmenu == "categories" ? "active" : "")">
-                @if (categories != null && categories.Any())
-                {
-                    @foreach (var parentCategory in categories.Where(c => c.ParentCategoryId == null))
-                    {
-                        <div class="mobile-parent-category">
-                            <a href="/products?category=@parentCategory.CategoryId" class="mobile-nav-item parent">
-                                @parentCategory.CategoryName
-                            </a>
-                            @{
-                                var childCategories = categories.Where(c => c.ParentCategoryId == parentCategory.CategoryId).ToList();
-                            }
-                            @if (childCategories.Any())
-                            {
-                                @foreach (var childCategory in childCategories)
-                                {
-                                    <a href="/products?category=@childCategory.CategoryId" class="mobile-nav-item child">
-                                        @childCategory.CategoryName
-                                    </a>
-                                }
-                            }
-                        </div>
-                    }
-                }
-            </div>
-
             <a href="/products" class="mobile-nav-item">Products</a>
             <a href="/orders" class="mobile-nav-item">Orders</a>
             
-            <a href="#" class="mobile-nav-item" @onclick="@(() => ToggleSubmenu("pages"))">
-                Pages
-                <i class="fas fa-chevron-down @(_openSubmenu == "pages" ? "rotate" : "")" style="color: #4B5966; font-size: 12px;"></i>
-            </a>
-            <div class="mobile-submenu @(_openSubmenu == "pages" ? "active" : "")">
-                <a href="/about" class="mobile-nav-item">About Us</a>
-                <a href="/contact" class="mobile-nav-item">Contact</a>
-                <a href="/faq" class="mobile-nav-item">FAQ</a>
-            </div>
         </div>
     </div>
 

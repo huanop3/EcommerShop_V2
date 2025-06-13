@@ -97,11 +97,13 @@ builder.Services.AddHostedService<KafkaConsumerService>();
 //DI Repository
 builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<IProductImageRepository, ProductImageRepository>();
 //DI UnitOfWork
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 //DI Service
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IProdService, ProdService>();
+
 builder.Services.AddHttpClient();
 // Lấy chuỗi kết nối Redis từ cấu hình
 var redisConnectionString = builder.Configuration.GetConnectionString("RedisConnection");
@@ -133,7 +135,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("CorsPolicy", builder =>
         builder
-            .WithOrigins("http://localhost:5093", "https://localhost:7257","https://localhost:7260") // Thêm tất cả domain client của bạn
+            .WithOrigins("http://localhost:5093", "https://localhost:7257","https://localhost:7260","http://localhost:5282") // Thêm tất cả domain client của bạn
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials()); // Quan trọng cho SignalR

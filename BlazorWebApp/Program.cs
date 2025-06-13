@@ -68,6 +68,8 @@ builder.Services.AddScoped<SellerProfileService>();
 builder.Services.AddScoped<ProdService>();
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<DashboardService>();
+builder.Services.AddScoped<ShipperProfileService>();
+builder.Services.AddScoped<ShipmentService>();
 // Register MudBlazor services
 builder.Services.AddMudServices();
 // Thêm vào Program.cs trước dòng var app = builder.Build()

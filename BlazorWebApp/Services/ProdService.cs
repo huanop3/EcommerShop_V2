@@ -35,7 +35,7 @@ namespace BlazorWebApp.Services
 
         public async Task<IEnumerable<ProductVM>> GetAllProductsAsync()
         {
-            var response = await _httpClient.GetAsync("https://localhost:7252/api/Product/GetAllProducts");
+            var response = await _httpClient.GetAsync("http://localhost:5282/product/api/Product/GetAllProducts");
             
             if (!response.IsSuccessStatusCode)
             {
@@ -54,7 +54,7 @@ namespace BlazorWebApp.Services
         }
         public async Task<HTTPResponseClient<IEnumerable<ProductVM>>> GetAllProductByPageAsync(int pageIndex, int pageSize)
         {
-            var response = await _httpClient.GetAsync($"https://localhost:7252/api/Product/GetPagedProducts?pageIndex={pageIndex}&pageSize={pageSize}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/product/api/Product/GetPagedProducts?pageIndex={pageIndex}&pageSize={pageSize}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -71,7 +71,7 @@ namespace BlazorWebApp.Services
         }
         public async Task<ProductVM> GetProductByIdAsync(int id)
         {
-            var response = await _httpClient.GetAsync($"https://localhost:7252/api/Product/GetProductById/{id}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/product/api/Product/GetProductById/{id}");
             
             if (!response.IsSuccessStatusCode)
             {
@@ -88,7 +88,7 @@ namespace BlazorWebApp.Services
 
         public async Task<IEnumerable<ProductVM>> GetProductsByCategoryAsync(int categoryId)
         {
-            var response = await _httpClient.GetAsync($"https://localhost:7252/api/Product/GetProductsByCategory/{categoryId}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/product/api/Product/GetProductsByCategory/{categoryId}");
             
             if (!response.IsSuccessStatusCode)
             {
@@ -107,7 +107,7 @@ namespace BlazorWebApp.Services
 
         public async Task<IEnumerable<ProductVM>> GetProductsBySellerAsync(int sellerId)
         {
-            var response = await _httpClient.GetAsync($"https://localhost:7252/api/Product/GetProductsBySeller/{sellerId}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/product/api/Product/GetProductsBySeller/{sellerId}");
             
             if (!response.IsSuccessStatusCode)
             {
@@ -126,7 +126,7 @@ namespace BlazorWebApp.Services
 
         public async Task<IEnumerable<ProductVM>> SearchProductsAsync(string searchTerm)
         {
-            var response = await _httpClient.GetAsync($"https://localhost:7252/api/Product/SearchProducts?searchTerm={Uri.EscapeDataString(searchTerm)}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/product/api/Product/SearchProducts?searchTerm={Uri.EscapeDataString(searchTerm)}");
             
             if (!response.IsSuccessStatusCode)
             {
@@ -147,7 +147,7 @@ namespace BlazorWebApp.Services
             if (product == null) return false;
             
             await SetAuthorizationHeader();
-            var response = await _httpClient.PostAsJsonAsync($"https://localhost:7252/api/Product/CreateProduct?userId={userId}", product);
+            var response = await _httpClient.PostAsJsonAsync($"http://localhost:5282/product/api/Product/CreateProduct?userId={userId}", product);
             
             if (!response.IsSuccessStatusCode) return false;
             
@@ -160,7 +160,7 @@ namespace BlazorWebApp.Services
             if (product == null) return false;
             
             await SetAuthorizationHeader();
-            var response = await _httpClient.PutAsJsonAsync($"https://localhost:7252/api/Product/UpdateProduct/{id}", product);
+            var response = await _httpClient.PutAsJsonAsync($"http://localhost:5282/product/api/Product/UpdateProduct/{id}", product);
             
             if (!response.IsSuccessStatusCode) return false;
             
@@ -171,7 +171,7 @@ namespace BlazorWebApp.Services
         public async Task<bool> DeleteProductAsync(int id)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.DeleteAsync($"https://localhost:7252/api/Product/DeleteProduct/{id}");
+            var response = await _httpClient.DeleteAsync($"http://localhost:5282/product/api/Product/DeleteProduct/{id}");
             
             if (!response.IsSuccessStatusCode) return false;
             
@@ -182,7 +182,7 @@ namespace BlazorWebApp.Services
         public async Task<bool> UpdateProductQuantityAsync(int id, int quantity)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.PatchAsync($"https://localhost:7252/api/Product/UpdateProductQuantity/{id}?quantity={quantity}", null);
+            var response = await _httpClient.PatchAsync($"http://localhost:5282/product/api/Product/UpdateProductQuantity/{id}?quantity={quantity}", null);
             
             if (!response.IsSuccessStatusCode) return false;
             

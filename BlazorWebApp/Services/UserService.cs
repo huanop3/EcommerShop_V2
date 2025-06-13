@@ -34,7 +34,7 @@ namespace BlazorWebApp.Services
         {
             await SetAuthorizationHeader();
 
-            var response = await _httpClient.GetAsync("https://localhost:7260/api/User/GetAllUser");
+            var response = await _httpClient.GetAsync("http://localhost:5282/main/api/User/GetAllUser");
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<IEnumerable<UserVM>>>();
@@ -45,7 +45,7 @@ namespace BlazorWebApp.Services
         public async Task<IEnumerable<UserVM>> GetUsersByPageAsync(int pageIndex, int pageSize)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/User/GetUsersByPage?pageIndex={pageIndex}&pageSize={pageSize}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/User/GetUsersByPage?pageIndex={pageIndex}&pageSize={pageSize}");
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<IEnumerable<UserVM>>>();
@@ -56,7 +56,7 @@ namespace BlazorWebApp.Services
         public async Task<IEnumerable<RoleVM>> GetAllRoleAsync()
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.GetAsync("https://localhost:7260/api/User/GetAllRole");
+            var response = await _httpClient.GetAsync("http://localhost:5282/main/api/User/GetAllRole");
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<IEnumerable<RoleVM>>>();
@@ -68,7 +68,7 @@ namespace BlazorWebApp.Services
             if (user == null) return (false, "User data is null");
 
             await SetAuthorizationHeader();
-            var response = await _httpClient.PutAsJsonAsync("https://localhost:7260/api/User/UpdateUser", user);
+            var response = await _httpClient.PutAsJsonAsync("http://localhost:5282/main/api/User/UpdateUser", user);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -83,7 +83,7 @@ namespace BlazorWebApp.Services
         {
             if (string.IsNullOrEmpty(id)) return false;
             await SetAuthorizationHeader();
-            var response = await _httpClient.DeleteAsync($"https://localhost:7260/api/User/DeleteUser?id={id}");
+            var response = await _httpClient.DeleteAsync($"http://localhost:5282/main/api/User/DeleteUser?id={id}");
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<string>>();
@@ -93,7 +93,7 @@ namespace BlazorWebApp.Services
         public async Task<ProfileVM> GetProfileAsync(int id)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/User/GetUserProfile?userId={id}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/User/GetUserProfile?userId={id}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -113,7 +113,7 @@ namespace BlazorWebApp.Services
             if (profile == null) return false;
             await SetAuthorizationHeader();
 
-            var response = await _httpClient.PutAsJsonAsync("https://localhost:7260/api/User/UpdateUserProfile", profile);
+            var response = await _httpClient.PutAsJsonAsync("http://localhost:5282/main/api/User/UpdateUserProfile", profile);
 
             if (!response.IsSuccessStatusCode) return false;
 

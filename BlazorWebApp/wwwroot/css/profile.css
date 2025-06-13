@@ -965,76 +965,553 @@
     }
 }
 
-/* ...existing CSS continues... */
-
-/* Dark mode support (if needed) */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --white: #1a1a1a;
-        --light-bg: #121212;
-        --border-color: #333333;
-        --heading-color: #ffffff;
-        --text-color: #cccccc;
-        --light-gray: #2a2a2a;
-    }
+/* Business Profile Shared Styles */
+.business-selection {
+    padding: 20px 0;
 }
 
-/* Print styles */
-@media print {
-    .profile-container {
-        background: white;
-        box-shadow: none;
-        max-width: none;
-        padding: 0;
-    }
-    
-    .profile-header {
-        background: #f5f5f5 !important;
-        color: black !important;
-    }
-    
-    .btn,
-    .avatar-upload-overlay {
-        display: none !important;
-    }
-    
-    .profile-card {
-        break-inside: avoid;
-        box-shadow: none;
-        border: 1px solid #ddd;
-    }
+.business-intro {
+    text-align: center;
+    margin-bottom: 30px;
 }
 
-/* Connection status styles */
-.connection-status {
-    position: fixed;
-    bottom: 20px;
-    left: 20px;
-    padding: 8px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    background: rgba(255, 255, 255, 0.9);
+.business-intro h4 {
+    color: var(--heading-color);
+    margin-bottom: 15px;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.business-intro p {
+    color: var(--text-color);
+    font-size: 16px;
+    line-height: 1.6;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* Unified Business Option Cards */
+.become-seller-section,
+.become-shipper-section {
+    text-align: center;
+    padding: 40px 30px;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 16px;
+    margin-bottom: 20px;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.become-seller-section::before,
+.become-shipper-section::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(92, 175, 144, 0.03) 0%, transparent 70%);
+    transform: rotate(45deg);
+    pointer-events: none;
+}
+
+.become-seller-section:hover,
+.become-shipper-section:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(92, 175, 144, 0.15);
+    border-color: rgba(92, 175, 144, 0.2);
+}
+
+/* Business Info Section */
+.seller-info,
+.shipper-info {
+    margin-bottom: 30px;
+    position: relative;
+    z-index: 1;
+}
+
+.seller-icon,
+.shipper-icon {
+    font-size: 56px;
+    color: var(--primary-color);
+    margin-bottom: 20px;
+    filter: drop-shadow(0 4px 8px rgba(92, 175, 144, 0.3));
+}
+
+.seller-info h4,
+.shipper-info h4 {
+    color: var(--heading-color);
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0 0 15px 0;
+    letter-spacing: -0.5px;
+}
+
+.seller-info p,
+.shipper-info p {
+    color: var(--text-color);
+    font-size: 16px;
+    margin-bottom: 25px;
+    line-height: 1.6;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Benefits Section */
+.seller-benefits,
+.shipper-benefits {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 15px;
+    margin: 25px 0;
+    text-align: left;
+    max-width: 450px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.benefit-item {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 10px;
+    border: 1px solid rgba(92, 175, 144, 0.1);
+    transition: all 0.3s ease;
     backdrop-filter: blur(10px);
-    border: 1px solid #e0e0e0;
-    z-index: 1000;
+}
+
+.benefit-item:hover {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(92, 175, 144, 0.3);
+    transform: translateX(5px);
+    box-shadow: 0 4px 12px rgba(92, 175, 144, 0.1);
+}
+
+.benefit-item i {
+    color: var(--primary-color);
+    margin-right: 12px;
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.benefit-item span {
+    color: var(--heading-color);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+/* Action Buttons */
+.btn-become-seller,
+.btn-become-shipper {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+    border: none;
+    padding: 16px 32px;
+    font-size: 16px;
+    font-weight: 700;
+    border-radius: 50px;
+    color: white;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(92, 175, 144, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-become-seller::before,
+.btn-become-shipper::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn-become-seller:hover::before,
+.btn-become-shipper:hover::before {
+    left: 100%;
+}
+
+.btn-become-seller:hover,
+.btn-become-shipper:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(92, 175, 144, 0.4);
+    background: linear-gradient(135deg, var(--primary-hover), var(--primary-color));
+}
+
+.btn-become-seller:active,
+.btn-become-shipper:active {
+    transform: translateY(-1px);
+}
+
+/* Profile Information Cards */
+.seller-profile-info,
+.shipper-profile-info {
+    padding: 30px;
+    background: linear-gradient(135deg, #ffffff, #f8f9fa);
+    border-radius: 16px;
+    border: 1px solid rgba(92, 175, 144, 0.1);
+}
+
+/* Status Badges */
+.seller-status,
+.shipper-status {
+    margin-bottom: 25px;
+    text-align: center;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 24px;
+    border-radius: 50px;
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;
 }
 
-.connection-status.connected {
-    color: #28a745;
-    border-color: #28a745;
+.status-badge.verified,
+.status-badge.active {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    border: 2px solid rgba(40, 167, 69, 0.3);
 }
 
-.connection-status.disconnected {
-    color: #dc3545;
-    border-color: #dc3545;
+.status-badge.pending {
+    background: linear-gradient(135deg, #ffc107, #fd7e14);
+    color: #856404;
+    border: 2px solid rgba(255, 193, 7, 0.3);
 }
 
-.connection-status i {
-    margin-right: 5px;
-    font-size: 8px;
+.status-badge.inactive {
+    background: linear-gradient(135deg, #6c757d, #495057);
+    color: white;
+    border: 2px solid rgba(108, 117, 125, 0.3);
 }
 
-.connection-status.connected i {
-    animation: pulse 2s infinite;
+.status-badge:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* Details Section */
+.seller-details,
+.shipper-details {
+    background: rgba(248, 249, 250, 0.8);
+    padding: 25px;
+    border-radius: 12px;
+    margin-bottom: 25px;
+    border: 1px solid rgba(92, 175, 144, 0.1);
+}
+
+.detail-item {
+    margin-bottom: 18px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.detail-item:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.detail-item label {
+    display: block;
+    font-weight: 700;
+    color: var(--heading-color);
+    font-size: 12px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.8;
+}
+
+.store-name,
+.shipper-name {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin: 0;
+    line-height: 1.3;
+}
+
+.store-description {
+    color: var(--text-color);
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 8px;
+    border: 1px solid rgba(92, 175, 144, 0.1);
+    font-style: italic;
+}
+
+/* Header Badges */
+.seller-badge,
+.shipper-badge {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+    color: white;
+    padding: 8px 16px;
+    border-radius: 50px;
+    font-size: 13px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    box-shadow: 0 4px 12px rgba(92, 175, 144, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.seller-badge i,
+.shipper-badge i {
+    font-size: 14px;
+}
+
+/* Actions Section */
+.seller-actions,
+.shipper-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    align-items: center;
+    border-top: 2px solid rgba(92, 175, 144, 0.1);
+    padding-top: 25px;
+}
+
+.seller-actions .btn,
+.shipper-actions .btn {
+    min-width: 200px;
+    padding: 12px 24px;
+    font-weight: 600;
+    border-radius: 25px;
+    transition: all 0.3s ease;
+}
+
+/* Info Text */
+.shipper-info-text {
+    background: linear-gradient(135deg, #e7f3ff, #cce7ff);
+    border: 2px solid #b3d9ff;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 14px;
+    color: #0066cc;
+    text-align: left;
+    max-width: 450px;
+    margin: 20px auto;
+    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.1);
+}
+
+.shipper-info-text i {
+    color: #0066cc;
+    margin-top: 2px;
+    flex-shrink: 0;
+    font-size: 16px;
+}
+
+/* Verification Info */
+.verification-info {
+    margin-top: 20px;
+    padding: 16px;
+    background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+    border: 2px solid rgba(255, 193, 7, 0.3);
+    border-radius: 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 13px;
+    color: #856404;
+    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.1);
+}
+
+.verification-info i {
+    margin-top: 2px;
+    flex-shrink: 0;
+    font-size: 16px;
+    color: #ffc107;
+}
+
+/* Modal Styles for Business Registration */
+.shipper-requirements {
+    background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+    border: 2px solid rgba(255, 193, 7, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.1);
+}
+
+.shipper-requirements h5 {
+    color: #856404;
+    font-weight: 700;
+    margin-bottom: 15px;
+    font-size: 16px;
+}
+
+.requirements-list,
+.terms-list {
+    margin: 15px 0 0 0;
+    padding-left: 25px;
+}
+
+.requirements-list li,
+.terms-list li {
+    margin-bottom: 8px;
+    color: #856404;
+    line-height: 1.5;
+    font-size: 14px;
+}
+
+.seller-terms,
+.shipper-terms {
+    margin-top: 25px;
+    padding-top: 25px;
+    border-top: 2px solid rgba(92, 175, 144, 0.1);
+}
+
+.terms-section h5 {
+    color: var(--heading-color);
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 15px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .become-seller-section,
+    .become-shipper-section {
+        padding: 30px 20px;
+        margin: 15px 0;
+    }
+    
+    .seller-benefits,
+    .shipper-benefits {
+        max-width: 100%;
+    }
+    
+    .benefit-item {
+        justify-content: flex-start;
+        text-align: left;
+        padding: 10px 12px;
+    }
+    
+    .btn-become-seller,
+    .btn-become-shipper {
+        width: 100%;
+        padding: 14px 20px;
+        font-size: 14px;
+    }
+    
+    .seller-actions .btn,
+    .shipper-actions .btn {
+        width: 100%;
+        min-width: auto;
+    }
+    
+    .shipper-info-text {
+        max-width: 100%;
+        margin: 15px 0;
+    }
+    
+    .seller-details,
+    .shipper-details {
+        padding: 20px;
+    }
+    
+    .status-badge {
+        padding: 10px 18px;
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .seller-icon,
+    .shipper-icon {
+        font-size: 42px;
+    }
+    
+    .seller-info h4,
+    .shipper-info h4 {
+        font-size: 20px;
+    }
+    
+    .store-name,
+    .shipper-name {
+        font-size: 18px;
+    }
+    
+    .benefit-item {
+        flex-direction: column;
+        text-align: center;
+        gap: 8px;
+    }
+    
+    .benefit-item i {
+        margin-right: 0;
+        margin-bottom: 4px;
+    }
+}
+
+/* Animation Enhancements */
+@keyframes shimmer {
+    0% {
+        background-position: -200px 0;
+    }
+    100% {
+        background-position: calc(200px + 100%) 0;
+    }
+}
+
+.benefit-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -200px;
+    width: 200px;
+    height: 100%;
+    background: linear-gradient(
+        to right,
+        transparent,
+        rgba(92, 175, 144, 0.1),
+        transparent
+    );
+    animation: shimmer 3s infinite;
+}
+
+.benefit-item {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Focus States for Accessibility */
+.btn-become-seller:focus,
+.btn-become-shipper:focus {
+    outline: 3px solid rgba(92, 175, 144, 0.5);
+    outline-offset: 2px;
+}
+
+.benefit-item:focus-within {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(92, 175, 144, 0.1);
 }

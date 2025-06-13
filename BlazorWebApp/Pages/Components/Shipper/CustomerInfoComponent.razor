@@ -1,0 +1,226 @@
+@using BlazorWebApp.ViewModel
+@using MudBlazor
+@inject IJSRuntime JSRuntime
+
+<MudGrid>
+    <!-- Buyer Information -->
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="1" Class="pa-4 h-100">
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Person" Class="mr-2" />
+                Thông tin người mua
+            </MudText>
+            
+            <MudList T="string">
+                <MudListItem T="string" Icon="@Icons.Material.Filled.AccountCircle">
+                    <MudText><strong>Họ tên:</strong> @Dashboard.BuyerInfo.FullName</MudText>
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Email">
+                    <MudText><strong>Email:</strong> @Dashboard.BuyerInfo.Email</MudText>
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Phone">
+                    <div class="d-flex justify-space-between align-center w-100">
+                        <MudText><strong>Số điện thoại:</strong> @Dashboard.BuyerInfo.PhoneNumber</MudText>
+                        <MudButton Variant="Variant.Text" 
+                                  Color="Color.Primary" 
+                                  Size="Size.Small"
+                                  StartIcon="@Icons.Material.Filled.Call"
+                                  OnClick="CallCustomer">
+                            Gọi
+                        </MudButton>
+                    </div>
+                </MudListItem>
+            </MudList>
+        </MudPaper>
+    </MudItem>
+
+    <!-- Shipping Address -->
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="1" Class="pa-4 h-100">
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.LocationOn" Class="mr-2" />
+                Địa chỉ giao hàng
+            </MudText>
+            
+            <MudList T="string">
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Home">
+                    <div>
+                        <MudText><strong>Địa chỉ:</strong></MudText>
+                        <MudText Typo="Typo.body2" Class="mt-1">
+                            @Dashboard.ShippingAddress.FullAddress
+                        </MudText>
+                    </div>
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.LocationCity">
+                    <MudText><strong>Thành phố:</strong> @Dashboard.ShippingAddress.City</MudText>
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Public">
+                    <MudText><strong>Quốc gia:</strong> @Dashboard.ShippingAddress.Country</MudText>
+                </MudListItem>
+            </MudList>
+            
+            <MudGrid Class="mt-3">
+                <MudItem xs="6">
+                    <MudButton Variant="Variant.Outlined" 
+                              Color="Color.Primary" 
+                              StartIcon="@Icons.Material.Filled.Map"
+                              OnClick="OpenGoogleMaps"
+                              FullWidth="true">
+                        Google Maps
+                    </MudButton>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudButton Variant="Variant.Outlined" 
+                              Color="Color.Secondary" 
+                              StartIcon="@Icons.Material.Filled.Navigation"
+                              OnClick="OpenDirections"
+                              FullWidth="true">
+                        Chỉ đường
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    </MudItem>
+
+    <!-- Contact Actions -->
+    <MudItem xs="12">
+        <MudPaper Elevation="1" Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.ContactPhone" Class="mr-2" />
+                Liên hệ khách hàng
+            </MudText>
+            
+            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Medium">
+                <MudButton StartIcon="@Icons.Material.Filled.Call" 
+                          Color="Color.Success"
+                          OnClick="CallCustomer">
+                    Gọi điện
+                </MudButton>
+                <MudButton StartIcon="@Icons.Material.Filled.Message" 
+                          Color="Color.Info"
+                          OnClick="SendSMS">
+                    Gửi SMS
+                </MudButton>
+                <MudButton StartIcon="@Icons.Material.Filled.Email" 
+                          Color="Color.Primary"
+                          OnClick="SendEmail">
+                    Gửi Email
+                </MudButton>
+                <MudButton StartIcon="@Icons.Material.Filled.Chat" 
+                          Color="Color.Secondary"
+                          OnClick="OpenWhatsApp">
+                    WhatsApp
+                </MudButton>
+            </MudButtonGroup>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter] public ShipmentDashboardVM Dashboard { get; set; } = new();
+
+    // ✅ MỞ GOOGLE MAPS
+    private async Task OpenGoogleMaps()
+    {
+        try
+        {
+            var address = Uri.EscapeDataString(Dashboard.ShippingAddress.FullAddress);
+            var mapUrl = $"https://www.google.com/maps/search/?api=1&query={address}";
+            
+            await JSRuntime.InvokeVoidAsync("open", mapUrl, "_blank");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error opening Google Maps: {ex.Message}");
+        }
+    }
+
+    // ✅ MỞ CHỈ ĐƯỜNG
+    private async Task OpenDirections()
+    {
+        try
+        {
+            var address = Uri.EscapeDataString(Dashboard.ShippingAddress.FullAddress);
+            var directionsUrl = $"https://www.google.com/maps/dir/?api=1&destination={address}";
+            
+            await JSRuntime.InvokeVoidAsync("open", directionsUrl, "_blank");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error opening directions: {ex.Message}");
+        }
+    }
+
+    // ✅ GỌI ĐIỆN
+    private async Task CallCustomer()
+    {
+        try
+        {
+            var phoneNumber = Dashboard.BuyerInfo.PhoneNumber.Replace(" ", "").Replace("-", "");
+            var telUrl = $"tel:{phoneNumber}";
+            
+            await JSRuntime.InvokeVoidAsync("open", telUrl);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error calling customer: {ex.Message}");
+        }
+    }
+
+    // ✅ GỬI SMS
+    private async Task SendSMS()
+    {
+        try
+        {
+            var phoneNumber = Dashboard.BuyerInfo.PhoneNumber.Replace(" ", "").Replace("-", "");
+            var message = Uri.EscapeDataString($"Xin chào, tôi là shipper đang giao đơn hàng #{Dashboard.OrderInfo.OrderId} cho bạn.");
+            var smsUrl = $"sms:{phoneNumber}?body={message}";
+            
+            await JSRuntime.InvokeVoidAsync("open", smsUrl);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error sending SMS: {ex.Message}");
+        }
+    }
+
+    // ✅ GỬI EMAIL
+    private async Task SendEmail()
+    {
+        try
+        {
+            var subject = Uri.EscapeDataString($"Đơn hàng #{Dashboard.OrderInfo.OrderId} - Thông báo giao hàng");
+            var body = Uri.EscapeDataString($"Xin chào {Dashboard.BuyerInfo.FullName},\n\nTôi là shipper phụ trách giao đơn hàng #{Dashboard.OrderInfo.OrderId} cho bạn.\n\nTrân trọng!");
+            var emailUrl = $"mailto:{Dashboard.BuyerInfo.Email}?subject={subject}&body={body}";
+            
+            await JSRuntime.InvokeVoidAsync("open", emailUrl);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error sending email: {ex.Message}");
+        }
+    }
+
+    // ✅ MỞ WHATSAPP
+    private async Task OpenWhatsApp()
+    {
+        try
+        {
+            var phoneNumber = Dashboard.BuyerInfo.PhoneNumber.Replace(" ", "").Replace("-", "").Replace("+", "");
+            // Remove leading 0 if exists and add country code (assuming Vietnam +84)
+            if (phoneNumber.StartsWith("0"))
+            {
+                phoneNumber = "84" + phoneNumber.Substring(1);
+            }
+            
+            var message = Uri.EscapeDataString($"Xin chào, tôi là shipper đang giao đơn hàng #{Dashboard.OrderInfo.OrderId} cho bạn.");
+            var whatsappUrl = $"https://wa.me/{phoneNumber}?text={message}";
+            
+            await JSRuntime.InvokeVoidAsync("open", whatsappUrl, "_blank");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error opening WhatsApp: {ex.Message}");
+        }
+    }
+}

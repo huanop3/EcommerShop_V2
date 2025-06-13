@@ -38,7 +38,7 @@ namespace BlazorWebApp.Services
         public async Task<IEnumerable<OrderVM>> GetAllOrdersAsync()
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.GetAsync("https://localhost:7260/api/Order/GetAllOrders");
+            var response = await _httpClient.GetAsync("http://localhost:5282/main/api/Order/GetAllOrders");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -61,7 +61,7 @@ namespace BlazorWebApp.Services
         public async Task<OrderVM> GetOrderByIdAsync(int orderId)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/Order/GetOrderById/{orderId}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/Order/GetOrderById/{orderId}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -82,7 +82,7 @@ namespace BlazorWebApp.Services
         public async Task<IEnumerable<OrderVM>> GetOrdersByUserIdAsync(int userId)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/Order/GetOrdersByUserId/{userId}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/Order/GetOrdersByUserId/{userId}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -105,7 +105,7 @@ namespace BlazorWebApp.Services
         public async Task<IEnumerable<OrderVM>> GetOrdersByStatusAsync(int statusId)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/Order/GetOrdersByStatus/{statusId}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/Order/GetOrdersByStatus/{statusId}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -128,7 +128,7 @@ namespace BlazorWebApp.Services
         public async Task<IEnumerable<OrderVM>> GetOrdersByDateRangeAsync(DateTime startDate, DateTime endDate)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/Order/GetOrdersByDateRange?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/Order/GetOrdersByDateRange?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -153,7 +153,7 @@ namespace BlazorWebApp.Services
             if (orderVM == null) return false;
 
             await SetAuthorizationHeader();
-            var response = await _httpClient.PostAsJsonAsync("https://localhost:7260/api/Order/CreateOrder", orderVM);
+            var response = await _httpClient.PostAsJsonAsync("http://localhost:5282/main/api/Order/CreateOrder", orderVM);
 
             if (!response.IsSuccessStatusCode) return false;
 
@@ -169,7 +169,7 @@ namespace BlazorWebApp.Services
             if (request == null) return (false, null);
 
             await SetAuthorizationHeader();
-            var response = await _httpClient.PostAsJsonAsync("https://localhost:7260/api/Order/CreateOrderWithItems", request);
+            var response = await _httpClient.PostAsJsonAsync("http://localhost:5282/main/api/Order/CreateOrderWithItems", request);
 
             if (!response.IsSuccessStatusCode) return (false, null);
 
@@ -185,7 +185,7 @@ namespace BlazorWebApp.Services
             if (orderVM == null) return false;
 
             await SetAuthorizationHeader();
-            var response = await _httpClient.PutAsJsonAsync("https://localhost:7260/api/Order/UpdateOrder", orderVM);
+            var response = await _httpClient.PutAsJsonAsync("http://localhost:5282/main/api/Order/UpdateOrder", orderVM);
 
             if (!response.IsSuccessStatusCode) return false;
 
@@ -200,7 +200,7 @@ namespace BlazorWebApp.Services
         {
             await SetAuthorizationHeader();
             var request = new { StatusId = statusId };
-            var response = await _httpClient.PutAsJsonAsync($"https://localhost:7260/api/Order/UpdateOrderStatus/{orderId}", request);
+            var response = await _httpClient.PutAsJsonAsync($"http://localhost:5282/main/api/Order/UpdateOrderStatus/{orderId}", request);
 
             if (!response.IsSuccessStatusCode) return false;
 
@@ -217,7 +217,7 @@ namespace BlazorWebApp.Services
 
             await SetAuthorizationHeader();
             var request = new { StatusName = statusName };
-            var response = await _httpClient.PutAsJsonAsync($"https://localhost:7260/api/Order/UpdateOrderStatusByName/{orderId}", request);
+            var response = await _httpClient.PutAsJsonAsync($"http://localhost:5282/main/api/Order/UpdateOrderStatusByName/{orderId}", request);
 
             if (!response.IsSuccessStatusCode) return false;
 
@@ -231,7 +231,7 @@ namespace BlazorWebApp.Services
         public async Task<bool> DeleteOrderAsync(int orderId)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.DeleteAsync($"https://localhost:7260/api/Order/DeleteOrder/{orderId}");
+            var response = await _httpClient.DeleteAsync($"http://localhost:5282/main/api/Order/DeleteOrder/{orderId}");
 
             if (!response.IsSuccessStatusCode) return false;
 
@@ -246,7 +246,7 @@ namespace BlazorWebApp.Services
             try
             {
                 await SetAuthorizationHeader();
-                var response = await _httpClient.GetAsync($"https://localhost:7260/api/Order/GetOrderStatusNameByOrderId/{orderId}");
+                var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/Order/GetOrderStatusNameByOrderId/{orderId}");
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -299,7 +299,7 @@ namespace BlazorWebApp.Services
                     CancelledAt = DateTime.Now
                 };
 
-                var response = await _httpClient.PutAsJsonAsync($"https://localhost:7260/api/Order/CancelOrder/{orderId}", orderId);
+                var response = await _httpClient.PutAsJsonAsync($"http://localhost:5282/main/api/Order/CancelOrder/{orderId}", orderId);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -347,7 +347,7 @@ namespace BlazorWebApp.Services
         public async Task<IEnumerable<OrderWithDetailsVM>> GetOrdersBySellerWithDetailsAsync(int sellerId)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/Order/GetOrdersBySellerWithDetails/{sellerId}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/Order/GetOrdersBySellerWithDetails/{sellerId}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -369,7 +369,7 @@ namespace BlazorWebApp.Services
     
     try
     {
-        var response = await _httpClient.GetAsync("https://localhost:7260/api/Order/GetAllOrdersWithCompleteDetails");
+        var response = await _httpClient.GetAsync("http://localhost:5282/main/api/Order/GetAllOrdersWithCompleteDetails");
 
         if (!response.IsSuccessStatusCode)
         {
@@ -401,7 +401,7 @@ namespace BlazorWebApp.Services
         public async Task<IEnumerable<OrderItemVM>> GetAllOrderItemsAsync()
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.GetAsync("https://localhost:7260/api/Order/OrderItems/GetAllOrderItems");
+            var response = await _httpClient.GetAsync("http://localhost:5282/main/api/Order/OrderItems/GetAllOrderItems");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -424,7 +424,7 @@ namespace BlazorWebApp.Services
         public async Task<OrderItemVM> GetOrderItemByIdAsync(int orderItemId)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/Order/OrderItems/GetOrderItemById/{orderItemId}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/Order/OrderItems/GetOrderItemById/{orderItemId}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -445,7 +445,7 @@ namespace BlazorWebApp.Services
         public async Task<IEnumerable<OrderItemVM>> GetOrderItemsByOrderIdAsync(int orderId)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/Order/OrderItems/GetOrderItemsByOrderId/{orderId}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/Order/OrderItems/GetOrderItemsByOrderId/{orderId}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -468,7 +468,7 @@ namespace BlazorWebApp.Services
         public async Task<IEnumerable<OrderItemVM>> GetOrderItemsByProductIdAsync(int productId)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/Order/OrderItems/GetOrderItemsByProductId/{productId}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/Order/OrderItems/GetOrderItemsByProductId/{productId}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -491,7 +491,7 @@ namespace BlazorWebApp.Services
         public async Task<decimal> GetTotalAmountByOrderIdAsync(int orderId)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/Order/OrderItems/GetTotalAmountByOrderId/{orderId}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/Order/OrderItems/GetTotalAmountByOrderId/{orderId}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -514,7 +514,7 @@ namespace BlazorWebApp.Services
             if (orderItemVM == null) return false;
 
             await SetAuthorizationHeader();
-            var response = await _httpClient.PostAsJsonAsync("https://localhost:7260/api/Order/OrderItems/CreateOrderItem", orderItemVM);
+            var response = await _httpClient.PostAsJsonAsync("http://localhost:5282/main/api/Order/OrderItems/CreateOrderItem", orderItemVM);
 
             if (!response.IsSuccessStatusCode) return false;
 
@@ -530,7 +530,7 @@ namespace BlazorWebApp.Services
             if (orderItemVM == null) return false;
 
             await SetAuthorizationHeader();
-            var response = await _httpClient.PutAsJsonAsync("https://localhost:7260/api/Order/OrderItems/UpdateOrderItem", orderItemVM);
+            var response = await _httpClient.PutAsJsonAsync("http://localhost:5282/main/api/Order/OrderItems/UpdateOrderItem", orderItemVM);
 
             if (!response.IsSuccessStatusCode) return false;
 
@@ -544,7 +544,7 @@ namespace BlazorWebApp.Services
         public async Task<bool> DeleteOrderItemAsync(int orderItemId)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.DeleteAsync($"https://localhost:7260/api/Order/OrderItems/DeleteOrderItem/{orderItemId}");
+            var response = await _httpClient.DeleteAsync($"http://localhost:5282/main/api/Order/OrderItems/DeleteOrderItem/{orderItemId}");
 
             if (!response.IsSuccessStatusCode) return false;
 
@@ -561,7 +561,7 @@ namespace BlazorWebApp.Services
         /// </summary>
         public async Task<IEnumerable<OrderStatusVM>> GetAllOrderStatusesAsync()
         {
-            var response = await _httpClient.GetAsync("https://localhost:7260/api/Order/OrderStatus/GetAllOrderStatuses");
+            var response = await _httpClient.GetAsync("http://localhost:5282/main/api/Order/OrderStatus/GetAllOrderStatuses");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -583,7 +583,7 @@ namespace BlazorWebApp.Services
         /// </summary>
         public async Task<OrderStatusVM> GetOrderStatusByIdAsync(int statusId)
         {
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/Order/OrderStatus/GetOrderStatusById/{statusId}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/Order/OrderStatus/GetOrderStatusById/{statusId}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -605,7 +605,7 @@ namespace BlazorWebApp.Services
         {
             if (string.IsNullOrEmpty(statusName)) return null;
 
-            var response = await _httpClient.GetAsync($"https://localhost:7260/api/Order/OrderStatus/GetOrderStatusByName/{Uri.EscapeDataString(statusName)}");
+            var response = await _httpClient.GetAsync($"http://localhost:5282/main/api/Order/OrderStatus/GetOrderStatusByName/{Uri.EscapeDataString(statusName)}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -628,7 +628,7 @@ namespace BlazorWebApp.Services
             if (orderStatusVM == null) return false;
 
             await SetAuthorizationHeader();
-            var response = await _httpClient.PostAsJsonAsync("https://localhost:7260/api/Order/OrderStatus/CreateOrderStatus", orderStatusVM);
+            var response = await _httpClient.PostAsJsonAsync("http://localhost:5282/main/api/Order/OrderStatus/CreateOrderStatus", orderStatusVM);
 
             if (!response.IsSuccessStatusCode) return false;
 
@@ -644,7 +644,7 @@ namespace BlazorWebApp.Services
             if (orderStatusVM == null) return false;
 
             await SetAuthorizationHeader();
-            var response = await _httpClient.PutAsJsonAsync("https://localhost:7260/api/Order/OrderStatus/UpdateOrderStatus", orderStatusVM);
+            var response = await _httpClient.PutAsJsonAsync("http://localhost:5282/main/api/Order/OrderStatus/UpdateOrderStatus", orderStatusVM);
 
             if (!response.IsSuccessStatusCode) return false;
 
@@ -658,7 +658,7 @@ namespace BlazorWebApp.Services
         public async Task<bool> DeleteOrderStatusAsync(int statusId)
         {
             await SetAuthorizationHeader();
-            var response = await _httpClient.DeleteAsync($"https://localhost:7260/api/Order/OrderStatus/DeleteOrderStatus/{statusId}");
+            var response = await _httpClient.DeleteAsync($"http://localhost:5282/main/api/Order/OrderStatus/DeleteOrderStatus/{statusId}");
 
             if (!response.IsSuccessStatusCode) return false;
 

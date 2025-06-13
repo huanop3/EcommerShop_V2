@@ -121,8 +121,6 @@ public partial class MainEcommerDBContext : DbContext
         {
             entity.HasKey(e => e.ClientId).HasName("PK__Clients__E67E1A243532E993");
 
-            entity.HasIndex(e => e.ClientName, "UQ_Clients_ClientName").IsUnique();
-
             entity.Property(e => e.ClientName).HasMaxLength(255);
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("(getdate())")
@@ -317,8 +315,6 @@ public partial class MainEcommerDBContext : DbContext
         {
             entity.HasKey(e => e.SellerId).HasName("PK__SellerPr__7FE3DB81425909A3");
 
-            entity.HasIndex(e => e.UserId, "UQ_SellerProfiles_UserId").IsUnique();
-
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime");
@@ -326,8 +322,8 @@ public partial class MainEcommerDBContext : DbContext
             entity.Property(e => e.StoreName).HasMaxLength(255);
             entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
 
-            entity.HasOne(d => d.User).WithOne(p => p.SellerProfile)
-                .HasForeignKey<SellerProfile>(d => d.UserId)
+            entity.HasOne(d => d.User).WithMany(p => p.SellerProfiles)
+                .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_SellerProfiles_Users");
         });
@@ -363,16 +359,17 @@ public partial class MainEcommerDBContext : DbContext
         {
             entity.HasKey(e => e.ShipperId).HasName("PK__ShipperP__1F8AFE59FC2C0565");
 
-            entity.Property(e => e.CompanyName).HasMaxLength(255);
-            entity.Property(e => e.ContactName).HasMaxLength(100);
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime");
-            entity.Property(e => e.Email).HasMaxLength(255);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.IsDeleted).HasDefaultValue(false);
-            entity.Property(e => e.PhoneNumber).HasMaxLength(20);
             entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
+
+            entity.HasOne(d => d.User).WithMany(p => p.ShipperProfiles)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ShipperProfiles_UserId");
         });
 
         modelBuilder.Entity<User>(entity =>

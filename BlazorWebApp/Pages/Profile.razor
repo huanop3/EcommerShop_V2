@@ -9,6 +9,7 @@
 @inject UserService UserService
 @inject AddressService AddressService
 @inject SellerProfileService SellerProfileService
+@inject ShipperProfileService ShipperProfileService
 @inject ToastService ToastService
 @inject SignalRService SignalRService
 @inject IJSRuntime JSRuntime
@@ -54,6 +55,20 @@ else if (currentUser != null)
                         else
                         {
                             <span class="pending-seller">Seller (Pending Verification)</span>
+                        }
+                    </div>
+                }
+                @if (currentShipperProfile != null)
+                {
+                    <div class="shipper-badge">
+                        <i class="fas fa-truck"></i>
+                        @if (currentShipperProfile.IsActive == true)
+                        {
+                            <span class="active-shipper">Active Shipper</span>
+                        }
+                        else
+                        {
+                            <span class="inactive-shipper">Inactive Shipper</span>
                         }
                     </div>
                 }
@@ -127,145 +142,217 @@ else if (currentUser != null)
                 }
             </EditForm>
         </div>
+
         <!-- Seller Profile Card -->
         <AuthorizeView Roles="Seller,Customer">
-                <Authorized>
-<div class="profile-card">
-            <div class="card-header">
-                <div class="card-icon"><i class="fas fa-store"></i></div>
-                <h3 class="card-title">Seller Profile</h3>
-            </div>
-            
-            @if (currentSellerProfile == null)
-            {
-                <!-- Become a Seller Section -->
-                <div class="become-seller-section">
-                    <div class="seller-info">
-                        <i class="fas fa-rocket seller-icon"></i>
-                        <h4>Become a Seller</h4>
-                        <p>Start selling your products on our platform and reach thousands of customers!</p>
-                        
-                        <div class="seller-benefits">
-                            <div class="benefit-item">
-                                <i class="fas fa-check-circle"></i>
-                                <span>Create your own store</span>
-                            </div>
-                            <div class="benefit-item">
-                                <i class="fas fa-check-circle"></i>
-                                <span>Manage your products</span>
-                            </div>
-                            <div class="benefit-item">
-                                <i class="fas fa-check-circle"></i>
-                                <span>Track sales & earnings</span>
-                            </div>
-                            <div class="benefit-item">
-                                <i class="fas fa-check-circle"></i>
-                                <span>24/7 seller support</span>
-                            </div>
-                        </div>
+            <Authorized>
+                <div class="profile-card">
+                    <div class="card-header">
+                        <div class="card-icon"><i class="fas fa-store"></i></div>
+                        <h3 class="card-title">Seller Profile</h3>
                     </div>
                     
-                    <button type="button" class="btn btn-primary btn-become-seller" @onclick="OpenSellerRegistrationModal">
-                        <i class="fas fa-store"></i> Become a Seller
-                    </button>
+                    @if (currentSellerProfile == null)
+                    {
+                        <!-- Become a Seller Section -->
+                        <div class="become-seller-section">
+                            <div class="seller-info">
+                                <i class="fas fa-rocket seller-icon"></i>
+                                <h4>Become a Seller</h4>
+                                <p>Start selling your products on our platform and reach thousands of customers!</p>
+                                
+                                <div class="seller-benefits">
+                                    <div class="benefit-item">
+                                        <i class="fas fa-check-circle"></i>
+                                        <span>Create your own store</span>
+                                    </div>
+                                    <div class="benefit-item">
+                                        <i class="fas fa-check-circle"></i>
+                                        <span>Manage your products</span>
+                                    </div>
+                                    <div class="benefit-item">
+                                        <i class="fas fa-check-circle"></i>
+                                        <span>Track sales & earnings</span>
+                                    </div>
+                                    <div class="benefit-item">
+                                        <i class="fas fa-check-circle"></i>
+                                        <span>24/7 seller support</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="button" class="btn btn-primary btn-become-seller" @onclick="OpenSellerRegistrationModal">
+                                <i class="fas fa-store"></i> Become a Seller
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Existing Seller Profile Section -->
+                        <div class="seller-profile-info">
+                            <div class="seller-status">
+                                @if (currentSellerProfile.IsVerified == true)
+                                {
+                                    <div class="status-badge verified">
+                                        <i class="fas fa-check-circle"></i>
+                                        Verified Seller
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="status-badge pending">
+                                        <i class="fas fa-clock"></i>
+                                        Pending Verification
+                                    </div>
+                                }
+                            </div>
+                            
+                            <div class="seller-details">
+                                <div class="detail-item">
+                                    <label>Store Name:</label>
+                                    <span class="store-name">@currentSellerProfile.StoreName</span>
+                                </div>
+                                
+                                @if (!string.IsNullOrEmpty(currentSellerProfile.Description))
+                                {
+                                    <div class="detail-item">
+                                        <label>Description:</label>
+                                        <p class="store-description">@currentSellerProfile.Description</p>
+                                    </div>
+                                }
+                                
+                                <div class="detail-item">
+                                    <label>Registration Date:</label>
+                                    <span>@(currentSellerProfile.CreatedAt?.ToString("MMMM dd, yyyy") ?? "Unknown")</span>
+                                </div>
+                                
+                                @if (currentSellerProfile.UpdatedAt.HasValue)
+                                {
+                                    <div class="detail-item">
+                                        <label>Last Updated:</label>
+                                        <span>@currentSellerProfile.UpdatedAt.Value.ToString("MMMM dd, yyyy")</span>
+                                    </div>
+                                }
+                            </div>
+                            
+                            <div class="seller-actions">
+                                <button type="button" class="btn btn-secondary" @onclick="EditSellerProfile">
+                                    <i class="fas fa-edit"></i> Edit Store Info
+                                </button>
+                                
+                                @if (currentSellerProfile.IsVerified != true)
+                                {
+                                    <div class="verification-info">
+                                        <i class="fas fa-info-circle"></i>
+                                        <span>Your seller profile is under review. You'll be notified once it's verified.</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
                 </div>
-            }
-            else
-            {
-                <!-- Existing Seller Profile Section -->
-                <div class="seller-profile-info">
-                    <div class="seller-status">
-                        @if (currentSellerProfile.IsVerified == true)
-                        {
-                            <div class="status-badge verified">
-                                <i class="fas fa-check-circle"></i>
-                                Verified Seller
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="status-badge pending">
-                                <i class="fas fa-clock"></i>
-                                Pending Verification
-                            </div>
-                        }
-                    </div>
-                    
-                    <div class="seller-details">
-                        <div class="detail-item">
-                            <label>Store Name:</label>
-                            <span class="store-name">@currentSellerProfile.StoreName</span>
-                        </div>
-                        
-                        @if (!string.IsNullOrEmpty(currentSellerProfile.Description))
-                        {
-                            <div class="detail-item">
-                                <label>Description:</label>
-                                <p class="store-description">@currentSellerProfile.Description</p>
-                            </div>
-                        }
-                        
-                        <div class="detail-item">
-                            <label>Registration Date:</label>
-                            <span>@(currentSellerProfile.CreatedAt?.ToString("MMMM dd, yyyy") ?? "Unknown")</span>
-                        </div>
-                        
-                        @if (currentSellerProfile.UpdatedAt.HasValue)
-                        {
-                            <div class="detail-item">
-                                <label>Last Updated:</label>
-                                <span>@currentSellerProfile.UpdatedAt.Value.ToString("MMMM dd, yyyy")</span>
-                            </div>
-                        }
-                    </div>
-                    
-                    <div class="seller-actions">
-                        <button type="button" class="btn btn-secondary" @onclick="EditSellerProfile">
-                            <i class="fas fa-edit"></i> Edit Store Info
-                        </button>
-                        
-                        @if (currentSellerProfile.IsVerified != true)
-                        {
-                            <div class="verification-info">
-                                <i class="fas fa-info-circle"></i>
-                                <span>Your seller profile is under review. You'll be notified once it's verified.</span>
-                            </div>
-                        }
-                    </div>
-                </div>
-            }
-        </div>
-                </Authorized>
-            </AuthorizeView>
-        
+            </Authorized>
+        </AuthorizeView>
 
-        <!-- Account Statistics -->
-        <div class="profile-card">
-            <div class="card-header">
-                <div class="card-icon">
-                    <i class="fas fa-chart-bar"></i>
+        <!-- Shipper Profile Card -->
+        <AuthorizeView Roles="Shipper,Customer">
+            <Authorized>
+                <div class="profile-card">
+                    <div class="card-header">
+                        <div class="card-icon"><i class="fas fa-truck"></i></div>
+                        <h3 class="card-title">Shipper Profile</h3>
+                    </div>
+                    
+                    @if (currentShipperProfile == null)
+                    {
+                        <!-- Become a Shipper Section -->
+                        <div class="become-shipper-section">
+                            <div class="shipper-info">
+                                <i class="fas fa-shipping-fast shipper-icon"></i>
+                                <h4>Become a Shipper</h4>
+                                <p>Join our delivery network and earn money by delivering packages to customers!</p>
+                                
+                                <div class="shipper-benefits">
+                                    <div class="benefit-item">
+                                        <i class="fas fa-check-circle"></i>
+                                        <span>Flexible working hours</span>
+                                    </div>
+                                    <div class="benefit-item">
+                                        <i class="fas fa-check-circle"></i>
+                                        <span>Competitive delivery rates</span>
+                                    </div>
+                                    <div class="benefit-item">
+                                        <i class="fas fa-check-circle"></i>
+                                        <span>Real-time order tracking</span>
+                                    </div>
+                                    <div class="benefit-item">
+                                        <i class="fas fa-check-circle"></i>
+                                        <span>24/7 shipper support</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="button" class="btn btn-primary btn-become-shipper" @onclick="OpenShipperRegistrationModal">
+                                <i class="fas fa-truck"></i> Become a Shipper
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Existing Shipper Profile Section -->
+                        <div class="shipper-profile-info">
+                            <div class="shipper-status">
+                                @if (currentShipperProfile.IsActive == true)
+                                {
+                                    <div class="status-badge active">
+                                        <i class="fas fa-check-circle"></i>
+                                        Active Shipper
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="status-badge inactive">
+                                        <i class="fas fa-pause-circle"></i>
+                                        Inactive Shipper
+                                    </div>
+                                }
+                            </div>
+                            
+                            <div class="shipper-details">
+                                <div class="detail-item">
+                                    <label>Shipper Name:</label>
+                                    <span class="shipper-name">@currentShipperProfile.FullName</span>
+                                </div>
+                                
+                                <div class="detail-item">
+                                    <label>Email:</label>
+                                    <span>@currentShipperProfile.Email</span>
+                                </div>
+                                
+                                <div class="detail-item">
+                                    <label>Phone Number:</label>
+                                    <span>@currentShipperProfile.PhoneNumber</span>
+                                </div>
+                                
+                                <div class="detail-item">
+                                    <label>Registration Date:</label>
+                                    <span>@(currentShipperProfile.CreatedAt?.ToString("MMMM dd, yyyy") ?? "Unknown")</span>
+                                </div>
+                                
+                                @if (currentShipperProfile.UpdatedAt.HasValue)
+                                {
+                                    <div class="detail-item">
+                                        <label>Last Updated:</label>
+                                        <span>@currentShipperProfile.UpdatedAt.Value.ToString("MMMM dd, yyyy")</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
                 </div>
-                <h3 class="card-title">Account Statistics</h3>
-            </div>
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <span class="stat-number">@userStats.TotalOrders</span>
-                    <span class="stat-label">Total Orders</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number">@userStats.TotalSpent.ToString("C")</span>
-                    <span class="stat-label">Total Spent</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number">@userStats.WishlistItems</span>
-                    <span class="stat-label">Wishlist Items</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number">@userStats.ReviewsGiven</span>
-                    <span class="stat-label">Reviews Given</span>
-                </div>
-            </div>
-        </div>
+            </Authorized>
+        </AuthorizeView>
+
 
         <!-- Security Settings -->
         <div class="profile-card">
@@ -289,39 +376,6 @@ else if (currentUser != null)
                 <button type="button" class="btn btn-danger" @onclick="OpenDeleteAccountDialog">
                     <i class="fas fa-trash"></i> Delete Account
                 </button>
-            </div>
-        </div>
-
-        <!-- Recent Activity -->
-        <div class="profile-card">
-            <div class="card-header">
-                <div class="card-icon">
-                    <i class="fas fa-clock"></i>
-                </div>
-                <h3 class="card-title">Recent Activity</h3>
-            </div>
-            <div class="recent-activity">
-                @if (recentActivities != null && recentActivities.Any())
-                {
-                    @foreach (var activity in recentActivities)
-                    {
-                        <div class="activity-item">
-                            <div class="activity-icon">
-                                <i class="@GetActivityIcon(activity.Type)"></i>
-                            </div>
-                            <div class="activity-content">
-                                <p class="activity-text">@activity.Description</p>
-                                <span class="activity-time">@activity.CreatedAt.ToString("MMM dd, yyyy HH:mm")</span>
-                            </div>
-                        </div>
-                    }
-                }
-                else
-                {
-                    <p style="text-align: center; color: var(--light-text); padding: 20px;">
-                        No recent activity found.
-                    </p>
-                }
             </div>
         </div>
 
@@ -504,6 +558,82 @@ else
     </div>
 }
 
+<!-- Shipper Registration Modal -->
+@if (isShipperRegistrationModalOpen)
+{
+    <div class="modal-overlay fade-in" @onclick="CloseShipperRegistrationModal">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3>Become a Shipper</h3>
+                <button class="modal-close" @onclick="CloseShipperRegistrationModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <EditForm Model="@shipperProfileModel" OnValidSubmit="@SaveShipperProfile">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <div>
+                            <strong>Welcome to Shipper Registration!</strong> 
+                            Your information will be used to create your shipper profile.
+                        </div>
+                    </div>
+                    
+                    <div class="shipper-requirements">
+                        <h5>Shipper Requirements</h5>
+                        <ul class="requirements-list">
+                            <li>Must be at least 18 years old</li>
+                            <li>Valid phone number for customer contact</li>
+                            <li>Reliable transportation method</li>
+                            <li>Available during business hours</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="shipper-terms">
+                        <div class="terms-section">
+                            <h5>Shipper Terms & Conditions</h5>
+                            <ul class="terms-list">
+                                <li>You agree to deliver packages safely and on time</li>
+                                <li>You will handle packages with care</li>
+                                <li>You comply with our shipper policies and guidelines</li>
+                                <li>You will maintain professional communication with customers</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <InputCheckbox @bind-Value="acceptShipperTerms" />
+                                I agree to the <a href="#" target="_blank">Shipper Terms & Conditions</a>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseShipperRegistrationModal">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary" 
+                            disabled="@(isSavingShipperProfile || !acceptShipperTerms)">
+                        @if (isSavingShipperProfile)
+                        {
+                            <span class="loading-spinner"></span>
+                            <text>Registering...</text>
+                        }
+                        else
+                        {
+                            <text><i class="fas fa-truck"></i> Register as Shipper</text>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
 <!-- Address Modal -->
 @if (isAddressModalOpen)
 {
@@ -628,6 +758,13 @@ else
     private bool isSavingSellerProfile = false;
     private bool acceptTerms = false;
     
+    // Shipper Profile properties
+    private ShipperProfileVM? currentShipperProfile;
+    private ShipperProfileVM shipperProfileModel = new();
+    private bool isShipperRegistrationModalOpen = false;
+    private bool isSavingShipperProfile = false;
+    private bool acceptShipperTerms = false;
+    
     private bool isLoading = true;
     private bool isEditing = false;
     private bool isSaving = false;
@@ -651,12 +788,14 @@ else
             LoadUserProfile(),
             LoadUserAddresses(),
             LoadSellerProfile(),
+            LoadShipperProfile(),
             LoadUserStats(),
             LoadRecentActivity()
         );
         isLoading = false;
     }
-        private async Task<int?> GetCurrentUserIdAsync()
+
+    private async Task<int?> GetCurrentUserIdAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
@@ -670,6 +809,233 @@ else
         }
         return null;
     }
+
+    // Shipper Profile Methods
+    private async Task LoadShipperProfile()
+    {
+        try
+        {
+            var userId = await GetCurrentUserIdAsync();
+            if (userId.HasValue)
+            {
+                currentShipperProfile = await ShipperProfileService.GetShipperProfileByUserIdAsync(userId.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading shipper profile: {ex.Message}");
+        }
+    }
+
+    private async Task OpenShipperRegistrationModal()
+    {
+        try
+        {
+            var userId = await GetCurrentUserIdAsync();
+            if (!userId.HasValue)
+            {
+                ToastService.ShowError("User ID not found. Please login again.");
+                return;
+            }
+
+            var hasShipperProfile = await ShipperProfileService.CheckUserHasShipperProfileAsync(userId.Value);
+            if (hasShipperProfile)
+            {
+                ToastService.ShowWarning("You already have a shipper profile");
+                await LoadShipperProfile();
+                return;
+            }
+
+            shipperProfileModel = new ShipperProfileVM
+            {
+                UserId = userId.Value,
+                FirstName = currentUser?.FirstName,
+                LastName = currentUser?.LastName,
+                Email = currentUser?.Email,
+                PhoneNumber = currentUser?.PhoneNumber,
+                IsActive = true,
+                IsDeleted = false
+            };
+
+            acceptShipperTerms = false;
+            isShipperRegistrationModalOpen = true;
+            StateHasChanged();
+            
+            await Task.Delay(50);
+            await JSRuntime.InvokeVoidAsync("document.body.classList.add", "modal-open");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error opening shipper registration: {ex.Message}");
+        }
+    }
+
+    private async Task SaveShipperProfile()
+    {
+        try
+        {
+            if (!acceptShipperTerms)
+            {
+                ToastService.ShowWarning("Please accept the shipper terms and conditions");
+                return;
+            }
+
+            isSavingShipperProfile = true;
+            StateHasChanged();
+            
+            await EnsureSignalRConnectionAsync();
+            
+            var userId = await GetCurrentUserIdAsync();
+            if (!userId.HasValue)
+            {
+                ToastService.ShowError("User ID not found. Please login again.");
+                return;
+            }
+
+            shipperProfileModel.UserId = userId.Value;
+            shipperProfileModel.CreatedAt = DateTime.Now;
+            shipperProfileModel.UpdatedAt = DateTime.Now;
+            shipperProfileModel.IsActive = true;
+            shipperProfileModel.IsDeleted = false;
+            
+            var success = await ShipperProfileService.CreateShipperProfileAsync(shipperProfileModel);
+            
+            if (success)
+            {
+                ToastService.ShowSuccess("Shipper profile created successfully! You can now start receiving delivery assignments.");
+                currentShipperProfile = shipperProfileModel;
+                
+                await EnsureSignalRConnectionAndNotify(async () =>
+                {
+                    var shipperName = shipperProfileModel.FullName ?? "New Shipper";
+                    await SignalRService.NotifyShipperProfileCreatedAsync(shipperName);
+                });
+                
+                recentActivities.Insert(0, new ActivityModel
+                {
+                    Type = "shipper",
+                    Description = "Registered as a shipper",
+                    CreatedAt = DateTime.Now
+                });
+                
+                await CloseShipperRegistrationModal();
+            }
+            else
+            {
+                ToastService.ShowError("Failed to create shipper profile. Please try again.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error saving shipper profile: {ex.Message}");
+            ToastService.ShowError($"Error saving shipper profile: {ex.Message}");
+        }
+        finally
+        {
+            isSavingShipperProfile = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CloseShipperRegistrationModal()
+    {
+        try
+        {
+            isShipperRegistrationModalOpen = false;
+            await JSRuntime.InvokeVoidAsync("document.body.classList.remove", "modal-open");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error closing shipper registration modal: {ex.Message}");
+        }
+    }
+
+    private async Task ActivateShipperProfile()
+    {
+        if (currentShipperProfile == null) return;
+
+        try
+        {
+            await EnsureSignalRConnectionAsync();
+            
+            var success = await ShipperProfileService.ActivateShipperProfileAsync(currentShipperProfile.ShipperId);
+            
+            if (success)
+            {
+                currentShipperProfile.IsActive = true;
+                ToastService.ShowSuccess("Your shipper profile has been activated! You can now receive delivery assignments.");
+                
+                await EnsureSignalRConnectionAndNotify(async () =>
+                {
+                    await SignalRService.NotifyShipperProfileActivatedAsync(
+                        currentShipperProfile.ShipperId
+                    );
+                });
+                
+                recentActivities.Insert(0, new ActivityModel
+                {
+                    Type = "shipper",
+                    Description = "Shipper profile activated",
+                    CreatedAt = DateTime.Now
+                });
+                
+                StateHasChanged();
+            }
+            else
+            {
+                ToastService.ShowError("Failed to activate shipper profile. Please try again.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error activating shipper profile: {ex.Message}");
+        }
+    }
+
+    private async Task DeactivateShipperProfile()
+    {
+        if (currentShipperProfile == null) return;
+
+        try
+        {
+            await EnsureSignalRConnectionAsync();
+            
+            var success = await ShipperProfileService.DeactivateShipperProfileAsync(currentShipperProfile.ShipperId);
+            
+            if (success)
+            {
+                currentShipperProfile.IsActive = false;
+                ToastService.ShowSuccess("Your shipper profile has been deactivated. You will not receive new delivery assignments.");
+                
+                await EnsureSignalRConnectionAndNotify(async () =>
+                {
+                    await SignalRService.NotifyShipperProfileDeactivatedAsync(
+                        currentShipperProfile.ShipperId
+                    );
+                });
+                
+                recentActivities.Insert(0, new ActivityModel
+                {
+                    Type = "shipper",
+                    Description = "Shipper profile deactivated",
+                    CreatedAt = DateTime.Now
+                });
+                
+                StateHasChanged();
+            }
+            else
+            {
+                ToastService.ShowError("Failed to deactivate shipper profile. Please try again.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error deactivating shipper profile: {ex.Message}");
+        }
+    }
+
+    // Seller Profile Methods
     private async Task LoadSellerProfile()
     {
         try
@@ -683,7 +1049,6 @@ else
         catch (Exception ex)
         {
             Console.WriteLine($"Error loading seller profile: {ex.Message}");
-            // Don't show error to user as not having a seller profile is normal for customers
         }
     }
 
@@ -743,7 +1108,6 @@ else
             isSavingSellerProfile = true;
             StateHasChanged();
             
-            // 🔥 THÊM: Kiểm tra connection trước khi save
             await EnsureSignalRConnectionAsync();
             
             var userId = await GetCurrentUserIdAsync();
@@ -760,16 +1124,12 @@ else
             
             if (isEditingSellerProfile)
             {
-                // Update existing seller profile
-                Console.WriteLine($"🔔 Profile.razor updating seller: SellerId={sellerProfileModel.SellerId}");
-                
                 success = await SellerProfileService.UpdateSellerProfileAsync(sellerProfileModel);
                 if (success)
                 {
                     ToastService.ShowSuccess("Store information updated successfully!");
                     currentSellerProfile = sellerProfileModel;
                     
-                    // 🔥 IMPROVED: Đảm bảo connection và gửi notification
                     await EnsureSignalRConnectionAndNotify(async () =>
                     {
                         await SignalRService.NotifySellerProfileUpdatedAsync(
@@ -780,14 +1140,12 @@ else
             }
             else
             {
-                // Create new seller profile
                 success = await SellerProfileService.CreateSellerProfileAsync(sellerProfileModel);
                 if (success)
                 {
                     ToastService.ShowSuccess("Seller registration submitted successfully!");
                     currentSellerProfile = sellerProfileModel;
                     
-                    // 🔥 IMPROVED: Đảm bảo connection và gửi notification
                     await EnsureSignalRConnectionAndNotify(async () =>
                     {
                         await SignalRService.NotifySellerProfileCreatedAsync(sellerProfileModel.StoreName);
@@ -795,11 +1153,14 @@ else
                 }
                 else
                 {
-                    ToastService.ShowError("Failed to register as a seller Store Name. Please try again.");
+                    ToastService.ShowError("Failed to register as a seller. Please try again.");
                 }
             }
+            
+            if (success)
+            {
                 await CloseSellerRegistrationModal();
-
+            }
         }
         catch (Exception ex)
         {
@@ -810,64 +1171,6 @@ else
         {
             isSavingSellerProfile = false;
             StateHasChanged();
-        }
-    }
-
-    // 🔥 THÊM: Method để đảm bảo SignalR connection
-    private async Task EnsureSignalRConnectionAsync()
-    {
-        try
-        {
-            if (!SignalRService.IsMainHubConnected)
-            {
-                Console.WriteLine("🔄 SignalR not connected, attempting to reconnect...");
-                await SignalRService.StartConnectionAsync();
-                
-                // Re-register user connection
-                if (currentUserId.HasValue)
-                {
-                    await SignalRService.RegisterUserConnectionAsync(currentUserId.Value.ToString());
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ Failed to ensure SignalR connection: {ex.Message}");
-        }
-    }
-
-    // 🔥 THÊM: Method để đảm bảo connection và gửi notification
-    private async Task EnsureSignalRConnectionAndNotify(Func<Task> notificationAction)
-    {
-        try
-        {
-            // Kiểm tra và đảm bảo connection
-            await EnsureSignalRConnectionAsync();
-            
-            // Delay để đảm bảo database update hoàn tất
-            await Task.Delay(500);
-            
-            // Gửi notification
-            await notificationAction();
-            
-            Console.WriteLine("✅ SignalR notification sent successfully");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ SignalR notification failed: {ex.Message}");
-            
-            // Retry một lần nữa
-            try
-            {
-                await Task.Delay(1000);
-                await EnsureSignalRConnectionAsync();
-                await notificationAction();
-                Console.WriteLine("✅ SignalR notification retry successful");
-            }
-            catch (Exception retryEx)
-            {
-                Console.WriteLine($"❌ SignalR notification retry failed: {retryEx.Message}");
-            }
         }
     }
 
@@ -885,128 +1188,308 @@ else
         }
     }
 
+    // SignalR Helper Methods
+    private async Task EnsureSignalRConnectionAsync()
+    {
+        try
+        {
+            if (!SignalRService.IsMainHubConnected)
+            {
+                Console.WriteLine("🔄 SignalR not connected, attempting to reconnect...");
+                await SignalRService.StartConnectionAsync();
+                
+                if (currentUserId.HasValue)
+                {
+                    await SignalRService.RegisterUserConnectionAsync(currentUserId.Value.ToString());
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Failed to ensure SignalR connection: {ex.Message}");
+        }
+    }
+
+    private async Task EnsureSignalRConnectionAndNotify(Func<Task> notificationAction)
+    {
+        try
+        {
+            await EnsureSignalRConnectionAsync();
+            await Task.Delay(500);
+            await notificationAction();
+            Console.WriteLine("✅ SignalR notification sent successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ SignalR notification failed: {ex.Message}");
+            
+            try
+            {
+                await Task.Delay(1000);
+                await EnsureSignalRConnectionAsync();
+                await notificationAction();
+                Console.WriteLine("✅ SignalR notification retry successful");
+            }
+            catch (Exception retryEx)
+            {
+                Console.WriteLine($"❌ SignalR notification retry failed: {retryEx.Message}");
+            }
+        }
+    }
+
+    // SignalR Initialization
     private async Task InitializeSignalRAsync()
-{
-    try
     {
-        currentUserId = await GetCurrentUserIdAsync();
-        
-        // Subscribe to SignalR events for Address
-        SignalRService.AddressCreated += OnAddressCreated;
-        SignalRService.AddressUpdated += OnAddressUpdated;
-        SignalRService.AddressDeleted += OnAddressDeleted;
-        SignalRService.DefaultAddressChanged += OnDefaultAddressChanged;
-
-        // Subscribe to Seller Profile events
-        SignalRService.SellerProfileCreated += OnSellerProfileCreated;
-        SignalRService.SellerProfileUpdated += OnSellerProfileUpdated;
-        SignalRService.SellerProfileDeleted += OnSellerProfileDeleted;
-        SignalRService.SellerProfileVerified += OnSellerProfileVerified;
-        SignalRService.SellerProfileUnverified += OnSellerProfileUnverified;
-
-        // 🔥 THÊM: Subscribe to User events để biết khi thông tin user thay đổi
-        SignalRService.UserUpdated += OnUserUpdated;
-        SignalRService.UserStatusChanged += OnUserStatusChanged;
-
-        // Start connection if not already connected
-        if (!SignalRService.IsMainHubConnected)
+        try
         {
-            await SignalRService.StartConnectionAsync();
+            currentUserId = await GetCurrentUserIdAsync();
+            
+            // Subscribe to SignalR events for Address
+            SignalRService.AddressCreated += OnAddressCreated;
+            SignalRService.AddressUpdated += OnAddressUpdated;
+            SignalRService.AddressDeleted += OnAddressDeleted;
+            SignalRService.DefaultAddressChanged += OnDefaultAddressChanged;
+
+            // Subscribe to Seller Profile events
+            SignalRService.SellerProfileCreated += OnSellerProfileCreated;
+            SignalRService.SellerProfileUpdated += OnSellerProfileUpdated;
+            SignalRService.SellerProfileDeleted += OnSellerProfileDeleted;
+            SignalRService.SellerProfileVerified += OnSellerProfileVerified;
+            SignalRService.SellerProfileUnverified += OnSellerProfileUnverified;
+
+            // Subscribe to Shipper Profile events
+            SignalRService.ShipperProfileCreated += OnShipperProfileCreated;
+            SignalRService.ShipperProfileUpdated += OnShipperProfileUpdated;
+            SignalRService.ShipperProfileDeleted += OnShipperProfileDeleted;
+            SignalRService.ShipperProfileActivated += OnShipperProfileActivated;
+            SignalRService.ShipperProfileDeactivated += OnShipperProfileDeactivated;
+
+            // Subscribe to User events
+            SignalRService.UserUpdated += OnUserUpdated;
+            SignalRService.UserStatusChanged += OnUserStatusChanged;
+
+            if (!SignalRService.IsMainHubConnected)
+            {
+                await SignalRService.StartConnectionAsync();
+            }
+
+            if (currentUserId.HasValue)
+            {
+                await SignalRService.RegisterUserConnectionAsync(currentUserId.Value.ToString());
+            }
+            
+            Console.WriteLine("✅ Profile.razor SignalR initialized successfully");
         }
-
-        // Register user connection for receiving targeted notifications
-        if (currentUserId.HasValue)
+        catch (Exception ex)
         {
-            await SignalRService.RegisterUserConnectionAsync(currentUserId.Value.ToString());
+            Console.WriteLine($"❌ Error initializing SignalR: {ex.Message}");
         }
-        
-        Console.WriteLine("✅ Profile.razor SignalR initialized successfully");
     }
-    catch (Exception ex)
+
+    // Shipper Profile SignalR Event Handlers
+    private async void OnShipperProfileCreated(string shipperName)
     {
-        Console.WriteLine($"❌ Error initializing SignalR: {ex.Message}");
-    }
-}
-private async void OnUserUpdated(int userId, string username)
-{
-    try
-    {
-        if (currentUserId.HasValue && currentUserId.Value == userId)
+        try
         {
-            Console.WriteLine($"🔔 Profile.razor received UserUpdated: UserId={userId}, Username={username}");
+            Console.WriteLine($"🔔 Received shipper profile created event: {shipperName}");
             
             await InvokeAsync(async () =>
             {
-                // Reload user data để có thông tin mới nhất từ server
-                await LoadUserProfile();
-                ToastService.ShowInfo("Your account information has been updated by admin");
+                var previousProfile = currentShipperProfile;
+                await LoadShipperProfile();
                 
-                // Add activity
-                recentActivities.Insert(0, new ActivityModel
+                if (previousProfile == null && currentShipperProfile != null)
                 {
-                    Type = "account",
-                    Description = "Account information updated by admin",
-                    CreatedAt = DateTime.Now
-                });
+                    ToastService.ShowSuccess($"🎉 Welcome to delivery! Your shipper profile has been created!");
+                    
+                    recentActivities.Insert(0, new ActivityModel
+                    {
+                        Type = "shipper",
+                        Description = "Shipper profile was created",
+                        CreatedAt = DateTime.Now
+                    });
+                }
                 
                 StateHasChanged();
             });
         }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"❌ Error in OnUserUpdated: {ex.Message}");
-    }
-}
-
-private async void OnUserStatusChanged(int userId, string status)
-{
-    try
-    {
-        if (currentUserId.HasValue && currentUserId.Value == userId)
+        catch (Exception ex)
         {
-            Console.WriteLine($"🔔 Profile.razor received UserStatusChanged: UserId={userId}, Status={status}");
-            
-            await InvokeAsync(async () =>
+            Console.WriteLine($"❌ Error in OnShipperProfileCreated: {ex.Message}");
+        }
+    }
+
+    private async void OnShipperProfileUpdated(int shipperId, string shipperName)
+    {
+        try
+        {
+            if (currentShipperProfile != null && currentShipperProfile.ShipperId == shipperId)
             {
-                // Reload user data để có status mới
-                await LoadUserProfile();
+                Console.WriteLine($"🔔 Received shipper profile updated event: {shipperId} - {shipperName}");
                 
-                var message = status == "Active" ? "Your account has been activated" : "Your account has been deactivated";
-                ToastService.ShowInfo(message);
+                await InvokeAsync(async () =>
+                {
+                    await LoadShipperProfile();
+                    ToastService.ShowInfo($"Your shipper profile was updated");
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error in OnShipperProfileUpdated: {ex.Message}");
+        }
+    }
+
+    private async void OnShipperProfileDeleted(int shipperId)
+    {
+        if (currentShipperProfile != null && currentShipperProfile.ShipperId == shipperId)
+        {
+            await InvokeAsync(() =>
+            {
+                currentShipperProfile = null;
+                ToastService.ShowWarning("Your shipper profile has been deleted by admin");
                 
-                // Add activity
                 recentActivities.Insert(0, new ActivityModel
                 {
-                    Type = "account",
-                    Description = $"Account status changed to {status}",
+                    Type = "shipper",
+                    Description = "Shipper profile was deleted by admin",
                     CreatedAt = DateTime.Now
                 });
                 
                 StateHasChanged();
+                return Task.CompletedTask;
             });
         }
     }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"❌ Error in OnUserStatusChanged: {ex.Message}");
-    }
-}
 
-    // 🔥 THÊM: Seller Profile SignalR Event Handlers
+    private async void OnShipperProfileActivated(int shipperId)
+    {
+        if (currentShipperProfile != null && currentShipperProfile.ShipperId == shipperId)
+        {
+            await InvokeAsync(() =>
+            {
+                if (currentShipperProfile != null)
+                {
+                    currentShipperProfile.IsActive = true;
+                }
+                
+                ToastService.ShowSuccess($"🎉 Your shipper profile has been activated!");
+                
+                recentActivities.Insert(0, new ActivityModel
+                {
+                    Type = "shipper",
+                    Description = "Shipper profile was activated",
+                    CreatedAt = DateTime.Now
+                });
+                
+                StateHasChanged();
+                return Task.CompletedTask;
+            });
+        }
+    }
+
+    private async void OnShipperProfileDeactivated(int shipperId)
+    {
+        if (currentShipperProfile != null && currentShipperProfile.ShipperId == shipperId)
+        {
+            await InvokeAsync(() =>
+            {
+                if (currentShipperProfile != null)
+                {
+                    currentShipperProfile.IsActive = false;
+                }
+                
+                ToastService.ShowWarning($"Your shipper profile has been deactivated.");
+                
+                recentActivities.Insert(0, new ActivityModel
+                {
+                    Type = "shipper",
+                    Description = "Shipper profile was deactivated",
+                    CreatedAt = DateTime.Now
+                });
+                
+                StateHasChanged();
+                return Task.CompletedTask;
+            });
+        }
+    }
+
+    // User SignalR Event Handlers
+    private async void OnUserUpdated(int userId, string username)
+    {
+        try
+        {
+            if (currentUserId.HasValue && currentUserId.Value == userId)
+            {
+                Console.WriteLine($"🔔 Profile.razor received UserUpdated: UserId={userId}, Username={username}");
+                
+                await InvokeAsync(async () =>
+                {
+                    await LoadUserProfile();
+                    ToastService.ShowInfo("Your account information has been updated by admin");
+                    
+                    recentActivities.Insert(0, new ActivityModel
+                    {
+                        Type = "account",
+                        Description = "Account information updated by admin",
+                        CreatedAt = DateTime.Now
+                    });
+                    
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error in OnUserUpdated: {ex.Message}");
+        }
+    }
+
+    private async void OnUserStatusChanged(int userId, string status)
+    {
+        try
+        {
+            if (currentUserId.HasValue && currentUserId.Value == userId)
+            {
+                Console.WriteLine($"🔔 Profile.razor received UserStatusChanged: UserId={userId}, Status={status}");
+                
+                await InvokeAsync(async () =>
+                {
+                    await LoadUserProfile();
+                    
+                    var message = status == "Active" ? "Your account has been activated" : "Your account has been deactivated";
+                    ToastService.ShowInfo(message);
+                    
+                    recentActivities.Insert(0, new ActivityModel
+                    {
+                        Type = "account",
+                        Description = $"Account status changed to {status}",
+                        CreatedAt = DateTime.Now
+                    });
+                    
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error in OnUserStatusChanged: {ex.Message}");
+        }
+    }
+
+    // Seller Profile SignalR Event Handlers
     private async void OnSellerProfileCreated(string storeName)
     {
         try
         {
             Console.WriteLine($"🔔 Received seller profile created event: {storeName}");
             
-            // 🔥 IMPROVED: Luôn reload để check xem user hiện tại có tạo seller profile không
             await InvokeAsync(async () =>
             {
                 var previousProfile = currentSellerProfile;
                 await LoadSellerProfile();
                 
-                // Chỉ show notification nếu profile mới được tạo cho user này
                 if (previousProfile == null && currentSellerProfile != null)
                 {
                     ToastService.ShowSuccess($"🎉 Welcome to selling! Your store '{storeName}' has been created!");
@@ -1031,7 +1514,6 @@ private async void OnUserStatusChanged(int userId, string status)
                 
                 await InvokeAsync(async () =>
                 {
-                    // 🔥 IMPROVED: Reload seller profile từ server để đảm bảo data consistency
                     await LoadSellerProfile();
                     ToastService.ShowInfo($"Your store '{storeName}' information was updated");
                     StateHasChanged();
@@ -1050,10 +1532,9 @@ private async void OnUserStatusChanged(int userId, string status)
         {
             await InvokeAsync(() =>
             {
-                currentSellerProfile = null; // Clear seller profile
+                currentSellerProfile = null;
                 ToastService.ShowWarning("Your seller profile has been deleted by admin");
                 
-                // Add activity
                 recentActivities.Insert(0, new ActivityModel
                 {
                     Type = "seller",
@@ -1075,12 +1556,11 @@ private async void OnUserStatusChanged(int userId, string status)
             {
                 if (currentSellerProfile != null)
                 {
-                    currentSellerProfile.IsVerified = true; // Update verification status
+                    currentSellerProfile.IsVerified = true;
                 }
                 
                 ToastService.ShowSuccess($"🎉 Congratulations! Your store '{storeName}' has been verified!");
                 
-                // Add activity
                 recentActivities.Insert(0, new ActivityModel
                 {
                     Type = "seller",
@@ -1102,12 +1582,11 @@ private async void OnUserStatusChanged(int userId, string status)
             {
                 if (currentSellerProfile != null)
                 {
-                    currentSellerProfile.IsVerified = false; // Update verification status
+                    currentSellerProfile.IsVerified = false;
                 }
                 
                 ToastService.ShowWarning($"Your store '{storeName}' verification has been revoked by admin");
                 
-                // Add activity
                 recentActivities.Insert(0, new ActivityModel
                 {
                     Type = "seller",
@@ -1121,6 +1600,7 @@ private async void OnUserStatusChanged(int userId, string status)
         }
     }
 
+    // Address SignalR Event Handlers
     private async void OnAddressCreated(int userId, string addressInfo)
     {
         if (currentUserId.HasValue && currentUserId.Value == userId)
@@ -1178,6 +1658,7 @@ private async void OnUserStatusChanged(int userId, string status)
         }
     }
 
+    // User Profile Methods
     private async Task LoadUserProfile()
     {
         try
@@ -1209,7 +1690,6 @@ private async void OnUserStatusChanged(int userId, string status)
         catch (Exception ex)
         {
             ToastService.ShowError($"Error loading profile: {ex.Message}");
-            // Fallback logic for testing
             await TryLoadFallbackUser();
         }
     }
@@ -1263,7 +1743,6 @@ private async void OnUserStatusChanged(int userId, string status)
 
     private async Task LoadUserStats()
     {
-        // Mock data for now
         userStats = new UserStatsModel
         {
             TotalOrders = 15,
@@ -1275,16 +1754,10 @@ private async void OnUserStatusChanged(int userId, string status)
 
     private async Task LoadRecentActivity()
     {
-        // Mock data for now
-        recentActivities = new List<ActivityModel>
-        {
-            new() { Type = "order", Description = "Placed order #ORD-2024-001", CreatedAt = DateTime.Now.AddDays(-1) },
-            new() { Type = "review", Description = "Left a review for 'iPhone 15 Pro'", CreatedAt = DateTime.Now.AddDays(-3) },
-            new() { Type = "wishlist", Description = "Added 'MacBook Air M2' to wishlist", CreatedAt = DateTime.Now.AddDays(-5) },
-            new() { Type = "profile", Description = "Updated profile information", CreatedAt = DateTime.Now.AddDays(-7) }
-        };
+
     }
 
+    // Profile Editing Methods
     private void StartEdit() => isEditing = true;
 
     private void CancelEdit()
@@ -1299,65 +1772,61 @@ private async void OnUserStatusChanged(int userId, string status)
     }
 
     private async Task UpdateProfile()
-{
-    if (currentUser == null) return;
-
-    try
     {
-        isSaving = true;
-        
-        // 🔥 THÊM: Kiểm tra SignalR connection trước khi update
-        await EnsureSignalRConnectionAsync();
-        
-        var success = await UserService.UpdateProfileAsync(editModel);
-        
-        if (success)
+        if (currentUser == null) return;
+
+        try
         {
-            // Update local data
-            currentUser.FirstName = editModel.FirstName;
-            currentUser.LastName = editModel.LastName;
-            currentUser.PhoneNumber = editModel.PhoneNumber;
+            isSaving = true;
             
-            isEditing = false;
-            ToastService.ShowSuccess("Profile updated successfully!");
+            await EnsureSignalRConnectionAsync();
             
-            // 🔥 THÊM: Gửi SignalR notification sau khi update thành công
-            await EnsureSignalRConnectionAndNotify(async () =>
+            var success = await UserService.UpdateProfileAsync(editModel);
+            
+            if (success)
             {
-                var fullName = GetFullName(currentUser);
-                var userId = await GetCurrentUserIdAsync();
-                if (userId.HasValue)
+                currentUser.FirstName = editModel.FirstName;
+                currentUser.LastName = editModel.LastName;
+                currentUser.PhoneNumber = editModel.PhoneNumber;
+                
+                isEditing = false;
+                ToastService.ShowSuccess("Profile updated successfully!");
+                
+                await EnsureSignalRConnectionAndNotify(async () =>
                 {
-                    await SignalRService.NotifyUserUpdatedAsync(userId.Value, fullName);
-                    Console.WriteLine($"🔔 Profile.razor sent user update notification: UserId={userId.Value}, Name={fullName}");
-                }
-            });
-            
-            // Add activity
-            recentActivities.Insert(0, new ActivityModel
+                    var fullName = GetFullName(currentUser);
+                    var userId = await GetCurrentUserIdAsync();
+                    if (userId.HasValue)
+                    {
+                        await SignalRService.NotifyUserUpdatedAsync(userId.Value, fullName);
+                        Console.WriteLine($"🔔 Profile.razor sent user update notification: UserId={userId.Value}, Name={fullName}");
+                    }
+                });
+                
+                recentActivities.Insert(0, new ActivityModel
+                {
+                    Type = "profile",
+                    Description = "Updated profile information",
+                    CreatedAt = DateTime.Now
+                });
+            }
+            else
             {
-                Type = "profile",
-                Description = "Updated profile information",
-                CreatedAt = DateTime.Now
-            });
+                ToastService.ShowError("Failed to update profile. Please try again.");
+            }
         }
-        else
+        catch (Exception ex)
         {
-            ToastService.ShowError("Failed to update profile. Please try again.");
+            Console.WriteLine($"❌ Error updating profile: {ex.Message}");
+            ToastService.ShowError($"Error updating profile: {ex.Message}");
+        }
+        finally
+        {
+            isSaving = false;
         }
     }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"❌ Error updating profile: {ex.Message}");
-        ToastService.ShowError($"Error updating profile: {ex.Message}");
-    }
-    finally
-    {
-        isSaving = false;
-    }
-}
 
-
+    // Address Methods
     private async Task SaveAddress()
     {
         try
@@ -1395,7 +1864,6 @@ private async void OnUserStatusChanged(int userId, string status)
                         : "New address added successfully!");
                 ToastService.ShowSuccess(message);
                 
-                // Send SignalR notification for address creation/update
                 _ = Task.Run(async () =>
                 {
                     try
@@ -1448,7 +1916,6 @@ private async void OnUserStatusChanged(int userId, string status)
                 }
                 ToastService.ShowSuccess("Default address updated!");
                 
-                // Send SignalR notification for default address change
                 _ = Task.Run(async () =>
                 {
                     try
@@ -1495,7 +1962,6 @@ private async void OnUserStatusChanged(int userId, string status)
                 StateHasChanged();
                 ToastService.ShowSuccess("Address deleted successfully!");
                 
-                // Send SignalR notification for address deletion
                 _ = Task.Run(async () =>
                 {
                     try
@@ -1537,7 +2003,6 @@ private async void OnUserStatusChanged(int userId, string status)
     {
         try
         {
-            Console.WriteLine("AddNewAddress clicked"); // Debug log
             editingAddress = new AddressVM();
             isDefaultAddress = !userAddresses.Any();
             isEditingAddress = false;
@@ -1545,7 +2010,6 @@ private async void OnUserStatusChanged(int userId, string status)
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error in AddNewAddress: {ex.Message}");
             ToastService.ShowError($"Error opening address form: {ex.Message}");
         }
     }
@@ -1554,7 +2018,6 @@ private async void OnUserStatusChanged(int userId, string status)
     {
         try
         {
-            Console.WriteLine("EditAddress clicked"); // Debug log
             editingAddress = new AddressVM
             {
                 AddressId = address.AddressId,
@@ -1573,7 +2036,6 @@ private async void OnUserStatusChanged(int userId, string status)
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error in EditAddress: {ex.Message}");
             ToastService.ShowError($"Error opening address form: {ex.Message}");
         }
     }
@@ -1582,19 +2044,14 @@ private async void OnUserStatusChanged(int userId, string status)
     {
         try
         {
-            Console.WriteLine("OpenAddressModal called"); // Debug log
             isAddressModalOpen = true;
-            StateHasChanged(); // Force UI update first
+            StateHasChanged();
             
-            // Add delay to ensure UI is rendered
             await Task.Delay(50);
-            
             await JSRuntime.InvokeVoidAsync("document.body.classList.add", "modal-open");
-            Console.WriteLine("Modal should be open now"); // Debug log
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error in OpenAddressModal: {ex.Message}");
             ToastService.ShowError($"Error opening modal: {ex.Message}");
         }
     }
@@ -1603,7 +2060,6 @@ private async void OnUserStatusChanged(int userId, string status)
     {
         try
         {
-            Console.WriteLine("CloseAddressModal called"); // Debug log
             isAddressModalOpen = false;
             await JSRuntime.InvokeVoidAsync("document.body.classList.remove", "modal-open");
             StateHasChanged();
@@ -1614,12 +2070,10 @@ private async void OnUserStatusChanged(int userId, string status)
         }
     }
 
+    // Utility Methods
     private async Task OpenAvatarUpload() => await JSRuntime.InvokeVoidAsync("document.getElementById('avatarInput').click");
-
     private async Task HandleAvatarUpload(InputFileChangeEventArgs e) => ToastService.ShowInfo("Avatar upload feature will be implemented soon!");
-
     private async Task OpenChangePasswordDialog() => ToastService.ShowInfo("Change password feature will be implemented soon!");
-
     private async Task OpenDeleteAccountDialog() => ToastService.ShowWarning("Delete account feature will be implemented soon!");
 
     private string GetFullName(ProfileVM user) => 
@@ -1651,9 +2105,12 @@ private async void OnUserStatusChanged(int userId, string status)
         "wishlist" => "fas fa-heart",
         "profile" => "fas fa-user-edit",
         "seller" => "fas fa-store",
+        "shipper" => "fas fa-truck",
+        "account" => "fas fa-user-cog",
         _ => "fas fa-clock"
     };
 
+    // Model Classes
     public class UserStatsModel
     {
         public int TotalOrders { get; set; }
@@ -1677,17 +2134,19 @@ private async void OnUserStatusChanged(int userId, string status)
         SignalRService.AddressDeleted -= OnAddressDeleted;
         SignalRService.DefaultAddressChanged -= OnDefaultAddressChanged;
         
-        // 🔥 THÊM: Unsubscribe Seller Profile events
         SignalRService.SellerProfileCreated -= OnSellerProfileCreated;
         SignalRService.SellerProfileUpdated -= OnSellerProfileUpdated;
         SignalRService.SellerProfileDeleted -= OnSellerProfileDeleted;
         SignalRService.SellerProfileVerified -= OnSellerProfileVerified;
         SignalRService.SellerProfileUnverified -= OnSellerProfileUnverified;
-        // 🔥 THÊM: Unsubscribe User events
-    SignalRService.UserUpdated -= OnUserUpdated;
-    SignalRService.UserStatusChanged -= OnUserStatusChanged;
+        
+        SignalRService.ShipperProfileCreated -= OnShipperProfileCreated;
+        SignalRService.ShipperProfileUpdated -= OnShipperProfileUpdated;
+        SignalRService.ShipperProfileDeleted -= OnShipperProfileDeleted;
+        SignalRService.ShipperProfileActivated -= OnShipperProfileActivated;
+        SignalRService.ShipperProfileDeactivated -= OnShipperProfileDeactivated;
+        
+        SignalRService.UserUpdated -= OnUserUpdated;
+        SignalRService.UserStatusChanged -= OnUserStatusChanged;
     }
-
-    // ...rest of existing code...
 }
-

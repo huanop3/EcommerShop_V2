@@ -16,6 +16,8 @@ public interface IUnitOfWork : IAsyncDisposable
     public IOrderStatusRepository _orderStatusRepository { get; }
     public IOrderItemRepository _orderItemRepository { get; }
     public IOrderRepository _orderRepository { get; }
+    public IShipperProfileRepository _shipperProfileRepository { get; }
+    public IShipmentRepository _shipmentRepository { get; }
     Task BeginTransaction();
     Task CommitTransaction();
     Task RollbackTransaction();
@@ -39,10 +41,12 @@ public class UnitOfWork : IUnitOfWork
     public IOrderStatusRepository _orderStatusRepository { get; }
     public IOrderItemRepository _orderItemRepository { get; }
     public IOrderRepository _orderRepository { get; }
+    public IShipperProfileRepository _shipperProfileRepository { get; }
+    public IShipmentRepository _shipmentRepository { get; }
 
-    private readonly MainEcommerDBContext  _context;
+    private readonly MainEcommerDBContext _context;
 
-    public UnitOfWork(MainEcommerDBContext context, IUserRepository userRepository, IUserRoleRepository userRoleRepository, IRoleRepository roleRepository, IClientRepository clientRepository, ILoginLogRepository loginLogRepository, ICouponRepository couponRepository, IRefreshTokenRepository refreshTokenRepository, IAddressRepository addressRepository, ISellerProfileRepository sellerProfileRepository, IPaymentRepository paymentRepository, IOrderStatusRepository orderStatusRepository, IOrderItemRepository orderItemRepository, IOrderRepository orderRepository)
+    public UnitOfWork(MainEcommerDBContext context, IUserRepository userRepository, IUserRoleRepository userRoleRepository, IRoleRepository roleRepository, IClientRepository clientRepository, ILoginLogRepository loginLogRepository, ICouponRepository couponRepository, IRefreshTokenRepository refreshTokenRepository, IAddressRepository addressRepository, ISellerProfileRepository sellerProfileRepository, IPaymentRepository paymentRepository, IOrderStatusRepository orderStatusRepository, IOrderItemRepository orderItemRepository, IOrderRepository orderRepository, IShipperProfileRepository shipperProfileRepository, IShipmentRepository shipmentRepository)
     {
         _context = context;
         _userRepository = userRepository;
@@ -58,6 +62,8 @@ public class UnitOfWork : IUnitOfWork
         _orderStatusRepository = orderStatusRepository;
         _orderItemRepository = orderItemRepository;
         _orderRepository = orderRepository;
+        _shipperProfileRepository = shipperProfileRepository;
+        _shipmentRepository = shipmentRepository;
     }
     public async Task BeginTransaction()
     {

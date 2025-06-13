@@ -265,8 +265,21 @@ public class UserService : IUserService
                     return response;
                 }
             }
+            //Kiểm tra nếu trong ShipperProfile mà bị xóa thì không cho cập nhật role Shipper
+            if (role.RoleName == "Shipper")
+            {
+                var shipperProfile = await _unitOfWork._shipperProfileRepository.Query()
+                    .FirstOrDefaultAsync(sp => sp.UserId == userlistVM.Id && sp.IsDeleted == true);
+                if (shipperProfile != null)
+                {
+                    response.Success = false;
+                    response.StatusCode = 400; // Bad Request
+                    response.Message = "Không thể cập nhật vai trò Shipper vì người dùng đã bị xóa trong Shipper Profile";
+                    return response;
+                }
+            }
                 //Cap nhat role
-                    var userRole = await _unitOfWork._userRoleRepository.Query()
+                var userRole = await _unitOfWork._userRoleRepository.Query()
                 .FirstOrDefaultAsync(ur => ur.UserId == userlistVM.Id);
 
             if (userRole != null)

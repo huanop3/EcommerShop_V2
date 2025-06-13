@@ -133,6 +133,7 @@
         SignalRService.UserUpdated += HandleUserUpdated;
         SignalRService.UserDeleted += HandleUserDeleted;
         SignalRService.UserStatusChanged += HandleUserStatusChanged;
+        SignalRService.UserRoleUpdated += HandleUserRoleUpdated;
     }
 
     // 🔥 OPTIMIZED: Debounced refresh để tránh multiple refreshes
@@ -194,7 +195,15 @@
         var severity = status == "Active" ? Severity.Success : Severity.Warning;
         Snackbar.Add($"User {username} status changed to {status}", severity);
     }
-
+    private void HandleUserRoleUpdated(int userId,string userName, string newRole)
+    {
+        RefreshUsers();
+        
+        var user = users.FirstOrDefault(u => u.Id == userId);
+        var username = user?.UserName ?? $"User {userId}";
+        
+        Snackbar.Add($"User {username} role updated to {newRole}", Severity.Info);
+    }
     private async Task LoadRolesAsync()
     {
         try
@@ -353,6 +362,7 @@
         SignalRService.UserUpdated -= HandleUserUpdated;
         SignalRService.UserDeleted -= HandleUserDeleted;
         SignalRService.UserStatusChanged -= HandleUserStatusChanged;
+        SignalRService.UserRoleUpdated -= HandleUserRoleUpdated;
     }
 }
 

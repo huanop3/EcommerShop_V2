@@ -7,13 +7,7 @@ public partial class ShipperProfile
 {
     public int ShipperId { get; set; }
 
-    public string CompanyName { get; set; } = null!;
-
-    public string? ContactName { get; set; }
-
-    public string? PhoneNumber { get; set; }
-
-    public string? Email { get; set; }
+    public int UserId { get; set; }
 
     public DateTime? CreatedAt { get; set; }
 
@@ -24,4 +18,6 @@ public partial class ShipperProfile
     public bool? IsDeleted { get; set; }
 
     public virtual ICollection<Shipment> Shipments { get; set; } = new List<Shipment>();
+
+    public virtual User User { get; set; } = null!;
 }

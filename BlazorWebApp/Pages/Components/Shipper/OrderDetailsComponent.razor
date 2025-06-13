@@ -1,0 +1,187 @@
+@namespace BlazorWebApp.Pages.Components.Shipper
+@using BlazorWebApp.ViewModel
+@using BlazorWebApp.Services
+@using MudBlazor
+@inject ShipmentService ShipmentService
+@inject SignalRService SignalRService
+@inject ISnackbar Snackbar
+
+<MudGrid>
+    <!-- Order Information -->
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="1" Class="pa-4 h-100">
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" />
+                Thông tin đơn hàng
+            </MudText>
+            
+            <MudList T="string">
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Tag">
+                    <MudText><strong>Order ID:</strong> #@Dashboard.OrderInfo.OrderId</MudText>
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Schedule">
+                    <MudText><strong>Ngày đặt:</strong> @Dashboard.OrderInfo.FormattedOrderDate</MudText>
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.AttachMoney">
+                    <MudText><strong>Tổng tiền:</strong> @Dashboard.OrderInfo.FormattedTotalAmount</MudText>
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Info">
+                    <MudChip Color="GetStatusColor(Dashboard.OrderInfo.OrderStatusId)" 
+                             Size="Size.Small">
+                        @Dashboard.OrderInfo.CurrentOrderStatus
+                    </MudChip>
+                </MudListItem>
+            </MudList>
+        </MudPaper>
+    </MudItem>
+
+    <!-- Shipment Information -->
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="1" Class="pa-4 h-100">
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Class="mr-2" />
+                Thông tin vận chuyển
+            </MudText>
+            
+            @if (Dashboard.ShipmentInfo != null)
+            {
+                <MudList T="string">
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.QrCode">
+                        <MudText><strong>Mã vận đơn:</strong> @Dashboard.ShipmentInfo.TrackingNumber</MudText>
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Schedule">
+                        <MudText><strong>Ngày lấy hàng:</strong> @Dashboard.ShipmentInfo.FormattedShippedDate</MudText>
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle">
+                        <MudText><strong>Ngày giao:</strong> @Dashboard.ShipmentInfo.FormattedDeliveredDate</MudText>
+                    </MudListItem>
+                </MudList>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info">
+                    Chưa có thông tin vận chuyển
+                </MudAlert>
+            }
+        </MudPaper>
+    </MudItem>
+
+    <!-- Status Update Section -->
+    @if (Dashboard.AvailableStatusUpdates.Any())
+    {
+        <MudItem xs="12">
+            <MudPaper Elevation="1" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Update" Class="mr-2" />
+                    Cập nhật trạng thái
+                </MudText>
+                
+                <MudGrid AlignItems="Center">
+                    <MudItem xs="12" md="8">
+                        <MudSelect @bind-Value="selectedStatusId" 
+                                  Label="Chọn trạng thái mới" 
+                                  Variant="Variant.Outlined"
+                                  AnchorOrigin="Origin.BottomCenter">
+                            @foreach (var status in Dashboard.AvailableStatusUpdates)
+                            {
+                                <MudSelectItem Value="status.StatusId">@status.StatusName - @status.Description</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudButton Variant="Variant.Filled" 
+                                  Color="Color.Primary"
+                                  StartIcon="@Icons.Material.Filled.Update"
+                                  OnClick="UpdateStatus"
+                                  Disabled="selectedStatusId == 0 || isUpdating"
+                                  FullWidth="true">
+                            @if (isUpdating)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                <span class="ml-2">Đang cập nhật...</span>
+                            }
+                            else
+                            {
+                                <span>Cập nhật</span>
+                            }
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+                
+                <MudTextField @bind-Value="updateNote" 
+                             Label="Ghi chú (tùy chọn)" 
+                             Variant="Variant.Outlined"
+                             Lines="2"
+                             Class="mt-3" />
+            </MudPaper>
+        </MudItem>
+    }
+</MudGrid>
+
+@code {
+    [Parameter] public ShipmentDashboardVM Dashboard { get; set; } = new();
+    [Parameter] public EventCallback OnStatusUpdated { get; set; }
+
+    private int selectedStatusId = 0;
+    private string updateNote = string.Empty;
+    private bool isUpdating = false;
+
+    private Color GetStatusColor(int statusId)
+    {
+        return statusId switch
+        {
+            1 => Color.Tertiary,    // New
+            2 => Color.Secondary,  // Processing
+            3 => Color.Surface,       // Ready for Pickup
+            4 => Color.Primary,    // Shipped
+            5 => Color.Info,       // In Transit
+            6 => Color.Warning,    // Out for Delivery
+            7 => Color.Success,    // Delivered
+            9 => Color.Error,      // Returned
+            _ => Color.Default
+        };
+    }
+
+    private async Task UpdateStatus()
+    {
+        if (selectedStatusId == 0 || Dashboard.ShipmentInfo == null)
+        {
+            Snackbar.Add("Vui lòng chọn trạng thái", Severity.Warning);
+            return;
+        }
+
+        isUpdating = true;
+        try
+        {
+            var request = new UpdateShipmentStatusRequest
+            {
+                NewStatusId = selectedStatusId,
+                Note = updateNote
+            };
+
+            var success = await ShipmentService.UpdateShipmentStatusAsync(Dashboard.ShipmentInfo.ShipmentId, request);
+
+            if (success)
+            {
+                selectedStatusId = 0;
+                updateNote = string.Empty;
+                Snackbar.Add("Cập nhật trạng thái thành công", Severity.Success);
+                //call signalR to notify other components
+                await SignalRService.NotifyShipmentStatusUpdatedAsync(Dashboard.ShipmentInfo.ShipmentId ,Dashboard.OrderInfo.OrderId, selectedStatusId.ToString());
+                await OnStatusUpdated.InvokeAsync();
+            }
+            else
+            {
+                Snackbar.Add("Cập nhật trạng thái thất bại", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi cập nhật: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isUpdating = false;
+        }
+    }
+}

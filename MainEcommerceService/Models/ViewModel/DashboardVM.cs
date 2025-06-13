@@ -9,32 +9,23 @@ namespace MainEcommerceService.Models.ViewModel
     /// </summary>
     public class AdminDashboardVM
     {
-        // Overview Stats
         public int TotalUsers { get; set; }
         public int TotalSellers { get; set; }
         public int TotalProducts { get; set; }
         public int TotalOrders { get; set; }
         public decimal TotalRevenue { get; set; }
-
-        // Growth Stats (set default 0)
         public decimal UsersGrowthPercentage { get; set; }
         public decimal SellersGrowthPercentage { get; set; }
         public decimal ProductsGrowthPercentage { get; set; }
         public decimal OrdersGrowthPercentage { get; set; }
         public decimal RevenueGrowthPercentage { get; set; }
-
-        // Recent Activity
         public List<DashboardOrderVM> RecentOrders { get; set; } = new();
         public List<DashboardUserVM> NewUsers { get; set; } = new();
         public List<DashboardSellerVM> PendingSellers { get; set; } = new();
-
-        // Analytics - Simplified
         public List<MonthlyStatsVM> MonthlyStats { get; set; } = new();
         public List<CategoryStatsVM> TopCategories { get; set; } = new();
         public List<ProductStatsVM> TopProducts { get; set; } = new();
         public List<SellerStatsVM> TopSellers { get; set; } = new();
-
-        // System Health
         public int LowStockProductsCount { get; set; }
         public int PendingOrdersCount { get; set; }
         public int VerificationPendingCount { get; set; }
@@ -47,26 +38,16 @@ namespace MainEcommerceService.Models.ViewModel
     {
         public int SellerId { get; set; }
         public string StoreName { get; set; } = "";
-
-        // Overview Stats
         public int TotalProducts { get; set; }
         public int TotalOrders { get; set; }
         public decimal TotalRevenue { get; set; }
         public decimal AverageOrderValue { get; set; }
-
-        // Growth Stats (set default 0)
         public decimal ProductsGrowthPercentage { get; set; }
         public decimal OrdersGrowthPercentage { get; set; }
         public decimal RevenueGrowthPercentage { get; set; }
-
-        // Recent Activity
         public List<DashboardOrderVM> RecentOrders { get; set; } = new();
         public List<ProductStatsVM> TopProducts { get; set; } = new();
-
-        // Analytics
         public List<MonthlyStatsVM> MonthlyStats { get; set; } = new();
-
-        // Alerts
         public int LowStockProductsCount { get; set; }
         public int PendingOrdersCount { get; set; }
         public bool IsVerified { get; set; }
@@ -115,7 +96,7 @@ namespace MainEcommerceService.Models.ViewModel
     }
 
     /// <summary>
-    /// Thống kê theo tháng - SIMPLIFIED
+    /// Monthly statistics for charts
     /// </summary>
     public class MonthlyStatsVM
     {
@@ -129,7 +110,7 @@ namespace MainEcommerceService.Models.ViewModel
     }
 
     /// <summary>
-    /// Thống kê category - SIMPLIFIED
+    /// Category statistics
     /// </summary>
     public class CategoryStatsVM
     {
@@ -141,7 +122,7 @@ namespace MainEcommerceService.Models.ViewModel
     }
 
     /// <summary>
-    /// Thống kê sản phẩm - SIMPLIFIED
+    /// Product statistics
     /// </summary>
     public class ProductStatsVM
     {
@@ -156,7 +137,7 @@ namespace MainEcommerceService.Models.ViewModel
     }
 
     /// <summary>
-    /// Thống kê seller - SIMPLIFIED
+    /// Seller statistics
     /// </summary>
     public class SellerStatsVM
     {
@@ -169,9 +150,8 @@ namespace MainEcommerceService.Models.ViewModel
         public decimal AverageOrderValue { get; set; }
     }
 
-    // Keep existing DashboardStatsVM and ProductDashboardVM as they are simple
     /// <summary>
-    /// ViewModel cho thống kê tổng quan - dùng cho API nhẹ
+    /// Dashboard basic stats for lightweight requests
     /// </summary>
     public class DashboardStatsVM
     {
@@ -186,24 +166,49 @@ namespace MainEcommerceService.Models.ViewModel
     }
 
     /// <summary>
-    /// ViewModel cho Product trong Dashboard
+    /// Product model for API response from ProductService
     /// </summary>
-    public class ProductDashboardVM
+    public class ProductApiModel
     {
         public int ProductId { get; set; }
+        public int CategoryId { get; set; }
         public string ProductName { get; set; } = "";
-        public int? CategoryId { get; set; }
-        public string CategoryName { get; set; } = "";
+        public string? Description { get; set; }
         public decimal Price { get; set; }
+        public decimal? DiscountPrice { get; set; }
         public int Quantity { get; set; }
-        public int? SellerId { get; set; }
-        public string SellerStoreName { get; set; } = "";
-        public string SellerName { get; set; } = "";
         public DateTime? CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+        public int? TotalSold { get; set; }
         public bool? IsDeleted { get; set; }
+        public int SellerId { get; set; }
+        public string CategoryName { get; set; } = "";
         public string ImageUrl { get; set; } = "";
-        public string Description { get; set; } = "";
-        public decimal? Rating { get; set; }
-        public int ReviewCount { get; set; }
+    }
+
+    /// <summary>
+    /// Category model for API response from ProductService
+    /// </summary>
+    public class CategoryApiModel
+    {
+        public int CategoryId { get; set; }
+        public string CategoryName { get; set; } = "";
+        public string? Description { get; set; }
+        public int? ParentCategoryId { get; set; }
+        public DateTime? CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+        public bool? IsDeleted { get; set; }
+    }
+
+    /// <summary>
+    /// API Response model for ProductService
+    /// </summary>
+    public class APIResponseModel<T>
+    {
+        public bool Success { get; set; }
+        public int StatusCode { get; set; }
+        public string Message { get; set; } = "";
+        public T? Data { get; set; }
+        public DateTime DateTime { get; set; }
     }
 }

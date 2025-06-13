@@ -148,7 +148,7 @@ namespace BlazorWebApp.Services
                 };
 
                 // Gọi API đăng nhập
-                var response = await _httpClient.PostAsJsonAsync("https://localhost:7260/api/UserLogin/LoginUser", loginRequest);
+                var response = await _httpClient.PostAsJsonAsync("http://localhost:5282/main/api/UserLogin/LoginUser", loginRequest);
 
                 // Phân tích phản hồi từ server
                 var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<UserLoginResponseVM>>();
@@ -198,7 +198,7 @@ namespace BlazorWebApp.Services
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync("https://localhost:7260/api/UserLogin/RegisterUser", registerModel);
+                var response = await _httpClient.PostAsJsonAsync("http://localhost:5282/main/api/UserLogin/RegisterUser", registerModel);
 
                 // Đọc phản hồi từ server
                 var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<RegisterLoginVM>>();
@@ -233,7 +233,7 @@ namespace BlazorWebApp.Services
             var refreshToken = await _localStorage.GetItemAsStringAsync("refreshToken");
 
             // Lưu lại token đã sửa
-            var response = await _httpClient.PutAsJsonAsync("https://localhost:7260/api/UserLogin/Logout", refreshToken);
+            var response = await _httpClient.PutAsJsonAsync("http://localhost:5282/main/api/UserLogin/Logout", refreshToken);
             if (response.IsSuccessStatusCode)
             {
                 await _localStorage.RemoveItemAsync("token");

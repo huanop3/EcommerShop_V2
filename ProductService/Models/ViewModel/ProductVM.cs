@@ -28,6 +28,8 @@ public class ProductVM
     public bool? IsDeleted { get; set; }
 
     public int SellerId { get; set; }
+    public string CategoryName { get; set; } = null!;
+    public string ImageUrl { get; set; } = null!;
     
 }
 
