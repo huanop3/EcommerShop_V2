@@ -1,0 +1,490 @@
+@page "/shipper/dashboard"
+@using BlazorWebApp.ViewModel
+@using BlazorWebApp.Services
+@using BlazorWebApp
+@using MainEcommerceService.Models.ViewModel
+@using MudBlazor
+@using BlazorWebApp.Pages.Components.Shipper
+@layout _AdminLayout
+@inject ShipmentService ShipmentService
+@inject ShipperProfileService ShipperProfileService
+@inject SignalRService SignalRService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@implements IDisposable
+@attribute [Authorize(Roles = "Shipper")]
+
+<PageTitle>Dashboard - Shipper</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <!-- Header with Connection Status -->
+    <MudPaper Elevation="2" Class="pa-4 mb-4">
+        <div class="d-flex justify-space-between align-center">
+            <div>
+                <MudText Typo="Typo.h4" Class="mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Class="mr-3" />
+                    Shipper Dashboard
+                    @if (currentShipperProfile != null)
+                    {
+                        <MudChip T="int" Size="Size.Small" Color="Color.Primary" Class="ml-2">
+                            ID: @currentShipperProfile.ShipperId
+                        </MudChip>
+                    }
+                </MudText>
+                <MudText Typo="Typo.subtitle1" Color="Color.Secondary">
+                    Quản lý đơn hàng và giao hàng
+                    @if (currentShipperProfile != null)
+                    {
+                        <span> - @currentShipperProfile.FullName</span>
+                    }
+                </MudText>
+            </div>
+            <div class="text-right">
+                <MudChip T="string" 
+                        Size="Size.Small" 
+                        Color="@(isConnected ? Color.Success : Color.Error)"
+                        Icon="@(isConnected ? Icons.Material.Filled.Wifi : Icons.Material.Filled.WifiOff)">
+                    @(isConnected ? "Connected" : "Disconnected")
+                </MudChip>
+                @if (lastRefreshTime.HasValue)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                        Cập nhật: @lastRefreshTime.Value.ToString("HH:mm:ss")
+                    </MudText>
+                }
+            </div>
+        </div>
+    </MudPaper>
+
+    <!-- Summary Cards -->
+    @if (summary != null)
+    {
+        <MudGrid Class="mb-6">
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Assignment" Size="Size.Large" Color="Color.Primary" Class="mb-2" />
+                    <MudText Typo="Typo.h6">@summary.TotalAssignedOrders</MudText>
+                    <MudText Typo="Typo.caption">Tổng đơn hàng</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Size="Size.Large" Color="Color.Info" Class="mb-2" />
+                    <MudText Typo="Typo.h6">@summary.OrdersInProgress</MudText>
+                    <MudText Typo="Typo.caption">Đang giao</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Large" Color="Color.Success" Class="mb-2" />
+                    <MudText Typo="Typo.h6">@summary.OrdersCompleted</MudText>
+                    <MudText Typo="Typo.caption">Hoàn thành</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Large" Color="Color.Warning" Class="mb-2" />
+                    <MudText Typo="Typo.h6">@summary.FormattedTotalEarnings</MudText>
+                    <MudText Typo="Typo.caption">Hoa hồng</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+    else if (isLoadingData)
+    {
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="120px" Class="mb-4" />
+    }
+
+    <!-- ✅ ORDER CONFIRMATION SECTION -->
+    @if (currentShipperProfile != null)
+    {
+        <OrderConfirmationComponent @ref="orderConfirmationRef"
+                                  ShipperId="currentShipperProfile.ShipperId"
+                                  isConnected="isConnected"
+                                  OnOrderConfirmed="HandleOrderConfirmed" />
+    }
+
+    <!-- ✅ MY ASSIGNED ORDERS WITH DETAILS -->
+    <MudPaper Elevation="2" Class="pa-4 mb-4">
+        <!-- ✅ SỬA TITLE -->
+        <div class="d-flex justify-space-between align-center mb-3">
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Class="mr-2" />
+                Đơn hàng của bạn (@myAssignedOrders.Count)
+                @if (isLoadingData)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="ml-2" />
+                }
+            </MudText>
+            
+            <MudButtonGroup Variant="Variant.Text" Size="Size.Small">
+                <MudButton StartIcon="@Icons.Material.Filled.Refresh"
+                          OnClick="LoadAssignedOrders"
+                          Disabled="isLoadingData">
+                    Refresh
+                </MudButton>
+                <MudButton StartIcon="@Icons.Material.Filled.FilterList"
+                          OnClick="ToggleFilter">
+                    Filter
+                </MudButton>
+            </MudButtonGroup>
+        </div>
+        
+        @if (myAssignedOrders.Any())
+        {
+            <!-- ✅ HIỂN THỊ THỐNG KÊ NHANH -->
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="mr-2" />
+                    <MudText Typo="Typo.body2">
+                        <strong>Tổng cộng:</strong> @myAssignedOrders.Count đơn hàng
+                    </MudText>
+                </div>
+            </MudAlert>
+            
+            <!-- ✅ ORDERS TABLE -->
+            <AssignedOrdersComponent Orders="myAssignedOrders" OnOrderSelected="LoadOrderDashboard" />
+            
+            <!-- ✅ ORDER DETAILS BELOW TABLE -->
+            @if (currentDashboard != null)
+            {
+                <MudDivider Class="my-4" />
+                
+                <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Class="mr-2" />
+                        <MudText Typo="Typo.body2">
+                            <strong>Chi tiết đơn hàng @currentDashboard.OrderInfo.OrderId</strong>
+                            @if (currentDashboard.ShipmentInfo != null)
+                            {
+                                <span> | Tracking: <strong>@currentDashboard.ShipmentInfo.TrackingNumber</strong></span>
+                            }
+                        </MudText>
+                    </div>
+                </MudAlert>
+
+                <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" Class="mb-4">
+                    <MudTabPanel Text="Thông tin đơn hàng" Icon="@Icons.Material.Filled.Info">
+                        <OrderDetailsComponent Dashboard="currentDashboard" OnStatusUpdated="HandleStatusUpdated" />
+                    </MudTabPanel>
+                    <MudTabPanel Text="Thông tin khách hàng" Icon="@Icons.Material.Filled.Person">
+                        <CustomerInfoComponent Dashboard="currentDashboard" />
+                    </MudTabPanel>
+                    <MudTabPanel Text="Sản phẩm" Icon="@Icons.Material.Filled.Inventory">
+                        <OrderItemsComponent Dashboard="currentDashboard" />
+                    </MudTabPanel>
+                </MudTabs>
+            }
+        }
+        else if (isLoadingData)
+        {
+            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" />
+        }
+        else
+        {
+            <!-- ✅ SỬA MESSAGE KHI CHƯA CÓ ĐƠN HÀNG -->
+            <MudAlert Severity="Severity.Info">
+                <MudText Typo="Typo.h6">📦 Bạn chưa có đơn hàng nào</MudText>
+                <MudText>Sử dụng form "Nhận đơn hàng mới" ở trên để nhận đơn hàng từ admin hoặc chờ admin assign đơn hàng cho bạn.</MudText>
+            </MudAlert>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    // ✅ COMPONENT REFERENCES
+    private OrderConfirmationComponent? orderConfirmationRef;
+    
+    // ✅ DATA PROPERTIES
+    private bool isLoadingData = false;
+    private bool isConnected = false;
+    private int currentUserId;
+    private ShipperProfileVM? currentShipperProfile;
+    private ShipmentDashboardVM? currentDashboard;
+    private List<AssignedOrderVM> allAssignedOrders = new(); // ✅ TẤT CẢ ĐƠN HÀNG TỪ API
+    private List<AssignedOrderVM> myAssignedOrders = new(); // ✅ CHỈ ĐƠN HÀNG CỦA SHIPPER NÀY
+    private ShipperDashboardSummaryVM? summary;
+    private DateTime? lastRefreshTime;
+    private int signalREventCount = 0;
+
+    // ✅ LIFECYCLE METHODS
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LoadUserProfile();
+            await InitializeSignalR();
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error initializing dashboard: {ex.Message}");
+            Snackbar.Add($"Lỗi khởi tạo dashboard: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // ✅ USER PROFILE LOADING
+    private async Task LoadUserProfile()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userIdClaim = authState.User.FindFirst("sub")?.Value ?? authState.User.FindFirst("UserId")?.Value;
+            
+            if (int.TryParse(userIdClaim, out currentUserId))
+            {
+                currentShipperProfile = await ShipperProfileService.GetShipperProfileByUserIdAsync(currentUserId);
+                Console.WriteLine($"✅ Loaded shipper profile: ID {currentShipperProfile?.ShipperId}, User {currentUserId}");
+            }
+            else
+            {
+                Console.WriteLine("❌ Cannot parse user ID from claims");
+                Snackbar.Add("Không thể xác định thông tin user", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading user profile: {ex.Message}");
+            Snackbar.Add($"Lỗi tải thông tin user: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // ✅ SIGNALR INITIALIZATION
+    private async Task InitializeSignalR()
+    {
+        try
+        {
+            Console.WriteLine("🔄 Starting SignalR connection...");
+            
+            await SignalRService.StartConnectionAsync();
+            isConnected = SignalRService.IsMainHubConnected;
+            
+            Console.WriteLine($"✅ SignalR connected: {isConnected}");
+            
+            if (currentShipperProfile != null && isConnected)
+            {
+                await SignalRService.RegisterShipperConnectionAsync(currentShipperProfile.ShipperId, currentUserId);
+                Console.WriteLine($"✅ Registered to Shipper_{currentShipperProfile.ShipperId} group");
+            }
+            
+            SignalRService.ShipmentStatusUpdated += HandleShipmentStatusUpdated;
+            SignalRService.YourOrderAssignedToShipper += HandleOrderAssigned;
+            SignalRService.OrderStatusChanged += HandleYourOrderStatusChanged;
+
+            StateHasChanged();
+            Snackbar.Add($"SignalR: {(isConnected ? "✅" : "❌")}", isConnected ? Severity.Success : Severity.Error);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ SignalR Error: {ex.Message}");
+            Snackbar.Add($"Lỗi SignalR: {ex.Message}", Severity.Warning);
+        }
+    }
+
+    // ✅ SIGNALR EVENT HANDLERS
+    private async void HandleShipmentStatusUpdated(int shipmentId, int orderId, string status)
+    {
+        await InvokeAsync(async () =>
+        {
+            signalREventCount++;
+            Snackbar.Add($"📦 Shipment #{shipmentId}: {status}", Severity.Info);
+            
+            if (orderConfirmationRef != null)
+            {
+                await orderConfirmationRef.OnShipmentStatusUpdated(shipmentId, orderId, status);
+            }
+            
+            if (currentDashboard?.OrderInfo.OrderId == orderId)
+            {
+                await LoadOrderDashboard(orderId);
+            }
+            
+            await LoadAssignedOrders();
+            lastRefreshTime = DateTime.Now;
+            StateHasChanged();
+        });
+    }
+
+    private async void HandleOrderAssigned(int orderId)
+    {
+        await InvokeAsync(async () =>
+        {
+            signalREventCount++;
+            Snackbar.Add($"🎯 Đơn hàng mới #{orderId}", Severity.Success);
+            
+            await LoadData();
+            lastRefreshTime = DateTime.Now;
+            StateHasChanged();
+        });
+    }
+
+    private async void HandleYourOrderStatusChanged(int orderId, int userId, int statusId, string statusName)
+    {
+        await InvokeAsync(async () =>
+        {
+            signalREventCount++;
+            Snackbar?.Add($"🔔 Order #{orderId}: {statusName}", Severity.Info);
+            
+            if (orderConfirmationRef != null)
+            {
+                await orderConfirmationRef.OnYourOrderStatusChanged(orderId, userId, statusId, statusName);
+            }
+            
+            await LoadData();
+            lastRefreshTime = DateTime.Now;
+            StateHasChanged();
+        });
+    }
+
+    // ✅ DATA LOADING METHODS
+    private async Task LoadData()
+    {
+        isLoadingData = true;
+        try
+        {
+            await LoadAssignedOrders();
+            await LoadSummary();
+            lastRefreshTime = DateTime.Now;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading data: {ex.Message}");
+            Snackbar.Add($"Lỗi tải dữ liệu: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoadingData = false;
+        }
+    }
+
+    // ✅ LOAD ASSIGNED ORDERS - FILTER BY CURRENT SHIPPER
+    // ✅ ĐƠN GIẢN NHẤT - TIN TƯỞNG API GetMyAssignedOrdersAsync()
+private async Task LoadAssignedOrders()
+{
+    try
+    {
+        Console.WriteLine($"🔍 Loading my assigned orders...");
+        
+        // ✅ API GetMyAssignedOrdersAsync() đã filter theo JWT token rồi
+        // Không cần filter thêm gì nữa
+        myAssignedOrders = await ShipmentService.GetMyAssignedOrdersAsync(currentShipperProfile.ShipperId);
+
+        Console.WriteLine($"✅ Loaded {myAssignedOrders.Count} assigned orders from API");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error loading assigned orders: {ex.Message}");
+        myAssignedOrders = new List<AssignedOrderVM>();
+        throw;
+    }
+}
+
+    private async Task LoadSummary()
+    {
+        try
+        {
+            if (currentShipperProfile != null)
+            {
+                summary = await ShipmentService.GetShipperDashboardSummaryAsync(currentShipperProfile.ShipperId);
+                Console.WriteLine($"✅ Loaded summary for shipper {currentShipperProfile.ShipperId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading summary: {ex.Message}");
+        }
+    }
+
+    // ✅ LOAD ORDER DASHBOARD - CHỈ NẾU THUỘC VỀ SHIPPER
+    private async Task LoadOrderDashboard(int orderId)
+    {
+        try
+        {
+            if (currentShipperProfile == null)
+            {
+                Snackbar.Add("Không xác định được thông tin shipper", Severity.Error);
+                return;
+            }
+
+            Console.WriteLine($"🔍 Loading dashboard for order {orderId}");
+            
+            var dashboard = await ShipmentService.GetShipmentDashboardByOrderIdAsync(orderId);
+            
+            if (dashboard == null)
+            {
+                Console.WriteLine($"❌ Dashboard not found for order {orderId}");
+                currentDashboard = null;
+                return;
+            }
+
+            // ✅ KIỂM TRA QUYỀN TRUY CẬP
+            if (dashboard.ShipmentInfo?.ShipperId != currentShipperProfile.ShipperId)
+            {
+                Console.WriteLine($"❌ Order {orderId} không thuộc về shipper {currentShipperProfile.ShipperId}");
+                Snackbar.Add("Bạn không có quyền truy cập đơn hàng này", Severity.Warning);
+                currentDashboard = null;
+                return;
+            }
+            
+            currentDashboard = dashboard;
+            Console.WriteLine($"✅ Loaded dashboard for order {orderId}");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading order dashboard: {ex.Message}");
+            currentDashboard = null;
+        }
+    }
+
+    // ✅ EVENT HANDLERS
+    private async Task HandleOrderConfirmed(ShipmentDashboardVM dashboard)
+    {
+        Console.WriteLine($"✅ Order confirmed: {dashboard.OrderInfo.OrderId}");
+        await LoadData();
+        currentDashboard = dashboard;
+        Snackbar.Add($"✅ Đã nhận đơn hàng #{dashboard.OrderInfo.OrderId}!", Severity.Success);
+    }
+
+    private async Task HandleStatusUpdated()
+    {
+        Console.WriteLine("✅ Status updated, refreshing...");
+        await LoadData();
+        if (currentDashboard != null)
+        {
+            await LoadOrderDashboard(currentDashboard.OrderInfo.OrderId);
+        }
+        Snackbar.Add("Cập nhật thành công", Severity.Success);
+    }
+
+    // ✅ UI ACTIONS
+    private async Task RefreshData()
+    {
+        await LoadData();
+        Snackbar.Add("Đã làm mới", Severity.Info);
+    }
+
+    private void ToggleFilter()
+    {
+        Snackbar.Add("Filter coming soon", Severity.Info);
+    }
+
+    // ✅ DISPOSAL
+    public void Dispose()
+    {
+        try
+        {
+            if (SignalRService != null)
+            {
+                SignalRService.ShipmentStatusUpdated -= HandleShipmentStatusUpdated;
+                SignalRService.YourOrderAssignedToShipper -= HandleOrderAssigned;
+                SignalRService.OrderStatusChanged -= HandleYourOrderStatusChanged;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error disposing: {ex.Message}");
+        }
+    }
+}

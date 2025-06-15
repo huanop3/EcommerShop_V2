@@ -1,0 +1,679 @@
+@page "/orders"
+@page "/my-orders"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using BlazorWebApp.Services
+@using MainEcommerceService.Models.ViewModel
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject OrderService OrderService
+@inject UserService UserService
+@inject NavigationManager Navigation
+@inject SignalRService SignalRService
+@inject ToastService ToastService
+@attribute [Authorize]
+
+<PageTitle>My Orders - Grabit</PageTitle>
+<link href="css/my-order.css" rel="stylesheet" />
+
+<div class="order-confirmation-container">
+    @if (isLoading)
+    {
+        <div class="loading-section">
+            <div class="loading-content">
+                <div class="loading-spinner">
+                    <i class="fas fa-spinner fa-spin"></i>
+                </div>
+                <h3>Loading Your Orders...</h3>
+                <p>Please wait while we fetch your order history.</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="header-content">
+                <div class="header-info">
+                    <h1 class="page-title">
+                        <i class="fas fa-shopping-bags"></i>
+                        My Orders
+                    </h1>
+                    <p class="page-subtitle">Track and manage all your orders</p>
+                </div>
+                
+                <div class="header-stats">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-receipt"></i>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-number">@totalOrders</div>
+                            <div class="stat-label">Total Orders</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon active">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-number">@activeOrders</div>
+                            <div class="stat-label">Active Orders</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon completed">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-number">@completedOrders</div>
+                            <div class="stat-label">Completed</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Section -->
+        <div class="filter-section">
+            <div class="filter-content">
+                <div class="filter-group">
+                    <label for="statusFilter">Filter by Status:</label>
+                    <select id="statusFilter" @bind="selectedStatusFilter" @bind:after="FilterOrders" class="filter-select">
+                        <option value="">All Orders</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Confirmed">Confirmed</option>
+                        <option value="Processing">Processing</option>
+                        <option value="Shipped">Shipped</option>
+                        <option value="In Transit">In Transit</option>
+                        <option value="Out for Delivery">Out for Delivery</option>
+                        <option value="Delivered">Delivered</option>
+                        <option value="Cancelled">Cancelled</option>
+                        <option value="Returned">Returned</option>
+                        <option value="Refunded">Refunded</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="dateFilter">Filter by Date:</label>
+                    <select id="dateFilter" @bind="selectedDateFilter" @bind:after="FilterOrders" class="filter-select">
+                        <option value="">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                        <option value="3months">Last 3 Months</option>
+                        <option value="6months">Last 6 Months</option>
+                        <option value="year">This Year</option>
+                    </select>
+                </div>
+                
+                <div class="filter-actions">
+                    <button class="btn btn-secondary" @onclick="ClearFilters">
+                        <i class="fas fa-times"></i>
+                        Clear Filters
+                    </button>
+                    <button class="btn btn-info" @onclick="RefreshOrders" disabled="@isRefreshing">
+                        @if (isRefreshing)
+                        {
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <span>Refreshing...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-sync-alt"></i>
+                            <span>Refresh</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Orders List -->
+        <div class="orders-section">
+            @if (filteredOrders?.Any() == true)
+            {
+                <div class="orders-grid">
+                    @foreach (var order in filteredOrders.OrderByDescending(o => o.OrderDate))
+                    {
+                        <div class="order-card @GetOrderCardClass(order)" @onclick="() => ViewOrderDetails(order.OrderId)">
+                            <!-- Order Header -->
+                            <div class="order-header">
+                                <div class="order-id">
+                                    <span class="order-label">Order</span>
+                                    <span class="order-number">#ORD-@order.OrderId</span>
+                                </div>
+                                
+                                <div class="order-status">
+                                    <span class="status-badge @GetOrderStatusBadgeClass(order)">
+                                        @GetOrderStatusDisplayName(order)
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Order Info -->
+                            <div class="order-info">
+                                <div class="order-meta">
+                                    <div class="meta-item">
+                                        <i class="fas fa-calendar-alt"></i>
+                                        <span class="meta-label">Ordered:</span>
+                                        <span class="meta-value">@order.OrderDate.ToString("MMM dd, yyyy")</span>
+                                    </div>
+                                    
+                                    @if (order.UpdatedAt.HasValue && order.UpdatedAt != order.OrderDate)
+                                    {
+                                        <div class="meta-item">
+                                            <i class="fas fa-clock"></i>
+                                            <span class="meta-label">Updated:</span>
+                                            <span class="meta-value">@order.UpdatedAt.Value.ToString("MMM dd, yyyy HH:mm")</span>
+                                        </div>
+                                    }
+                                    
+                                    <div class="meta-item">
+                                        <i class="fas fa-box"></i>
+                                        <span class="meta-label">Items:</span>
+                                        <span class="meta-value">@(order.OrderItems?.Count() ?? 0) item(s)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Order Items Preview -->
+                            @if (order.OrderItems?.Any() == true)
+                            {
+                                <div class="order-items-preview">
+                                    @{
+                                        var previewItems = order.OrderItems.Take(3);
+                                        var remainingCount = order.OrderItems.Count() - 3;
+                                    }
+                                    
+                                    @foreach (var item in previewItems)
+                                    {
+                                        <div class="preview-item">
+                                            <div class="item-placeholder">
+                                                <i class="fas fa-cube"></i>
+                                            </div>
+                                            <div class="item-details">
+                                                <div class="item-name">Product #@item.ProductId</div>
+                                                <div class="item-quantity">Qty: @item.Quantity</div>
+                                            </div>
+                                        </div>
+                                    }
+                                    
+                                    @if (remainingCount > 0)
+                                    {
+                                        <div class="more-items">
+                                            <span>+@remainingCount more item(s)</span>
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            <!-- Order Total -->
+                            <div class="order-footer">
+                                <div class="order-total">
+                                    <span class="total-label">Total:</span>
+                                    <span class="total-amount">$@order.TotalAmount.ToString("F2")</span>
+                                </div>
+                                
+                                <div class="order-actions-preview">
+                                    <button class="btn-link view-details" @onclick:stopPropagation="true" @onclick="() => ViewOrderDetails(order.OrderId)">
+                                        <i class="fas fa-eye"></i>
+                                        View Details
+                                    </button>
+                                    
+                                    @if (CanCancelOrder(order))
+                                    {
+                                        <button class="btn-link cancel-order" @onclick:stopPropagation="true" @onclick="() => ShowCancelDialog(order.OrderId)">
+                                            <i class="fas fa-times"></i>
+                                            Cancel
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+
+                            <!-- Hover Effect Overlay -->
+                            <div class="card-overlay">
+                                <div class="overlay-content">
+                                    <i class="fas fa-arrow-right"></i>
+                                    <span>Click to view details</span>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else if (!isLoading)
+            {
+                <div class="no-orders">
+                    <div class="no-orders-content">
+                        <div class="no-orders-icon">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <h3>No Orders Found</h3>
+                        <p>@GetNoOrdersMessage()</p>
+                        <div class="no-orders-actions">
+                            <a href="/products" class="btn btn-primary">
+                                <i class="fas fa-shopping-bag"></i>
+                                Start Shopping
+                            </a>
+                            @if (!string.IsNullOrEmpty(selectedStatusFilter) || !string.IsNullOrEmpty(selectedDateFilter))
+                            {
+                                <button class="btn btn-secondary" @onclick="ClearFilters">
+                                    <i class="fas fa-filter"></i>
+                                    Clear Filters
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Cancel Order Dialog -->
+        @if (showCancelDialog)
+        {
+            <div class="modal-overlay" @onclick="HideCancelDialog">
+                <div class="cancel-dialog" @onclick:stopPropagation="true">
+                    <div class="dialog-header">
+                        <h3>Cancel Order</h3>
+                        <button class="close-btn" @onclick="HideCancelDialog">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="dialog-content">
+                        <div class="warning-message">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <p>Are you sure you want to cancel this order?</p>
+                            <small>This action cannot be undone.</small>
+                        </div>
+                        
+                        <div class="order-info">
+                            <div class="info-row">
+                                <span class="label">Order:</span>
+                                <span class="value">#ORD-@orderToCancel</span>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="cancelReason">Reason for cancellation (optional):</label>
+                            <textarea id="cancelReason" @bind="cancelReason" 
+                                     placeholder="Please let us know why you're cancelling this order..."
+                                     rows="3" class="form-control"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="dialog-actions">
+                        <button class="btn btn-secondary" @onclick="HideCancelDialog" disabled="@isCancelling">
+                            Keep Order
+                        </button>
+                        <button class="btn btn-danger" @onclick="ConfirmCancelOrder" disabled="@isCancelling">
+                            @if (isCancelling)
+                            {
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <span>Cancelling...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-times"></i>
+                                <span>Confirm Cancel</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    // Data
+    private List<OrderVM> allOrders = new();
+    private List<OrderVM> filteredOrders = new();
+    private int? currentUserId;
+    private ProfileVM? userProfile;
+    
+    // Statistics
+    private int totalOrders => allOrders?.Count ?? 0;
+    private int activeOrders => allOrders?.Count(o => !IsCompletedOrCancelledOrder(o)) ?? 0;
+    private int completedOrders => allOrders?.Count(o => IsCompletedOrder(o)) ?? 0;
+    
+    // UI State
+    private bool isLoading = true;
+    private bool isRefreshing = false;
+    
+    // Filters
+    private string selectedStatusFilter = "";
+    private string selectedDateFilter = "";
+    public bool signalRConnected = false;
+    // Cancel Dialog
+    private bool showCancelDialog = false;
+    private int orderToCancel = 0;
+    private string cancelReason = "";
+    private bool isCancelling = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await GetCurrentUserAsync();
+            if (!currentUserId.HasValue)
+            {
+                Navigation.NavigateTo("/login", true);
+                return;
+            }
+
+            await LoadUserOrdersAsync();
+            await InitializeSignalRAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error in OnInitializedAsync: {ex.Message}");
+            ToastService?.ShowError("Error loading orders");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task GetCurrentUserAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState?.User;
+        if (user?.Identity?.IsAuthenticated == true)
+        {
+            var userIdClaim = user.Claims?.FirstOrDefault(c => c.Type == "UserId");
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+            {
+                currentUserId = userId;
+                Console.WriteLine($"✅ Current UserId: {currentUserId}");
+            }
+        }
+    }
+
+    private async Task LoadUserOrdersAsync()
+    {
+        if (!currentUserId.HasValue) return;
+
+        try
+        {
+            Console.WriteLine($"🔧 Loading orders for user: {currentUserId}");
+            
+            var orders = await OrderService.GetOrdersByUserIdAsync(currentUserId.Value);
+            allOrders = orders?.ToList() ?? new List<OrderVM>();
+            
+            Console.WriteLine($"✅ Loaded {allOrders.Count} orders");
+            
+            // Apply current filters
+            ApplyFilters();
+            
+            // Load user profile for additional info
+            userProfile = await UserService.GetProfileAsync(currentUserId.Value);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading orders: {ex.Message}");
+            allOrders = new List<OrderVM>();
+            filteredOrders = new List<OrderVM>();
+        }
+    }
+
+    private async Task RefreshOrders()
+    {
+        if (isRefreshing) return;
+        
+        try
+        {
+            isRefreshing = true;
+            StateHasChanged();
+            
+            await LoadUserOrdersAsync();
+            ToastService?.ShowSuccess("Orders refreshed successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error refreshing orders: {ex.Message}");
+            ToastService?.ShowError("Failed to refresh orders");
+        }
+        finally
+        {
+            isRefreshing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ApplyFilters()
+    {
+        filteredOrders = allOrders.AsEnumerable().ToList();
+
+        // Status filter
+        if (!string.IsNullOrEmpty(selectedStatusFilter))
+        {
+            filteredOrders = filteredOrders.Where(o => GetOrderStatusName(o).Equals(selectedStatusFilter, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        // Date filter
+        if (!string.IsNullOrEmpty(selectedDateFilter))
+        {
+            var now = DateTime.Now;
+            filteredOrders = selectedDateFilter switch
+            {
+                "today" => filteredOrders.Where(o => o.OrderDate.Date == now.Date).ToList(),
+                "week" => filteredOrders.Where(o => o.OrderDate >= now.AddDays(-7)).ToList(),
+                "month" => filteredOrders.Where(o => o.OrderDate >= now.AddDays(-30)).ToList(),
+                "3months" => filteredOrders.Where(o => o.OrderDate >= now.AddDays(-90)).ToList(),
+                "6months" => filteredOrders.Where(o => o.OrderDate >= now.AddDays(-180)).ToList(),
+                "year" => filteredOrders.Where(o => o.OrderDate.Year == now.Year).ToList(),
+                _ => filteredOrders
+            };
+        }
+
+        filteredOrders = filteredOrders.ToList();
+        Console.WriteLine($"🔍 Applied filters: {filteredOrders.Count()} orders match criteria");
+    }
+
+    private async Task FilterOrders()
+    {
+        ApplyFilters();
+        StateHasChanged();
+    }
+
+    private async Task ClearFilters()
+    {
+        selectedStatusFilter = "";
+        selectedDateFilter = "";
+        ApplyFilters();
+        StateHasChanged();
+    }
+
+    private void ViewOrderDetails(int orderId)
+    {
+        Navigation.NavigateTo($"/order-detail/{orderId}");
+    }
+
+    private void ShowCancelDialog(int orderId)
+    {
+        orderToCancel = orderId;
+        cancelReason = "";
+        showCancelDialog = true;
+        StateHasChanged();
+    }
+
+    private void HideCancelDialog()
+    {
+        showCancelDialog = false;
+        orderToCancel = 0;
+        cancelReason = "";
+        StateHasChanged();
+    }
+    public async Task InitializeSignalRAsync()
+    {
+        await SignalRService.StartConnectionAsync();
+        SignalRService.YourOrderStatusChanged += OnYourOrderStatusChanged;
+        SignalRService.OrderStatusChanged += OnOrderStatusChanged;
+    }
+    public async void OnYourOrderStatusChanged(int orderId, string statusName, string message)
+    {
+        
+        await InvokeAsync(async () =>
+        {
+            await LoadUserOrdersAsync(); // Refresh orders after status change
+            ToastService?.ShowInfo($"Trạng thái đơn hàng {orderId} đã cập nhật: {statusName}");
+            StateHasChanged();
+        });
+    }
+    private async void OnOrderStatusChanged(int orderId, int userId, int statusId, string statusName)
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadUserOrdersAsync(); // Refresh orders after status change
+            ToastService?.ShowInfo($"Trạng thái đơn hàng {orderId} đã cập nhật: {statusName}");
+            StateHasChanged();
+        });
+    }
+    private async Task ConfirmCancelOrder()
+    {
+        if (orderToCancel == 0 || isCancelling) return;
+
+        try
+        {
+            isCancelling = true;
+            StateHasChanged();
+
+            var (success, message) = await OrderService.CancelOrderAsync(orderToCancel, cancelReason);
+            
+            if (success)
+            {
+                await LoadUserOrdersAsync(); // Refresh orders
+                showCancelDialog = false;
+                ToastService?.ShowSuccess(message);
+            }
+            else
+            {
+                ToastService?.ShowError(message);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error cancelling order: {ex.Message}");
+            ToastService?.ShowError("An error occurred while cancelling the order");
+        }
+        finally
+        {
+            isCancelling = false;
+            StateHasChanged();
+        }
+    }
+
+    // Helper Methods
+    private string GetOrderStatusName(OrderVM order)
+    {
+        // You'll need to implement this based on your OrderStatusId mapping
+        // For now, return a placeholder
+        return order.OrderStatusId switch
+        {
+            1 => "Pending",
+            2 => "Confirmed", 
+            3 => "Processing",
+            4 => "Shipped",
+            5 => "In Transit",
+            6 => "Out for Delivery",
+            7 => "Delivered",
+            8 => "Cancelled",
+            9 => "Returned",
+            10 => "Refunded",
+            _ => "Unknown"
+        };
+    }
+
+    private string GetOrderStatusDisplayName(OrderVM order)
+    {
+        return GetOrderStatusName(order) switch
+        {
+            "Pending" => "Chờ xác nhận",
+            "Confirmed" => "Đã xác nhận",
+            "Processing" => "Đang chuẩn bị",
+            "Shipped" => "Đã giao ĐVVC",
+            "In Transit" => "Đang vận chuyển",
+            "Out for Delivery" => "Đang giao hàng",
+            "Delivered" => "Đã giao hàng",
+            "Cancelled" => "Đã hủy",
+            "Returned" => "Đã trả hàng",
+            "Refunded" => "Đã hoàn tiền",
+            _ => GetOrderStatusName(order)
+        };
+    }
+
+    private string GetOrderStatusBadgeClass(OrderVM order)
+    {
+        return GetOrderStatusName(order).ToLower() switch
+        {
+            "pending" => "badge-warning",
+            "confirmed" => "badge-info",
+            "processing" => "badge-primary",
+            "shipped" or "in transit" or "out for delivery" => "badge-info",
+            "delivered" => "badge-success",
+            "cancelled" => "badge-danger",
+            "returned" => "badge-warning",
+            "refunded" => "badge-success",
+            _ => "badge-secondary"
+        };
+    }
+
+    private string GetOrderCardClass(OrderVM order)
+    {
+        return GetOrderStatusName(order).ToLower() switch
+        {
+            "pending" => "order-pending",
+            "confirmed" => "order-confirmed",
+            "processing" => "order-processing", 
+            "shipped" or "in transit" or "out for delivery" => "order-shipping",
+            "delivered" => "order-delivered",
+            "cancelled" => "order-cancelled",
+            "returned" => "order-returned",
+            "refunded" => "order-refunded",
+            _ => "order-default"
+        };
+    }
+
+    private bool CanCancelOrder(OrderVM order)
+    {
+        var status = GetOrderStatusName(order).ToLower();
+        return status == "pending" || status == "confirmed";
+    }
+
+    private bool IsCompletedOrder(OrderVM order)
+    {
+        var status = GetOrderStatusName(order).ToLower();
+        return status == "delivered" || status == "refunded";
+    }
+
+    private bool IsCompletedOrCancelledOrder(OrderVM order)
+    {
+        var status = GetOrderStatusName(order).ToLower();
+        return status == "delivered" || status == "cancelled" || status == "returned" || status == "refunded";
+    }
+
+    private string GetNoOrdersMessage()
+    {
+        if (!string.IsNullOrEmpty(selectedStatusFilter) || !string.IsNullOrEmpty(selectedDateFilter))
+        {
+            return "No orders match your current filters. Try adjusting your search criteria.";
+        }
+        return "You haven't placed any orders yet. Start shopping to see your orders here!";
+    }
+    // ✅ SỬA: Cập nhật dispose để clear cache
+    public async ValueTask DisposeAsync()
+    {
+        // Unsubscribe from SignalR events
+        SignalRService.YourOrderStatusChanged -= OnYourOrderStatusChanged;
+        SignalRService.OrderStatusChanged -= OnOrderStatusChanged;
+        if (SignalRService != null)
+        {
+            await SignalRService.DisposeAsync();
+        }
+    }
+}

@@ -1,0 +1,34 @@
+﻿@using Microsoft.JSInterop
+@inherits LayoutComponentBase
+@inject IJSRuntime JSRuntime
+
+<LoadingScreen IsVisible="@isLoading" />
+
+<div class="page @(isLoading ? "hidden" : "")">
+  <HeaderComponent/>
+    <main>
+        @Body
+    </main>
+    <FooterComponent/>
+</div>
+
+<!-- Add Toast Container -->
+<ToastContainer />
+
+<!-- Add JavaScript -->
+<script src="js/toast.js"></script>
+
+@code {
+    private bool isLoading = true;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Giả lập thời gian load (có thể thay bằng logic kiểm tra tài nguyên thực tế)
+            await Task.Delay(1500);
+            
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+}

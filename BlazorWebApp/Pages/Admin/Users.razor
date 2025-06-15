@@ -1,0 +1,368 @@
+@page "/admin/users"
+@using BlazorWebApp.Pages.Admin.Dialogs
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using System.ComponentModel.DataAnnotations
+@using BlazorWebApp.Services
+@using MainEcommerceService.Models.ViewModel
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject UserService UserService
+@inject AddressService AddressService
+@layout _AdminLayout
+@inject SignalRService SignalRService
+@attribute [Authorize(Roles = "Admin")]
+<PageTitle>Users Management - Grabit</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12">
+        <MudPaper Elevation="0" Class="d-flex align-center justify-space-between pa-4"
+            Style="background-color: white; border-radius: 4px;">
+            <MudText Typo="Typo.h4">Users</MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+<MudGrid Class="mt-4">
+    <MudItem xs="12">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
+            <MudGrid>
+                <MudItem xs="12" md="8">
+                    <MudTextField @bind-Value="searchString" Placeholder="Search users..." Adornment="Adornment.Start"
+                        AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" Class="mt-0" />
+                </MudItem>
+                <MudItem xs="12" md="4" Class="d-flex justify-end">
+                    <MudSelect T="string" Label="Role" @bind-Value="selectedRole" Placeholder="Select Roles" Class="mr-2">
+                        <MudSelectItem Value="@("")">All Roles</MudSelectItem>
+                        @foreach (var role in availableRoles)
+                        {
+                            <MudSelectItem Value="@role.RoleName">@role.RoleName</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudSelect T="string" Label="Status" @bind-Value="selectedStatus" Placeholder="Select Status" Class="mr-2">
+                        <MudSelectItem Value="@("")">All Statuses</MudSelectItem>
+                        <MudSelectItem Value="@("Active")">Active</MudSelectItem>
+                        <MudSelectItem Value="@("Inactive")">Inactive</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+            </MudGrid>
+
+            <MudTable Items="@FilteredUsers" Dense="false" Hover="true" Bordered="false" Striped="false"
+                Loading="@isLoading" LoadingProgressColor="Color.Primary" FixedHeader="false" Elevation="0" Class="mt-3"
+                Breakpoint="Breakpoint.Sm" @bind-RowsPerPage="pageSize">
+                <HeaderContent>
+                    <MudTh Style="width: 80px">User ID</MudTh>
+                    <MudTh Style="width: 120px">Username</MudTh>
+                    <MudTh Style="width: 180px">Full Name</MudTh>
+                    <MudTh>Email</MudTh>
+                    <MudTh Style="width: 120px">Role</MudTh>
+                    <MudTh Style="width: 120px">Joined Date</MudTh>
+                    <MudTh Style="width: 80px; text-align: center">Status</MudTh>
+                    <MudTh Style="width: 100px; text-align: center">Addresses</MudTh>
+                    <MudTh Style="width: 80px; text-align: center">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="User ID">@context.Id</MudTd>
+                    <MudTd DataLabel="Username">
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">@context.UserName</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Full Name">
+                        <div class="d-flex align-center">
+                            <MudAvatar Size="Size.Small" Class="mr-2">@GetInitials(context)</MudAvatar>
+                            <MudText Typo="Typo.body1">@GetFullName(context)</MudText>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Email">@context.Email</MudTd>
+                    <MudTd DataLabel="Role">
+                        <div class="d-flex align-center">
+                            <MudChip T="string" Color="@GetRoleColor(context.Role)" Size="Size.Small"
+                                Variant="Variant.Filled" Class="mr-2">
+                                @context.Role
+                            </MudChip>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Joined Date">@(context.JoinedDate?.ToShortDateString() ?? "N/A")</MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudIcon Icon="@Icons.Material.Filled.Circle" 
+                                 Color="@(context.IsActive == true ? Color.Success : Color.Default)" 
+                                 Size="Size.Small" />
+                    </MudTd>
+                    <MudTd DataLabel="Addresses">
+                        <MudIconButton Icon="@Icons.Material.Filled.LocationOn" 
+                                     Color="Color.Primary" Size="Size.Small"
+                                     OnClick="@(() => ViewUserAddresses(context))"
+                                     Title="View Addresses">
+                        </MudIconButton>
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                            OnClick="@(() => OpenUserManagementDialog(context))">Edit User</MudIconButton>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 5, 10, 25, 50 }" />
+                </PagerContent>
+                <NoRecordsContent>
+                    <MudText>No users found</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private bool isLoading = true;
+    private string searchString = "";
+    private string selectedRole = "";
+    private string selectedStatus = "";
+    private int pageSize = 5;
+
+    private List<UserVM> users = new();
+    private List<RoleVM> availableRoles = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        RegisterSignalRHandlers();
+        await SignalRService.StartConnectionAsync();
+        await Task.WhenAll(LoadRolesAsync(), LoadUsersAsync());
+    }
+
+    private void RegisterSignalRHandlers()
+    {
+        SignalRService.UserCreated += HandleUserCreated;
+        SignalRService.UserUpdated += HandleUserUpdated;
+        SignalRService.UserDeleted += HandleUserDeleted;
+        SignalRService.UserStatusChanged += HandleUserStatusChanged;
+        SignalRService.UserRoleUpdated += HandleUserRoleUpdated;
+    }
+
+    // 🔥 OPTIMIZED: Debounced refresh để tránh multiple refreshes
+    private Timer? _refreshTimer;
+    private readonly object _refreshLock = new object();
+
+    private void RefreshUsers()
+    {
+        lock (_refreshLock)
+        {
+            _refreshTimer?.Dispose();
+            _refreshTimer = new Timer(async _ =>
+            {
+                await InvokeAsync(async () =>
+                {
+                    var previousCount = users.Count;
+                    await LoadUsersAsync();
+                    
+                    var newCount = users.Count;
+                    if (newCount != previousCount)
+                    {
+                        Console.WriteLine($"🔄 Users list updated: {previousCount} → {newCount} users");
+                    }
+                    
+                    StateHasChanged();
+                });
+            }, null, TimeSpan.FromMilliseconds(300), Timeout.InfiniteTimeSpan); // Debounce 300ms
+        }
+    }
+    private void HandleUserUpdated(int userId, string username)
+    {
+        Console.WriteLine($"🔔 Admin Users page received UserUpdated: UserId={userId}, Username={username}");
+        RefreshUsers();
+        Snackbar.Add($"User updated: {username} (ID: {userId})", Severity.Info);
+    }
+
+    private void HandleUserCreated(string username)
+    {
+        Console.WriteLine($"🔔 Admin Users page received UserCreated: Username={username}");
+        RefreshUsers();
+        Snackbar.Add($"New user registered: {username}", Severity.Info);
+    }
+
+    private void HandleUserDeleted(int userId)
+    {
+        Console.WriteLine($"🔔 Admin Users page received UserDeleted: UserId={userId}");
+        RefreshUsers();
+        Snackbar.Add($"User with ID {userId} has been deleted", Severity.Warning);
+    }
+
+    private void HandleUserStatusChanged(int userId, string status)
+    {
+        Console.WriteLine($"🔔 Admin Users page received UserStatusChanged: UserId={userId}, Status={status}");
+        RefreshUsers();
+        
+        var user = users.FirstOrDefault(u => u.Id == userId);
+        var username = user?.UserName ?? $"User {userId}";
+        
+        var severity = status == "Active" ? Severity.Success : Severity.Warning;
+        Snackbar.Add($"User {username} status changed to {status}", severity);
+    }
+    private void HandleUserRoleUpdated(int userId,string userName, string newRole)
+    {
+        RefreshUsers();
+        
+        var user = users.FirstOrDefault(u => u.Id == userId);
+        var username = user?.UserName ?? $"User {userId}";
+        
+        Snackbar.Add($"User {username} role updated to {newRole}", Severity.Info);
+    }
+    private async Task LoadRolesAsync()
+    {
+        try
+        {
+            var roles = await UserService.GetAllRoleAsync();
+            availableRoles = roles?.ToList() ?? new List<RoleVM>();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading roles: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        try
+        {
+            isLoading = true;
+            var fetchedUsers = await UserService.GetAllUserAsync();
+            users = fetchedUsers?.ToList() ?? new List<UserVM>();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading users: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private IEnumerable<UserVM> FilteredUsers => users
+        .Where(u => string.IsNullOrWhiteSpace(searchString) ||
+            u.FirstName.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+            u.LastName.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+            $"{u.FirstName} {u.LastName}".Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+            u.Email.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+            u.UserName.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+            u.Id.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase))
+        .Where(u => string.IsNullOrWhiteSpace(selectedRole) || u.Role == selectedRole)
+        .Where(u => string.IsNullOrWhiteSpace(selectedStatus) ||
+            (selectedStatus == "Active" && u.IsActive == true) ||
+            (selectedStatus == "Inactive" && u.IsActive != true));
+
+    private string GetUserDisplayInfo(UserVM user, string property)
+    {
+        return property switch
+        {
+            "FullName" => $"{user.FirstName} {user.LastName}".Trim(),
+            "Initials" => GetUserInitials(user.FirstName, user.LastName),
+            _ => ""
+        };
+    }
+
+    private string GetUserInitials(string firstName, string lastName)
+    {
+        var fn = firstName?.Trim() ?? "";
+        var ln = lastName?.Trim() ?? "";
+        
+        if (string.IsNullOrEmpty(fn) && string.IsNullOrEmpty(ln)) return "?";
+        if (string.IsNullOrEmpty(ln)) return fn.Length > 0 ? fn[0].ToString().ToUpper() : "?";
+        if (string.IsNullOrEmpty(fn)) return ln.Length > 0 ? ln[0].ToString().ToUpper() : "?";
+        
+        return $"{fn[0]}{ln[0]}".ToUpper();
+    }
+
+    private Color GetRoleColor(string role) => role switch
+    {
+        "Admin" => Color.Error,
+        "Customer" => Color.Info,
+        "Seller" => Color.Success,
+        "Shipper" => Color.Primary,
+        _ => Color.Default
+    };
+
+    private string GetFullName(UserVM user) => $"{user.FirstName} {user.LastName}".Trim();
+
+    private string GetInitials(UserVM user) => GetUserInitials(user.FirstName, user.LastName);
+
+    private async Task OpenUserManagementDialog(UserVM user)
+    {
+        try
+        {
+            var userCopy = new UserVM
+            {
+                Id = user.Id,
+                UserName = user.UserName,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Email = user.Email,
+                Role = user.Role,
+                IsActive = user.IsActive,
+                IsDeleted = user.IsDeleted,
+                JoinedDate = user.JoinedDate
+            };
+
+            var parameters = new DialogParameters
+            {
+                ["User"] = userCopy,
+                ["AvailableRoles"] = availableRoles
+            };
+
+            var options = new DialogOptions
+            {
+                CloseButton = true,
+                MaxWidth = MaxWidth.Medium,
+                FullWidth = true
+            };
+
+            var dialog = await DialogService.ShowAsync<UserManagementDialog>($"User Management", parameters, options);
+            var result = await dialog.Result;
+
+            if (!result.Canceled)
+            {
+                await LoadUsersAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ViewUserAddresses(UserVM user)
+    {
+        try
+        {
+            var addresses = await AddressService.GetAddressesByUserIdAsync(user.Id);
+            var userAddresses = addresses?.ToList() ?? new List<AddressVM>();
+
+            var parameters = new DialogParameters
+            {
+                ["User"] = user,
+                ["Addresses"] = userAddresses
+            };
+
+            var options = new DialogOptions
+            {
+                CloseButton = true,
+                MaxWidth = MaxWidth.Large,
+                FullWidth = true
+            };
+            
+            await DialogService.ShowAsync<UserAddressManagementDialog>($"Addresses for {GetFullName(user)}", parameters, options);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading addresses: {ex.Message}", Severity.Error);
+        }
+    }
+
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
+        SignalRService.UserCreated -= HandleUserCreated;
+        SignalRService.UserUpdated -= HandleUserUpdated;
+        SignalRService.UserDeleted -= HandleUserDeleted;
+        SignalRService.UserStatusChanged -= HandleUserStatusChanged;
+        SignalRService.UserRoleUpdated -= HandleUserRoleUpdated;
+    }
+}
+

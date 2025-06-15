@@ -1,0 +1,899 @@
+@page "/cart"
+@using ProductService.Models.ViewModel
+@using MainEcommerceService.Models.ViewModel
+@using BlazorWebApp.Services
+@inject ToastService ToastService
+@inject NavigationManager Navigation
+@inject CouponService CouponService
+
+<PageTitle>Shopping Cart</PageTitle>
+
+<link href="css/cart.css" rel="stylesheet" />
+
+<div class="cart-container">
+    <div class="border-container">
+        <div class="breadcrumb">
+            <div class="container">
+                <a href="/">Home</a> / <span>Cart</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="cart-section">
+        <div class="container">
+            <h2 class="section-title">
+                <i class="fas fa-shopping-cart"></i>
+                Shopping Cart
+            </h2>
+            
+            @if (cartItems.Count > 0)
+            {
+                <div class="cart-actions">
+                    <span class="cart-count">
+                        <i class="fas fa-list me-1"></i>
+                        <span class="badge">@cartItems.Count</span> item@(cartItems.Count > 1 ? "s" : "") in cart
+                    </span>
+                    <div class="cart-action-buttons">
+                        <a href="/products" class="btn btn-outline">
+                            <i class="fas fa-arrow-left me-1"></i>
+                            Continue Shopping
+                        </a>
+                        <button class="clear-cart" @onclick="ClearCart">
+                            <i class="fas fa-trash me-1"></i>
+                            Clear Cart
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="cart-items">
+                    <div class="table-responsive">
+                        <table class="cart-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Price</th>
+                                    <th>Quantity</th>
+                                    <th>Total</th>
+                                    <th>Remove</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in cartItems)
+                                {
+                                    <tr>
+                                        <td class="product-cell">
+                                            <div class="product-info">
+                                                <div class="product-image">
+                                                    <img src="@GetProductImageUrl(item)" 
+                                                         alt="@item.ProductName" 
+                                                         onerror="this.src='https://via.placeholder.com/80x80/f8f9fa/6c757d?text=Product'" />
+                                                    @if (item.HasDiscount)
+                                                    {
+                                                        <div class="discount-overlay">
+                                                            <span class="discount-percent">
+                                                                @(Math.Round((item.Price - item.UnitPrice) / item.Price * 100))% OFF
+                                                            </span>
+                                                        </div>
+                                                    }
+                                                </div>
+                                                <div class="product-details">
+                                                    <a href="/product/@item.ProductId" class="product-name">
+                                                        @item.ProductName
+                                                    </a>
+                                                    @if (!string.IsNullOrEmpty(item.Description))
+                                                    {
+                                                        <p class="product-description">@item.Description</p>
+                                                    }
+                                                    <small class="added-date">
+                                                        <i class="fas fa-calendar-plus me-1"></i>
+                                                        Added: @item.AddedAt.ToString("MMM dd, yyyy")
+                                                    </small>
+                                                    
+                                                    <!-- Mobile Quantity Controls -->
+                                                    <div class="mobile-quantity d-md-none mt-2">
+    <label class="quantity-label">
+        <i class="fas fa-sort-numeric-up"></i>
+        Quantity:
+    </label>
+    <div class="quantity-controls">
+        <button class="qty-btn qty-decrease" 
+                @onclick="() => DecreaseQuantity(item)"
+                disabled="@(item.CartQuantity <= 1)"
+                title="Decrease quantity">
+            <i class="fas fa-minus"></i>
+        </button>
+        <input type="number" 
+               value="@item.CartQuantity" 
+               @onchange="@((ChangeEventArgs e) => UpdateQuantityFromInput(item, e))"
+               @onblur="@((FocusEventArgs e) => ValidateQuantityInput(item))"
+               class="qty-input" 
+               min="1" 
+               max="99"
+               title="Enter quantity (1-99)" />
+        <button class="qty-btn qty-increase" 
+                @onclick="() => IncreaseQuantity(item)"
+                disabled="@(item.CartQuantity >= 99)"
+                title="Increase quantity">
+            <i class="fas fa-plus"></i>
+        </button>
+    </div>
+</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="price-cell">
+                                            @if (item.HasDiscount)
+                                            {
+                                                <div class="price-container">
+                                                    <span class="old-price">$@item.Price.ToString("F2")</span>
+                                                    <span class="current-price">$@item.UnitPrice.ToString("F2")</span>
+                                                    <span class="discount-badge">
+                                                        @(Math.Round((item.Price - item.UnitPrice) / item.Price * 100))% OFF
+                                                    </span>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <span class="current-price">$@item.UnitPrice.ToString("F2")</span>
+                                            }
+                                        </td>
+                                        <td class="quantity-cell">
+    <div class="quantity-controls">
+        <button class="qty-btn qty-decrease" 
+                @onclick="() => DecreaseQuantity(item)"
+                disabled="@(item.CartQuantity <= 1)"
+                title="Decrease quantity">
+            <i class="fas fa-minus"></i>
+        </button>
+        <input type="number" 
+               value="@item.CartQuantity" 
+               @onchange="@((ChangeEventArgs e) => UpdateQuantityFromInput(item, e))"
+               @onblur="@((FocusEventArgs e) => ValidateQuantityInput(item))"
+               class="qty-input" 
+               min="1" 
+               max="99"
+               title="Enter quantity (1-99)" />
+        <button class="qty-btn qty-increase" 
+                @onclick="() => IncreaseQuantity(item)"
+                disabled="@(item.CartQuantity >= 99)"
+                title="Increase quantity">
+            <i class="fas fa-plus"></i>
+        </button>
+    </div>
+    <div class="quantity-info">
+        <small class="stock-info">
+            <i class="fas fa-box"></i>
+            In Stock
+        </small>
+    </div>
+</td>
+                                        <td class="total-cell">
+                                            <span class="item-total">$@item.TotalPrice.ToString("F2")</span>
+                                            @if (item.HasDiscount)
+                                            {
+                                                <div class="savings-info">
+                                                    Save: $@item.DiscountAmount.ToString("F2")
+                                                </div>
+                                            }
+                                        </td>
+                                        <td class="remove-cell">
+                                            <button class="remove-btn" 
+                                                    @onclick="() => RemoveFromCart(item)"
+                                                    title="Remove from cart">
+                                                <i class="fas fa-trash delete-icon"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Cart Statistics -->
+                <div class="cart-stats">
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-shopping-bag"></i>
+            </div>
+            <div class="stat-content">
+                <h5>Total Items</h5>
+                <span class="stat-number">@cartItems.Count</span>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-layer-group"></i>
+            </div>
+            <div class="stat-content">
+                <h5>Total Quantity</h5>
+                <span class="stat-number">@GetTotalQuantity()</span>
+            </div>
+        </div>
+        
+        <div class="stat-card savings-card">
+            <div class="stat-icon">
+                <i class="fas fa-piggy-bank"></i>
+            </div>
+            <div class="stat-content">
+                <h5>You Save</h5>
+                <span class="stat-number">$@GetTotalSavingsIncludingCoupon().ToString("F2")</span>
+            </div>
+        </div>
+        
+        <div class="stat-card total-card">
+            <div class="stat-icon">
+                <i class="fas fa-calculator"></i>
+            </div>
+            <div class="stat-content">
+                <h5>Total Value</h5>
+                <span class="stat-number">$@TotalAmount.ToString("F2")</span>
+            </div>
+        </div>
+    </div>
+</div>
+                
+                <!-- Cart Summary Section -->
+                <div class="cart-summary">
+                    <div class="row">
+                        <div class="col-lg-8">
+                            <!-- Coupon Section -->
+                            <div class="coupon-section">
+                                <h4>
+                                    <i class="fas fa-ticket-alt me-2"></i>
+                                    Apply Coupon
+                                </h4>
+                                
+                                @if (appliedCoupon == null && !ShowCouponInput)
+                                {
+                                    <button class="coupon-toggle" @onclick="ToggleCouponInput">
+                                        <i class="fas fa-ticket-alt"></i>
+                                        Have a promo code?
+                                    </button>
+                                }
+                                else if (ShowCouponInput && appliedCoupon == null)
+                                {
+                                    <div class="coupon-input-section">
+                                        <div class="coupon-input-group">
+                                            <input type="text" 
+                                                   placeholder="Enter promo code" 
+                                                   @bind="CouponCode" 
+                                                   @onkeypress="OnCouponKeyPress"
+                                                   class="coupon-input" 
+                                                   disabled="@isApplyingCoupon" />
+                                            <button class="btn btn-secondary" 
+                                                    @onclick="ApplyCoupon" 
+                                                    disabled="@(isApplyingCoupon || string.IsNullOrWhiteSpace(CouponCode))">
+                                                @if (isApplyingCoupon)
+                                                {
+                                                    <i class="fas fa-spinner fa-spin"></i>
+                                                    <span>Applying...</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>Apply</span>
+                                                }
+                                            </button>
+                                            <button class="btn btn-outline" @onclick="CancelCouponInput">
+                                                Cancel
+                                            </button>
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(couponError))
+                                        {
+                                            <div class="coupon-error">
+                                                <i class="fas fa-exclamation-circle"></i>
+                                                @couponError
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else if (appliedCoupon != null)
+                                {
+                                    <div class="coupon-applied">
+                                        <div class="coupon-success">
+                                            <i class="fas fa-check-circle"></i>
+                                            <div class="coupon-details">
+                                                <strong>@appliedCoupon.CouponCode</strong>
+                                                
+                                                <span class="discount-info">
+                                                    @if (appliedCoupon.DiscountPercent.HasValue)
+                                                    {
+                                                        <text>@appliedCoupon.DiscountPercent.Value% OFF - Save $@CalculateCouponDiscount().ToString("F2")</text>
+                                                    }
+                                                    else if (appliedCoupon.DiscountAmount.HasValue)
+                                                    {
+                                                        <text>$@appliedCoupon.DiscountAmount.Value OFF</text>
+                                                    }
+                                                </span>
+                                                <span class="coupon-usage">
+                                                    <i class="fas fa-users"></i>
+                                                    Used: @(appliedCoupon.UsageCount ?? 0)/@(appliedCoupon.UsageLimit?.ToString() ?? "∞")
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <button class="remove-coupon-btn" @onclick="RemoveCoupon" title="Remove coupon">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                }
+                                
+                                <!-- Available Coupons -->
+                                @if (availableCoupons != null && availableCoupons.Any() && appliedCoupon == null)
+                                {
+                                    <div class="available-coupons">
+                                        <h5>
+                                            <i class="fas fa-tags me-1"></i>
+                                            Available Coupons (@availableCoupons.Count())
+                                        </h5>
+                                        <div class="coupon-list">
+                                            @foreach (var coupon in availableCoupons.Take(3))
+                                            {
+                                                <div class="coupon-item" @onclick="() => QuickApplyCoupon(coupon.CouponCode)">
+                                                    <div class="coupon-info">
+                                                        <span class="coupon-name">@coupon.CouponCode</span>
+                    
+                                                        <span class="coupon-discount">
+                                                            @if (coupon.DiscountPercent.HasValue)
+                                                            {
+                                                                <text>@coupon.DiscountPercent.Value% OFF</text>
+                                                            }
+                                                            else if (coupon.DiscountAmount.HasValue)
+                                                            {
+                                                                <text>$@coupon.DiscountAmount.Value OFF</text>
+                                                            }
+                                                        </span>
+                                                        <span class="coupon-validity">
+                                                            <i class="fas fa-clock"></i>
+                                                            Valid until @coupon.EndDate.ToString("MMM dd, yyyy")
+                                                        </span>
+                                                    </div>
+                                                    <button class="quick-apply-btn">
+                                                        <i class="fas fa-plus"></i>
+                                                        Apply
+                                                    </button>
+                                                </div>
+                                            }
+                                        </div>
+                                        @if (availableCoupons.Count() > 3)
+                                        {
+                                            <div class="view-all-coupons">
+                                                <button class="btn btn-outline btn-sm" @onclick="ToggleAllCoupons">
+                                                    @if (showAllCoupons)
+                                                    {
+                                                        <text>Show Less</text>
+                                                    }
+                                                    else
+                                                    {
+                                                        <text>View All (@availableCoupons.Count()) Coupons</text>
+                                                    }
+                                                </button>
+                                            </div>
+                                        }
+                                        
+                                        @if (showAllCoupons && availableCoupons.Count() > 3)
+                                        {
+                                            <div class="all-coupons-list">
+                                                @foreach (var coupon in availableCoupons.Skip(3))
+                                                {
+                                                    <div class="coupon-item" @onclick="() => QuickApplyCoupon(coupon.CouponCode)">
+                                                        <div class="coupon-info">
+                                                            <span class="coupon-name">@coupon.CouponCode</span>
+                                                           
+                                                            <span class="coupon-discount">
+                                                                @if (coupon.DiscountPercent.HasValue)
+                                                                {
+                                                                    <text>@coupon.DiscountPercent.Value% OFF</text>
+                                                                }
+                                                                else if (coupon.DiscountAmount.HasValue)
+                                                                {
+                                                                    <text>$@coupon.DiscountAmount.Value OFF</text>
+                                                                }
+                                                            </span>
+                                                            <span class="coupon-validity">
+                                                                <i class="fas fa-clock"></i>
+                                                                Valid until @coupon.EndDate.ToString("MMM dd, yyyy")
+                                                            </span>
+                                                        </div>
+                                                        <button class="quick-apply-btn">
+                                                            <i class="fas fa-plus"></i>
+                                                            Apply
+                                                        </button>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                        
+                        <div class="col-lg-4">
+                            <!-- Order Summary -->
+                            <div class="summary-card">
+                                <h4 class="summary-title">Order Summary</h4>
+                                
+                                <div class="price-breakdown">
+                                    <div class="price-row">
+                                        <span class="price-label">Subtotal (@cartItems.Count items):</span>
+                                        <span class="price-value">$@currentPricing.Subtotal.ToString("F2")</span>
+                                    </div>
+
+                                    @if (appliedCoupon != null && currentPricing.CouponDiscount > 0)
+                                    {
+                                        <div class="price-row savings-row">
+                                            <span class="price-label">
+                                                <i class="fas fa-ticket-alt"></i>
+                                                Coupon (@appliedCoupon.CouponCode):
+                                            </span>
+                                            <span class="price-value savings">-$@currentPricing.CouponDiscount.ToString("F2")</span>
+                                        </div>
+                                    }
+
+                                    <div class="price-row">
+                                        <span class="price-label">Shipping:</span>
+                                        <span class="price-value">
+                                            @if (currentPricing.IsFreeShipping)
+                                            {
+                                                <span class="free-shipping">FREE</span>
+                                            }
+                                            else
+                                            {
+                                                <text>$@currentPricing.ShippingCost.ToString("F2")</text>
+                                            }
+                                        </span>
+                                    </div>
+
+                                    <div class="total-row">
+                                        <span class="total-label">Total:</span>
+                                        <span class="total-value">$@currentPricing.TotalAmount.ToString("F2")</span>
+                                    </div>
+                                    
+                                    @if (currentPricing.TotalSavings > 0)
+                                    {
+                                        <div class="savings-summary">
+                                            <i class="fas fa-piggy-bank"></i>
+                                            You saved $@currentPricing.TotalSavings.ToString("F2") today!
+                                        </div>
+                                    }
+
+                                    @if (!currentPricing.FreeShippingEligible && currentPricing.AmountToFreeShipping > 0)
+                                    {
+                                        <div class="free-shipping-promo">
+                                            <i class="fas fa-truck"></i>
+                                            Add $@currentPricing.AmountToFreeShipping.ToString("F2") more for free standard shipping!
+                                        </div>
+                                    }
+                                </div>
+
+                                <!-- Checkout Button -->
+                                <div class="checkout-section">
+                                    <a href="/checkout" class="btn btn-primary btn-large">
+                                        <i class="fas fa-credit-card"></i>
+                                        Proceed to Checkout
+                                    </a>
+                                    <div class="security-note">
+                                        <i class="fas fa-shield-alt"></i>
+                                        Secure 256-bit SSL encryption
+                                    </div>
+                                </div>
+
+                                <!-- Payment Methods -->
+                                <div class="payment-methods">
+                                    <span class="payment-label">We accept:</span>
+                                    <div class="payment-icons">
+                                        <i class="fab fa-cc-visa"></i>
+                                        <i class="fab fa-cc-mastercard"></i>
+                                        <i class="fab fa-cc-paypal"></i>
+                                        <i class="fab fa-cc-apple-pay"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Quick Actions -->
+                <div class="quick-actions">
+                    <h4>Quick Actions</h4>
+                    <a href="/products" class="btn btn-outline">
+                        <i class="fas fa-plus me-1"></i>
+                        Continue Shopping
+                    </a>
+                    <a href="/wishlist" class="btn btn-outline">
+                        <i class="fas fa-heart me-1"></i>
+                        View Wishlist
+                    </a>
+                </div>
+            }
+            else
+            {
+                <div class="empty-cart">
+                    <div class="empty-cart-content">
+                        <div class="empty-icon">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <h3 class="empty-title">Your cart is empty</h3>
+                        <p class="empty-message">
+                            Looks like you haven't added anything to your cart yet. 
+                            Start shopping to fill it up!
+                        </p>
+                        <div class="empty-actions">
+                            <a href="/products" class="btn btn-primary">
+                                <i class="fas fa-shopping-bag"></i>
+                                Start Shopping
+                            </a>
+                            <a href="/wishlist" class="btn btn-outline">
+                                <i class="fas fa-heart"></i>
+                                View Wishlist
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<CartVM> cartItems = new List<CartVM>();
+    
+    // Coupon properties
+    private bool ShowCouponInput { get; set; } = false;
+    private string CouponCode { get; set; } = "";
+    private IEnumerable<CouponVM>? availableCoupons = null;
+    private bool isApplyingCoupon = false;
+    private string couponError = "";
+    private bool showAllCoupons = false;
+
+    // Use static services for pricing and coupon management
+    private CouponVM? appliedCoupon => CouponStateService.GetAppliedCoupon();
+    private PricingBreakdown currentPricing => CouponStateService.GetCurrentPricingBreakdown(cartItems, "standard");
+
+    // Calculated properties using static services
+    private decimal DeliveryCharges => currentPricing.ShippingCost;
+    private decimal TotalAmount => currentPricing.TotalAmount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoadCartItems();
+        await LoadAvailableCoupons();
+        LoadAppliedCoupon();
+        UpdatePricingData();
+    }
+    
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            LoadCartItems();
+            UpdatePricingData();
+            StateHasChanged();
+        }
+    }
+    
+    private void LoadCartItems()
+    {
+        cartItems = CartVM.GetAllCartItems();
+    }
+
+    private void LoadAppliedCoupon()
+    {
+        var savedCoupon = CouponStateService.GetAppliedCoupon();
+        if (savedCoupon != null)
+        {
+            // Verify coupon is still valid
+            if (!PricingCalculationService.IsValidCoupon(savedCoupon))
+            {
+                CouponStateService.RemoveAppliedCoupon();
+                ToastService.ShowWarning("Previously applied coupon is no longer valid");
+            }
+        }
+    }
+
+    private void UpdatePricingData()
+    {
+        // Update pricing data whenever cart changes
+        CouponStateService.UpdatePricingData(cartItems, appliedCoupon, "standard");
+    }
+
+    private async Task LoadAvailableCoupons()
+    {
+        try
+        {
+            var allCoupons = await CouponService.GetAllCouponsAsync();
+            // Filter active coupons that are within valid date range
+            availableCoupons = allCoupons?.Where(c => 
+                PricingCalculationService.IsValidCoupon(c)
+            );
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading coupons: {ex.Message}");
+        }
+    }
+
+    // Quantity methods with pricing update
+    private void IncreaseQuantity(CartVM item)
+    {
+        try
+        {
+            if (item.CartQuantity >= 99)
+            {
+                ToastService.ShowWarning("Maximum quantity is 99");
+                return;
+            }
+
+            if (item.ProductId.HasValue)
+            {
+                CartVM.UpdateQuantity(item.ProductId.Value, item.CartQuantity + 1);
+            }
+            else
+            {
+                CartVM.UpdateQuantity(item.ProductName, item.CartQuantity + 1);
+            }
+            
+            LoadCartItems();
+            UpdatePricingData(); // Update pricing after quantity change
+            ToastService.ShowSuccess($"Updated quantity for '{item.ProductName}'");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error updating quantity: {ex.Message}");
+        }
+    }
+
+    private void DecreaseQuantity(CartVM item)
+    {
+        try
+        {
+            if (item.CartQuantity <= 1)
+            {
+                ToastService.ShowWarning("Minimum quantity is 1");
+                return;
+            }
+
+            if (item.ProductId.HasValue)
+            {
+                CartVM.UpdateQuantity(item.ProductId.Value, item.CartQuantity - 1);
+            }
+            else
+            {
+                CartVM.UpdateQuantity(item.ProductName, item.CartQuantity - 1);
+            }
+            
+            LoadCartItems();
+            UpdatePricingData(); // Update pricing after quantity change
+            ToastService.ShowSuccess($"Updated quantity for '{item.ProductName}'");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error updating quantity: {ex.Message}");
+        }
+    }
+
+    private async Task UpdateQuantityFromInput(CartVM item, ChangeEventArgs e)
+    {
+        try
+        {
+            if (int.TryParse(e.Value?.ToString(), out int newQuantity))
+            {
+                // Validate quantity range
+                if (newQuantity < 1)
+                {
+                    newQuantity = 1;
+                    ToastService.ShowWarning("Minimum quantity is 1");
+                }
+                else if (newQuantity > 99)
+                {
+                    newQuantity = 99;
+                    ToastService.ShowWarning("Maximum quantity is 99");
+                }
+
+                if (newQuantity != item.CartQuantity)
+                {
+                    if (item.ProductId.HasValue)
+                    {
+                        CartVM.UpdateQuantity(item.ProductId.Value, newQuantity);
+                    }
+                    else
+                    {
+                        CartVM.UpdateQuantity(item.ProductName, newQuantity);
+                    }
+                    
+                    LoadCartItems();
+                    UpdatePricingData(); // Update pricing after quantity change
+                    ToastService.ShowSuccess($"Updated quantity to {newQuantity} for '{item.ProductName}'");
+                    StateHasChanged();
+                }
+            }
+            else
+            {
+                ToastService.ShowError("Please enter a valid number");
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error updating quantity: {ex.Message}");
+            LoadCartItems();
+            StateHasChanged();
+        }
+    }
+
+    private void RemoveFromCart(CartVM item)
+    {
+        try
+        {
+            if (item.ProductId.HasValue)
+            {
+                CartVM.RemoveFromCart(item.ProductId.Value);
+            }
+            else
+            {
+                CartVM.RemoveFromCart(item.ProductName);
+            }
+            
+            LoadCartItems();
+            UpdatePricingData(); // Update pricing after item removal
+            ToastService.ShowInfo($"Removed '{item.ProductName}' from cart");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error removing item from cart: {ex.Message}");
+        }
+    }
+
+    private async Task ClearCart()
+    {
+        try
+        {
+            var itemCount = cartItems.Count;
+            CartVM.ClearCart();
+            LoadCartItems();
+            UpdatePricingData(); // Update pricing after clearing cart
+            
+            ToastService.ShowSuccess($"Cleared {itemCount} item{(itemCount > 1 ? "s" : "")} from cart");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error clearing cart: {ex.Message}");
+        }
+    }
+
+    // Coupon methods using static services
+    private void ToggleCouponInput()
+    {
+        ShowCouponInput = !ShowCouponInput;
+        if (ShowCouponInput)
+        {
+            CouponCode = "";
+            couponError = "";
+        }
+    }
+
+    private void CancelCouponInput()
+    {
+        ShowCouponInput = false;
+        CouponCode = "";
+        couponError = "";
+    }
+
+    private void ToggleAllCoupons()
+    {
+        showAllCoupons = !showAllCoupons;
+    }
+
+    private async Task OnCouponKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(CouponCode))
+        {
+            await ApplyCoupon();
+        }
+    }
+
+    private async Task ApplyCoupon()
+    {
+        if (string.IsNullOrWhiteSpace(CouponCode))
+        {
+            couponError = "Please enter a coupon code";
+            return;
+        }
+
+        isApplyingCoupon = true;
+        couponError = "";
+        StateHasChanged();
+
+        try
+        {
+            var coupon = await CouponService.GetCouponByCodeAsync(CouponCode.Trim());
+            
+            if (CouponStateService.ApplyCouponWithPricing(coupon, cartItems, "standard"))
+            {
+                ShowCouponInput = false;
+                CouponCode = "";
+                ToastService.ShowSuccess($"Coupon '{coupon.CouponCode}' applied! You save ${currentPricing.CouponDiscount:F2}");
+            }
+            else
+            {
+                couponError = PricingCalculationService.GetCouponValidationMessage(coupon);
+                ToastService.ShowError(couponError);
+            }
+        }
+        catch (Exception ex)
+        {
+            couponError = "Error validating coupon. Please try again.";
+            ToastService.ShowError("Failed to apply coupon");
+            Console.WriteLine($"Error applying coupon: {ex.Message}");
+        }
+        finally
+        {
+            isApplyingCoupon = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task QuickApplyCoupon(string couponCode)
+    {
+        CouponCode = couponCode;
+        await ApplyCoupon();
+    }
+
+    private void RemoveCoupon()
+    {
+        CouponStateService.RemoveCouponWithPricing(cartItems, "standard");
+        ToastService.ShowInfo("Coupon removed");
+        StateHasChanged();
+    }
+
+    // Calculation methods using static services
+    private decimal CalculateDeliveryCharges()
+    {
+        return currentPricing.ShippingCost;
+    }
+
+    private decimal CalculateCouponDiscount()
+    {
+        return currentPricing.CouponDiscount;
+    }
+
+    private string GetProductImageUrl(CartVM item)
+    {
+        return $"https://via.placeholder.com/80x80/f8f9fa/6c757d?text=Product+{item.ProductId ?? 0}";
+    }
+
+    // Helper methods using static services
+    private decimal GetTotalSavings()
+    {
+        return currentPricing.ItemDiscounts;
+    }
+
+    private decimal GetTotalSavingsIncludingCoupon()
+    {
+        return currentPricing.TotalSavings;
+    }
+
+    private int GetTotalQuantity()
+    {
+        return currentPricing.TotalQuantity;
+    }
+
+    private decimal GetSubtotal()
+    {
+        return currentPricing.Subtotal;
+    }
+
+    private void ValidateQuantityInput(CartVM item)
+    {
+        if (item.CartQuantity < 1 || item.CartQuantity > 99)
+        {
+            LoadCartItems();
+            StateHasChanged();
+        }
+    }
+}

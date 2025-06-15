@@ -1,0 +1,830 @@
+@page "/product/{id:int}"
+@using ProductService.Models.ViewModel
+@using MainEcommerceService.Models.ViewModel
+@using MainEcommerceService.Models.dbMainEcommer
+@using BlazorWebApp.Services
+@inject ProdService ProductService
+@inject CategoryService CategoryService
+@inject SellerProfileService SellerProfileService
+@inject UserService UserService
+@inject ToastService ToastService
+@inject NavigationManager Navigation
+
+<PageTitle>@(currentProduct?.ProductName ?? "Product Detail") - Grabit</PageTitle>
+
+<link href="css/product-detail.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<div class="product-container">
+    <div class="border-container">
+        <div class="breadcrumb">
+            <div class="container">
+                <a href="/">Home</a> / <a href="/products">Products</a> / 
+                <span>@(currentProduct?.ProductName ?? "Product Details")</span>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-section">
+            <div class="loading-content">
+                <div class="loading-spinner"></div>
+                <h3>Loading product details...</h3>
+                <p>Please wait while we fetch the product information</p>
+            </div>
+        </div>
+    }
+    else if (currentProduct == null)
+    {
+        <div class="error-section">
+            <div class="error-content">
+                <div class="error-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h3>Product Not Found</h3>
+                <p>The product you're looking for doesn't exist or has been removed.</p>
+                <a href="/products" class="btn btn-primary">
+                    <i class="fas fa-arrow-left"></i>
+                    Back to Products
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <section class="product-detail-section">
+            <div class="container">
+                <div class="product-detail-container">
+                    <!-- Product Images -->
+                    <div class="product-images">
+                        <div class="main-image">
+                            <img src="@GetProductImageUrl(currentProduct, SelectedImageIndex)" 
+                                 alt="@currentProduct.ProductName" />
+                            @if (HasDiscount())
+                            {
+                                <div class="discount-badge">
+                                    -@GetDiscountPercentage()%
+                                </div>
+                            }
+                            @if (IsOutOfStock())
+                            {
+                                <div class="stock-overlay">
+                                    <span class="out-of-stock-text">OUT OF STOCK</span>
+                                </div>
+                            }
+                        </div>
+                        <div class="thumbnail-images">
+                            @for (int i = 0; i < currentProduct.Images.Count; i++)
+                            {
+                                var index = i;
+                                <div class="thumbnail @(SelectedImageIndex == index ? "active" : "")"
+                                     @onclick="() => SelectImage(index)">
+                                    <img src="@GetProductImageUrl(currentProduct, i)" 
+                                         alt="@currentProduct.ProductName thumbnail @(i + 1)" />
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Product Information -->
+                    <div class="product-info">
+                        <h1 class="product-title">@currentProduct.ProductName</h1>
+
+                        <div class="product-ratings">
+                            <div class="stars">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    <i class="fas fa-star @(i <= averageRating ? "filled" : "")"></i>
+                                }
+                            </div>
+                            <span class="rating-count">| @totalReviews Reviews</span>
+                        </div>
+
+                        <div class="product-details-grid">
+                            <div class="details-column">
+                                <div class="price-row">
+                                    <h2 class="current-price">
+                                        $@GetCurrentPrice().ToString("F2")
+                                    </h2>
+                                    @if (HasDiscount())
+                                    {
+                                        <span class="discount-badge">-@GetDiscountPercentage()%</span>
+                                    }
+                                </div>
+                                @if (HasDiscount())
+                                {
+                                    <div class="mrp-row">
+                                        <span>M.R.P. : </span>
+                                        <span class="old-price">$@currentProduct.Price.ToString("F2")</span>
+                                    </div>
+                                    <div class="savings-row">
+                                        <span class="savings-text">
+                                            You save: $@GetSavingsAmount().ToString("F2")
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+                            <div class="details-column">
+                                <div class="sku-row">
+                                    <span class="label">Product ID:</span>
+                                    <span class="value">#@currentProduct.ProductId.ToString("D6")</span>
+                                </div>
+                                <div class="stock-status">
+                                    @if (IsOutOfStock())
+                                    {
+                                        <span class="out-of-stock">OUT OF STOCK</span>
+                                    }
+                                    else if (IsLowStock())
+                                    {
+                                        <span class="low-stock">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                            Only @currentProduct.Quantity left in stock
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="in-stock">
+                                            <i class="fas fa-check-circle"></i>
+                                            IN STOCK (@currentProduct.Quantity available)
+                                        </span>
+                                    }
+                                </div>
+                                @if (currentProduct.TotalSold.HasValue && currentProduct.TotalSold > 0)
+                                {
+                                    <div class="sales-info">
+                                        <span class="sales-text">
+                                            <i class="fas fa-fire"></i>
+                                            @currentProduct.TotalSold sold
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(currentProduct.Description))
+                        {
+                            <div class="product-description">
+                                <p>@currentProduct.Description</p>
+                            </div>
+                        }
+
+                        <!-- Product Specifications -->
+                        <div class="product-specs">
+                            <ul>
+                                <li>
+                                    <span class="spec-label">Category: </span> 
+                                    @if (currentCategory != null)
+                                    {
+                                        <span class="spec-value">@currentCategory.CategoryName</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="spec-value loading">Loading...</span>
+                                    }
+                                </li>
+                                <li>
+                                    <span class="spec-label">Seller: </span> 
+                                    @if (currentSeller != null)
+                                    {
+                                        <span class="spec-value">@currentSeller.StoreName</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="spec-value loading">Loading...</span>
+                                    }
+                                </li>
+                                @if (currentProduct.CreatedAt.HasValue)
+                                {
+                                    <li><span class="spec-label">Added:</span> @currentProduct.CreatedAt.Value.ToString("MMM dd, yyyy")</li>
+                                }
+                                @if (currentProduct.UpdatedAt.HasValue)
+                                {
+                                    <li><span class="spec-label">Last Updated:</span> @currentProduct.UpdatedAt.Value.ToString("MMM dd, yyyy")</li>
+                                }
+                            </ul>
+                        </div>
+
+                        <!-- Add to Cart Section -->
+                        <div class="add-to-cart-section">
+                            @if (!IsOutOfStock())
+                            {
+                                <div class="quantity-selector">
+                                    <button class="qty-btn" @onclick="DecreaseQuantity" disabled="@(Quantity <= 1)">
+                                        <i class="fas fa-minus"></i>
+                                    </button>
+                                    <input type="number" @bind="Quantity" @bind:event="oninput" 
+                                           @onchange="OnQuantityChanged"
+                                           min="1" max="@GetMaxQuantity()" 
+                                           class="qty-input" />
+                                    <button class="qty-btn" @onclick="IncreaseQuantity" 
+                                            disabled="@(Quantity >= GetMaxQuantity())">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
+
+                                <button class="add-to-cart-btn @(isAddingToCart ? "loading" : "")" 
+                                        @onclick="AddToCart" 
+                                        disabled="@(isAddingToCart || IsOutOfStock())">
+                                    @if (isAddingToCart)
+                                    {
+                                        <i class="fas fa-spinner fa-spin"></i>
+                                        <span>ADDING...</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="fas fa-shopping-cart"></i>
+                                        <span>ADD TO CART</span>
+                                    }
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="add-to-cart-btn disabled" disabled>
+                                    <i class="fas fa-ban"></i>
+                                    <span>OUT OF STOCK</span>
+                                </button>
+                            }
+
+                            <button class="wishlist-btn @(isAddingToWishlist ? "loading" : "")" 
+                                    @onclick="AddToWishlist"
+                                    disabled="@isAddingToWishlist"
+                                    title="Add to Wishlist">
+                                @if (isAddingToWishlist)
+                                {
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                }
+                                else
+                                {
+                                    <i class="far fa-heart"></i>
+                                }
+                            </button>
+
+                            <button class="share-btn" @onclick="ShareProduct" title="Share Product">
+                                <i class="fas fa-share-alt"></i>
+                            </button>
+                        </div>
+
+                        <!-- Shipping Information -->
+                        <div class="shipping-info">
+                            <div class="shipping-item">
+                                <i class="fas fa-truck"></i>
+                                <span>Free shipping on orders over $100</span>
+                            </div>
+                            <div class="shipping-item">
+                                <i class="fas fa-undo"></i>
+                                <span>30-day return policy</span>
+                            </div>
+                            <div class="shipping-item">
+                                <i class="fas fa-shield-alt"></i>
+                                <span>Secure payment guaranteed</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product Tabs -->
+                <div class="product-tabs">
+                    <div class="tab-header">
+                        <button class="tab-btn @(ActiveTabIndex == 0 ? "active" : "")" 
+                                @onclick="() => SelectTab(0)">
+                            Description
+                        </button>
+                        <button class="tab-btn @(ActiveTabIndex == 2 ? "active" : "")" 
+                                @onclick="() => SelectTab(2)">
+                            Reviews (@totalReviews)
+                        </button>
+                    </div>
+                    <div class="tab-content">
+                        <div class="tab-pane @(ActiveTabIndex == 0 ? "active" : "")">
+                            @if (!string.IsNullOrEmpty(currentProduct.Description))
+                            {
+                                <div class="description-content">
+                                    <p>@currentProduct.Description</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="no-content">
+                                    <p>No description available for this product.</p>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="tab-pane @(ActiveTabIndex == 1 ? "active" : "")">
+                            <table class="product-attributes">
+                                <tbody>
+                                    <tr>
+                                        <th>Product ID</th>
+                                        <td>@currentProduct.ProductId</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Category</th>
+                                        <td>
+                                            @if (currentCategory != null)
+                                            {
+                                                <span>@currentCategory.CategoryName</span>
+                                                @if (!string.IsNullOrEmpty(currentCategory.Description))
+                                                {
+                                                    <small class="text-muted d-block">@currentCategory.Description</small>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <span class="loading">Loading category...</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Seller</th>
+                                        <td>
+                                            @if (currentSeller != null)
+                                            {
+                                                <div class="seller-info">
+                                                    <span class="seller-store">@currentSeller.StoreName</span>
+                                                    @if (currentSeller.IsVerified == true)
+                                                    {
+                                                        <span class="verified-badge">
+                                                            <i class="fas fa-check-circle"></i>
+                                                            Verified
+                                                        </span>
+                                                    }
+                                                    @if (!string.IsNullOrEmpty(currentSeller.Description))
+                                                    {
+                                                        <small class="seller-desc d-block">@currentSeller.Description</small>
+                                                    }
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <span class="loading">Loading seller info...</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Stock Quantity</th>
+                                        <td>@currentProduct.Quantity units</td>
+                                    </tr>
+                                    @if (currentProduct.TotalSold.HasValue)
+                                    {
+                                        <tr>
+                                            <th>Total Sold</th>
+                                            <td>@currentProduct.TotalSold units</td>
+                                        </tr>
+                                    }
+                                    @if (currentProduct.CreatedAt.HasValue)
+                                    {
+                                        <tr>
+                                            <th>Date Added</th>
+                                            <td>@currentProduct.CreatedAt.Value.ToString("MMMM dd, yyyy")</td>
+                                        </tr>
+                                    }
+                                    @if (currentProduct.UpdatedAt.HasValue)
+                                    {
+                                        <tr>
+                                            <th>Last Updated</th>
+                                            <td>@currentProduct.UpdatedAt.Value.ToString("MMMM dd, yyyy")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="tab-pane @(ActiveTabIndex == 2 ? "active" : "")">
+                            <div class="reviews-container">
+                                @if (reviews.Any())
+                                {
+                                    @foreach (var review in reviews)
+                                    {
+                                        <div class="review-item">
+                                            <div class="review-header">
+                                                <div class="reviewer-info">
+                                                    <h4>@review.ReviewerName</h4>
+                                                    <span class="review-date">@review.Date.ToString("MMMM dd, yyyy")</span>
+                                                </div>
+                                                <div class="review-rating">
+                                                    @for (int i = 1; i <= 5; i++)
+                                                    {
+                                                        <i class="fas fa-star @(i <= review.Rating ? "filled" : "")"></i>
+                                                    }
+                                                </div>
+                                            </div>
+                                            <div class="review-content">
+                                                <p>@review.Comment</p>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="no-reviews">
+                                        <div class="no-reviews-icon">
+                                            <i class="fas fa-star"></i>
+                                        </div>
+                                        <h4>No reviews yet</h4>
+                                        <p>Be the first to review this product!</p>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Related Products -->
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    // Product data
+    private PrdVMWithImages? currentProduct;
+    private List<PrdVMWithImages> relatedProducts = new();
+    
+    // Related data
+    private CategoryVM? currentCategory;
+    private SellerProfileVM? currentSeller;
+    
+    // UI state
+    private bool isLoading = true;
+    private bool isAddingToCart = false;
+    private bool isAddingToWishlist = false;
+    
+    // Product interaction
+    private int Quantity { get; set; } = 1;
+    private int SelectedImageIndex { get; set; } = 0;
+    private int ActiveTabIndex { get; set; } = 0;
+    
+    // Mock data for UI
+    private int averageRating = 4;
+    private int totalReviews = 3;
+
+    // Sample reviews
+    private List<ProductReview> reviews = new()
+    {
+        new ProductReview { ReviewerName = "John Doe", Rating = 5, Comment = "Excellent product! Very satisfied with the quality.", Date = DateTime.Now.AddDays(-10) },
+        new ProductReview { ReviewerName = "Sarah Johnson", Rating = 4, Comment = "Good quality but delivery took longer than expected.", Date = DateTime.Now.AddDays(-15) },
+        new ProductReview { ReviewerName = "Mike Brown", Rating = 5, Comment = "Great product! Will definitely buy again.", Date = DateTime.Now.AddDays(-20) }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProductData();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id > 0)
+        {
+            await LoadProductData();
+        }
+    }
+
+    private async Task LoadProductData()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            // Load current product
+            currentProduct = await ProductService.GetProductByIdAsync(Id);
+            
+            if (currentProduct == null)
+            {
+                return;
+            }
+
+            // Load related data concurrently
+            var categoryTask = LoadCategoryData(currentProduct.CategoryId);
+            var sellerTask = LoadSellerData(currentProduct.SellerId);
+            var relatedProductsTask = LoadRelatedProducts(currentProduct.CategoryId);
+
+            await Task.WhenAll(categoryTask, sellerTask, relatedProductsTask);
+
+            // Reset UI state
+            Quantity = 1;
+            SelectedImageIndex = 0;
+            ActiveTabIndex = 0;
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error loading product: {ex.Message}");
+            Console.WriteLine($"Error loading product {Id}: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadCategoryData(int categoryId)
+    {
+        try
+        {
+            currentCategory = await CategoryService.GetCategoryByIdAsync(categoryId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading category {categoryId}: {ex.Message}");
+            currentCategory = null;
+        }
+    }
+
+    private async Task LoadSellerData(int sellerId)
+    {
+        try
+        {
+            currentSeller = await SellerProfileService.GetSellerProfileByIdAsync(sellerId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading seller {sellerId}: {ex.Message}");
+            currentSeller = null;
+        }
+    }
+
+    private async Task LoadRelatedProducts(int categoryId)
+    {
+        try
+        {
+            var categoryProducts = await ProductService.GetProductsByCategoryAsync(categoryId);
+            relatedProducts = categoryProducts
+                .Where(p => p.ProductId != currentProduct.ProductId)
+                .Take(6)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading related products: {ex.Message}");
+            relatedProducts = new List<PrdVMWithImages>();
+        }
+    }
+
+    // Quantity methods
+    private void IncreaseQuantity()
+    {
+        if (Quantity < GetMaxQuantity())
+        {
+            Quantity++;
+        }
+        else
+        {
+            ToastService.ShowWarning($"Maximum quantity is {GetMaxQuantity()}");
+        }
+    }
+
+    private void DecreaseQuantity()
+    {
+        if (Quantity > 1)
+        {
+            Quantity--;
+        }
+    }
+
+    private void OnQuantityChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int newQuantity))
+        {
+            if (newQuantity < 1)
+            {
+                Quantity = 1;
+                ToastService.ShowWarning("Minimum quantity is 1");
+            }
+            else if (newQuantity > GetMaxQuantity())
+            {
+                Quantity = GetMaxQuantity();
+                ToastService.ShowWarning($"Maximum quantity is {GetMaxQuantity()}");
+            }
+            else
+            {
+                Quantity = newQuantity;
+            }
+        }
+        else
+        {
+            Quantity = 1;
+            ToastService.ShowWarning("Please enter a valid quantity");
+        }
+        StateHasChanged();
+    }
+
+    private int GetMaxQuantity()
+    {
+        return Math.Min(currentProduct?.Quantity ?? 0, 99); // Max 10 per order
+    }
+
+    // UI interaction methods
+    private void SelectImage(int index)
+    {
+        SelectedImageIndex = index;
+    }
+
+    private void SelectTab(int index)
+    {
+        ActiveTabIndex = index;
+    }
+
+    // Cart and Wishlist methods
+    private async Task AddToCart()
+    {
+        if (currentProduct == null || IsOutOfStock()) return;
+
+        try
+        {
+            isAddingToCart = true;
+            StateHasChanged();
+
+            // Add to cart using CartVM with correct parameters
+            CartVM.AddToCart(
+                currentProduct.ProductId,
+                currentProduct.ProductName,
+                GetCurrentPrice(),
+                currentProduct.Price,
+                Quantity,
+                currentProduct.PrimaryImageUrl
+            );
+
+            ToastService.ShowSuccess($"Added {Quantity} x {currentProduct.ProductName} to cart!");
+            
+            // Reset quantity to 1 after adding
+            Quantity = 1;
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error adding to cart: {ex.Message}");
+        }
+        finally
+        {
+            isAddingToCart = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task AddToWishlist()
+    {
+        if (currentProduct == null) return;
+
+        try
+        {
+            isAddingToWishlist = true;
+            StateHasChanged();
+
+            // Add to wishlist using WishlistVM with correct parameters
+            WishlistVM.AddToWishlist(
+                currentProduct.ProductId,
+                currentProduct.ProductName,
+                GetCurrentPrice(),
+                currentProduct.Price,
+                currentProduct.PrimaryImageUrl
+            );
+
+            ToastService.ShowSuccess($"Added '{currentProduct.ProductName}' to wishlist!");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error adding to wishlist: {ex.Message}");
+        }
+        finally
+        {
+            isAddingToWishlist = false;
+            StateHasChanged();
+        }
+    }
+
+    // Quick actions for related products
+    private void ViewProduct(int productId)
+    {
+        Navigation.NavigateTo($"/product/{productId}");
+    }
+
+    private async Task QuickAddToCart(PrdVMWithImages product)
+    {
+        if (product.Quantity <= 0)
+        {
+            ToastService.ShowWarning($"'{product.ProductName}' is out of stock");
+            return;
+        }
+
+        try
+        {
+            // Add to cart with correct parameters
+            CartVM.AddToCart(
+                product.ProductId,
+                product.ProductName,
+                GetCurrentPrice(product),
+                product.Price,
+                1,
+                product.PrimaryImageUrl
+            );
+
+            ToastService.ShowSuccess($"Added '{product.ProductName}' to cart!");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error adding to cart: {ex.Message}");
+        }
+    }
+
+    private async Task QuickAddToWishlist(PrdVMWithImages product)
+    {
+        try
+        {
+            // Add to wishlist with correct parameters
+            WishlistVM.AddToWishlist(
+                product.ProductId,
+                product.ProductName,
+                GetCurrentPrice(product),
+                product.Price
+            );
+
+            ToastService.ShowSuccess($"Added '{product.ProductName}' to wishlist!");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error adding to wishlist: {ex.Message}");
+        }
+    }
+
+    private async Task ShareProduct()
+    {
+        ToastService.ShowInfo("Share functionality coming soon!");
+    }
+
+    // Helper methods for pricing and stock
+    private decimal GetCurrentPrice(PrdVMWithImages? product = null)
+    {
+        var prod = product ?? currentProduct;
+        return prod?.DiscountPrice ?? prod?.Price ?? 0m;
+    }
+
+    private bool HasDiscount(PrdVMWithImages? product = null)
+    {
+        var prod = product ?? currentProduct;
+        return prod?.DiscountPrice.HasValue == true && prod.DiscountPrice < prod.Price;
+    }
+
+    private int GetDiscountPercentage(PrdVMWithImages? product = null)
+    {
+        var prod = product ?? currentProduct;
+        if (!HasDiscount(prod)) return 0;
+        
+        var discountAmount = prod.Price - prod.DiscountPrice.Value;
+        return (int)Math.Round((discountAmount / prod.Price) * 100);
+    }
+
+    private decimal GetSavingsAmount()
+    {
+        if (!HasDiscount()) return 0m;
+        return currentProduct.Price - currentProduct.DiscountPrice.Value;
+    }
+
+    private bool IsOutOfStock()
+    {
+        return currentProduct?.Quantity <= 0;
+    }
+
+    private bool IsLowStock()
+    {
+        return currentProduct?.Quantity > 0 && currentProduct.Quantity <= 5;
+    }
+
+    private string GetProductImageUrl(PrdVMWithImages product, int index = 0)
+    {
+        // Return placeholder image based on product ID and index
+        return product.Images.ElementAtOrDefault(index)?.ImageUrl ??
+               $"https://via.placeholder.com/500x500/f8f9fa/6c757d?text=Product+{product.ProductId}+Image+{index + 1}";
+    }
+
+    // Supporting classes
+    public class ProductReview
+    {
+        public string ReviewerName { get; set; } = "";
+        public int Rating { get; set; }
+        public string Comment { get; set; } = "";
+        public DateTime Date { get; set; }
+    }
+
+    // Helper method to get seller display name
+    private string GetSellerDisplayName()
+    {
+        if (currentSeller != null)
+        {
+            return currentSeller.StoreName;
+        }
+        return $"Seller #{currentProduct?.SellerId}";
+    }
+
+    // Helper method to get category display name
+    private string GetCategoryDisplayName()
+    {
+        if (currentCategory != null)
+        {
+            return currentCategory.CategoryName;
+        }
+        return $"Category #{currentProduct?.CategoryId}";
+    }
+}

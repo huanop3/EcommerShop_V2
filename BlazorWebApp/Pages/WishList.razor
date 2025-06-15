@@ -1,0 +1,325 @@
+@page "/wishlist"
+@using ProductService.Models.ViewModel
+@inject ToastService ToastService
+@inject NavigationManager Navigation
+
+<PageTitle>Wishlist - My Favorite Items</PageTitle>
+
+<link href="css/wishlist.css" rel="stylesheet" />
+
+<div class="wishlist-container">
+    <div class="border-container">
+        <div class="breadcrumb">
+            <div class="container">
+                <a href="/">Home</a> / <span>Wishlist</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="wishlist-section">
+        <div class="container">
+            <h2 class="section-title">
+                <i class="fas fa-heart text-danger me-2"></i>
+                My Wishlist
+            </h2>
+            
+            @if (wishlistItems.Count > 0)
+            {
+                <div class="wishlist-actions">
+                    <span class="wishlist-count">
+                        <i class="fas fa-list me-1"></i>
+                        @wishlistItems.Count item@(wishlistItems.Count > 1 ? "s" : "") in wishlist
+                    </span>
+                    <button class="clear-wishlist btn btn-outline-danger" @onclick="ClearWishlist" @onclick:preventDefault="true">
+                        <i class="fas fa-trash me-1"></i>
+                        Clear Wishlist
+                    </button>
+                </div>
+                
+                <div class="wishlist-items">
+                    <div class="table-responsive">
+                        <table class="wishlist-table table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Price</th>
+                                    <th>Stock Status</th>
+                                    <th>Actions</th>
+                                    <th>Remove</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in wishlistItems)
+                                {
+                                    <tr>
+                                        <td class="product-cell">
+                                            <div class="product-info">
+                                                <div class="product-image">
+                                                    <img src="@GetProductImageUrl(item)" 
+                                                         alt="@item.ProductName" 
+                                                         onerror="this.src='https://via.placeholder.com/80x80/f8f9fa/6c757d?text=Product'" />
+                                                </div>
+                                                <div class="product-details">
+                                                    <a href="/product/@item.ProductId" class="product-name">
+                                                        @item.ProductName
+                                                    </a>
+                                                    @if (!string.IsNullOrEmpty(item.Description))
+                                                    {
+                                                        <p class="product-description">@item.Description</p>
+                                                    }
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-calendar-plus me-1"></i>
+                                                        Added: @item.AddedAt.ToString("MMM dd, yyyy")
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="price-cell">
+                                            @if (item.DiscountPrice.HasValue && item.DiscountPrice > 0 && item.DiscountPrice < item.Price)
+                                            {
+                                                <div class="price-container">
+                                                    <span class="old-price">$@item.Price.ToString("F2")</span>
+                                                    <span class="current-price text-success">$@item.DiscountPrice.Value.ToString("F2")</span>
+                                                    <span class="discount-badge">
+                                                        @(Math.Round((item.Price - item.DiscountPrice.Value) / item.Price * 100))% OFF
+                                                    </span>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <span class="current-price">$@item.Price.ToString("F2")</span>
+                                            }
+                                        </td>
+                                        <td class="stock-cell">
+                                            @if (item.Quantity > 0)
+                                            {
+                                                <span class="in-stock">
+                                                    <i class="fas fa-check-circle me-1"></i>
+                                                    In Stock
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="out-of-stock">
+                                                    <i class="fas fa-times-circle me-1"></i>
+                                                    Out of Stock
+                                                </span>
+                                            }
+                                        </td>
+                                        <td class="actions-cell">
+                                            <button class="action-btn add-to-cart btn @(item.Quantity > 0 ? "btn-primary" : "btn-secondary")" 
+                                                    @onclick="() => AddToCart(item)" 
+                                                    disabled="@(item.Quantity <= 0)">
+                                                <i class="fas fa-shopping-cart me-1"></i> 
+                                                @if (item.Quantity > 0)
+                                                {
+                                                    <text>Add to Cart</text>
+                                                }
+                                                else
+                                                {
+                                                    <text>Out of Stock</text>
+                                                }
+                                            </button>
+                                        </td>
+                                        <td class="remove-cell">
+                                            <button class="remove-btn btn btn-outline-danger btn-sm" 
+                                                    @onclick="() => RemoveFromWishlist(item)"
+                                                    title="Remove from Wishlist">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Wishlist Statistics -->
+                <div class="wishlist-stats mt-4">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="stat-card">
+                                <h5>Total Items</h5>
+                                <span class="stat-number">@wishlistItems.Count</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="stat-card">
+                                <h5>Total Value</h5>
+                                <span class="stat-number">$@GetTotalWishlistValue().ToString("F2")</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="stat-card">
+                                <h5>Available Items</h5>
+                                <span class="stat-number">@wishlistItems.Count(x => x.Quantity > 0)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Quick Actions -->
+                <div class="quick-actions mt-4">
+                    <button class="btn btn-success me-2" @onclick="AddAllAvailableToCart">
+                        <i class="fas fa-shopping-cart me-1"></i>
+                        Add All Available to Cart
+                    </button>
+                    <a href="/products" class="btn btn-outline-primary">
+                        <i class="fas fa-plus me-1"></i>
+                        Continue Shopping
+                    </a>
+                </div>
+            }
+            else
+            {
+                <div class="empty-wishlist">
+                    <div class="empty-icon">
+                        <i class="far fa-heart"></i>
+                    </div>
+                    <h3>Your wishlist is empty</h3>
+                    <p>Add items you love to your wishlist. Review them anytime and easily move them to the cart.</p>
+                    <a href="/products" class="continue-shopping btn btn-primary">
+                        <i class="fas fa-shopping-bag me-2"></i>
+                        Continue Shopping
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<WishlistVM> wishlistItems = new List<WishlistVM>();
+    
+    protected override void OnInitialized()
+    {
+        LoadWishlistItems();
+    }
+    
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            // Refresh wishlist items in case they were updated from other pages
+            LoadWishlistItems();
+            StateHasChanged();
+        }
+    }
+    
+    private void LoadWishlistItems()
+    {
+        wishlistItems = WishlistVM.GetAllWishlistItems();
+    }
+    
+    private void RemoveFromWishlist(WishlistVM item)
+    {
+        try
+        {
+            if (item.ProductId.HasValue)
+            {
+                WishlistVM.RemoveFromWishlist(item.ProductId.Value);
+            }
+            else
+            {
+                WishlistVM.RemoveFromWishlist(item.ProductName);
+            }
+            
+            LoadWishlistItems(); // Refresh the list
+            ToastService.ShowInfo($"Removed '{item.ProductName}' from wishlist");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error removing item from wishlist: {ex.Message}");
+        }
+    }
+
+    private void ClearWishlist()
+    {
+        try
+        {
+            var itemCount = wishlistItems.Count;
+            WishlistVM.ClearWishlist();
+            LoadWishlistItems(); // Refresh the list
+            ToastService.ShowSuccess($"Cleared {itemCount} item{(itemCount > 1 ? "s" : "")} from wishlist");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error clearing wishlist: {ex.Message}");
+        }
+    }
+
+    private void AddToCart(WishlistVM item)
+    {
+        try
+        {
+            if (item.Quantity > 0)
+            {
+                // Sử dụng CartVM để thêm vào cart
+                CartVM.MoveFromWishlistToCart(item, 1);
+                
+                // Refresh wishlist sau khi move sang cart
+                LoadWishlistItems();
+                
+                ToastService.ShowSuccess($"Add '{item.ProductName}' from wishlist to cart");
+                StateHasChanged();
+            }
+            else
+            {
+                ToastService.ShowWarning($"'{item.ProductName}' is out of stock");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error adding item to cart: {ex.Message}");
+        }
+    }
+    
+    private void AddAllAvailableToCart()
+    {
+        try
+        {
+            var availableItems = wishlistItems.Where(x => x.Quantity > 0).ToList();
+            
+            if (availableItems.Any())
+            {
+                // Thêm tất cả items có sẵn vào cart
+                foreach (var item in availableItems)
+                {
+                    CartVM.MoveFromWishlistToCart(item, 1);
+                }
+                
+                // Refresh wishlist
+                LoadWishlistItems();
+                
+                ToastService.ShowSuccess($"Moved {availableItems.Count} item{(availableItems.Count > 1 ? "s" : "")} from wishlist to cart");
+                StateHasChanged();
+            }
+            else
+            {
+                ToastService.ShowWarning("No items are currently available to add to cart");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error adding items to cart: {ex.Message}");
+        }
+    }
+    
+    private decimal GetTotalWishlistValue()
+    {
+        return wishlistItems.Sum(item => 
+            item.DiscountPrice.HasValue && item.DiscountPrice > 0 && item.DiscountPrice < item.Price 
+                ? item.DiscountPrice.Value 
+                : item.Price);
+    }
+    
+    private string GetProductImageUrl(WishlistVM item)
+    {
+        // Return placeholder image with product info
+        return item.PrimaryImageUrl ?? 
+               $"https://via.placeholder.com/80x80/f8f9fa/6c757d?text={Uri.EscapeDataString(item.ProductName)}";
+    }
+}

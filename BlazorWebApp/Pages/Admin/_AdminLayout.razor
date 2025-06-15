@@ -1,0 +1,223 @@
+@inherits LayoutComponentBase
+@using Blazored.LocalStorage
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@inject NavigationManager NavigationManager
+@inject ILocalStorageService _localStorage
+
+<link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+
+<MudThemeProvider Theme="_currentTheme" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudPopoverProvider />
+<MudSnackbarProvider />
+<PageTitle>Admin Dashboard - Grabit</PageTitle>
+
+<MudLayout>
+    <MudAppBar Elevation="0" Color="Color.Primary" Style="border-bottom: 1px solid rgba(0,0,0,0.1)">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+            OnClick="@((e) => DrawerToggle())" />
+        <MudText Typo="Typo.h6" Class="ml-3">Grabit Admin Dashboard</MudText>
+        <MudSpacer />
+
+        <!-- Header Icons Group -->
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <!-- Avatar Menu -->
+            <AuthorizeView>
+                <Authorized>
+                    <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Dense="true">
+                        <ActivatorContent>
+                            <div class="d-flex align-center" style="gap: 8px; cursor: pointer;">
+                                <MudBadge Overlap="true" Color="Color.Success" Dot="true" Class="mx-2" Style="cursor: pointer;">
+                                    <MudAvatar Color="Color.Secondary" Style="background-color: #4B5966;">
+                                        @if (!string.IsNullOrEmpty(GetDisplayName(context.User)))
+                                        {
+                                            @GetDisplayName(context.User)[0].ToString().ToUpper()
+                                        }
+                                        else
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Filled.Person" />
+                                        }
+                                    </MudAvatar>
+                                </MudBadge>
+                                <div class="d-none d-sm-flex flex-column">
+                                    <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">Welcome,
+                                    </MudText>
+                                    <MudText Typo="Typo.body2">@GetDisplayName(context.User)</MudText>
+                                </div>
+                            </div>
+                        </ActivatorContent>
+                        <ChildContent>
+                            <MudList T="string" Dense="true" DisablePadding="true" Style="">
+                                <MudListItem T="string" Icon="@Icons.Material.Filled.Person" Text="Profile"
+                                    OnClick="NavigateToProfile" />
+                                <MudListItem T="string" Icon="@Icons.Material.Filled.Logout" Text="Logout"
+                                    OnClick="HandleLogout" />
+                            </MudList>
+                        </ChildContent>
+                    </MudMenu>
+                </Authorized>
+                <NotAuthorized>
+                    <div class="d-flex align-center">
+                        <MudText Typo="Typo.body2">Not Authenticated</MudText>
+                        <MudButton Href="/login" Color="Color.Secondary" Variant="Variant.Text">Login</MudButton>
+                    </div>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="0" Style="border-right: 1px solid rgba(0,0,0,0.1)">
+        <MudDrawerHeader>
+            <MudText Typo="Typo.h6">Grabit</MudText>
+        </MudDrawerHeader>
+        <MudNavMenu Color="Color.Primary" Rounded="true" Class="px-2">
+            <MudNavLink Href="/admin/dashboard" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">
+                Dashboard</MudNavLink>
+
+            <AuthorizeView Roles="Admin">
+                <Authorized>
+                    <MudNavLink Href="/admin/users" Icon="@Icons.Material.Filled.People">Users</MudNavLink>
+                    <MudNavLink Href="/admin/sellers" Icon="@Icons.Material.Filled.Sell">Sellers</MudNavLink>
+                    <MudNavLink Href="/admin/shippers" Icon="@Icons.Material.Filled.LocalShipping">Shippers</MudNavLink>
+                    <MudNavLink Href="/admin/orders" Icon="@Icons.Material.Filled.ShoppingCart">Orders</MudNavLink>
+                    <MudNavLink Href="/admin/products" Icon="@Icons.Material.Filled.Inventory">Products</MudNavLink>
+                    <MudNavLink Href="/admin/categories" Icon="@Icons.Material.Filled.Category">Categories</MudNavLink>
+                    <MudNavLink Href="/admin/coupons" Icon="@Icons.Material.Filled.LocalOffer">Coupons</MudNavLink>
+                </Authorized>
+            </AuthorizeView>
+            <AuthorizeView Roles="Seller">
+                <Authorized>
+                    <MudNavLink Href="/admin/products" Icon="@Icons.Material.Filled.Inventory">Products</MudNavLink>
+                    <MudNavLink Href="/admin/orders" Icon="@Icons.Material.Filled.ShoppingCart">Orders</MudNavLink>
+                    <MudNavLink Href="/admin/reviews" Icon="@Icons.Material.Filled.Star">Reviews</MudNavLink>
+                </Authorized>
+            </AuthorizeView>
+            <MudDivider />
+            <MudNavLink Href="/" Icon="@Icons.Material.Filled.ArrowBack">Back to Site</MudNavLink>
+        </MudNavMenu>
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.False" Class="py-4 px-4">
+            <AuthorizeView>
+                <Authorized>
+                    @Body
+                </Authorized>
+                <NotAuthorized>
+                    <div class="d-flex flex-column align-center justify-center" style="height: 50vh;">
+                        <MudIcon Icon="@Icons.Material.Filled.Lock" Style="font-size: 4rem; color: #999;" />
+                        <MudText Typo="Typo.h5" Class="mt-4">Access Denied</MudText>
+                        <MudText Typo="Typo.body1" Class="mt-2">You need to be logged in to access this page.</MudText>
+                        <MudButton Href="/login" Color="Color.Primary" Variant="Variant.Filled" Class="mt-4">
+                            Go to Login
+                        </MudButton>
+                    </div>
+                </NotAuthorized>
+            </AuthorizeView>
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@implements IDisposable
+
+@code {
+    private bool _drawerOpen = true;
+    private MudTheme _currentTheme = new MudTheme
+    {
+        PaletteDark = new PaletteDark(),
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#5CAF90",
+            Secondary = "#4B5966",
+            AppbarBackground = "#5CAF90",
+            Background = "#F8F8FB",
+            DrawerBackground = "#FFF",
+            DrawerText = "#4B5966",
+            Surface = "#FFF",
+            TextPrimary = "#2c3e50",
+            TextSecondary = "#596673",
+            ActionDefault = "#74808b",
+            DrawerIcon = "#5CAF90"
+        },
+        Typography = new Typography
+        {
+            Default = new DefaultTypography
+            {
+                FontFamily = new[] { "Poppins", "Roboto", "Helvetica", "Arial", "sans-serif" },
+                FontSize = ".9rem",
+                FontWeight = 400.ToString(),
+                LineHeight = 1.5.ToString()
+            },
+            H4 = new H4Typography
+            {
+                FontSize = "1.8rem",
+                FontWeight = 500.ToString()
+            },
+            H5 = new H5Typography
+            {
+                FontSize = "1.5rem",
+                FontWeight = 500.ToString()
+            },
+            H6 = new H6Typography
+            {
+                FontSize = "1.1rem",
+                FontWeight = 500.ToString()
+            }
+        }
+    };
+
+    // ✅ Remove all manual authentication fields and methods
+    // AuthorizeView handles everything automatically
+
+    private async Task HandleLogout()
+    {
+        try
+        {
+            // Clear authentication data
+            await _localStorage.RemoveItemAsync("token");
+            await _localStorage.RemoveItemAsync("refreshToken");
+            
+            NavigationManager.NavigateTo("/login", true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Logout error: {ex.Message}");
+            NavigationManager.NavigateTo("/login", true);
+        }
+    }
+
+    private void NavigateToProfile()
+    {
+        NavigationManager.NavigateTo("/profile", true);
+    }
+
+    private void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    /// <summary>
+    /// Extract display name from ClaimsPrincipal
+    /// </summary>
+    private string GetDisplayName(ClaimsPrincipal user)
+    {
+        if (user?.Identity?.IsAuthenticated == true)
+        {
+            var username = user.FindFirst("unique_name")?.Value 
+                        ?? user.FindFirst("username")?.Value 
+                        ?? user.FindFirst("sub")?.Value 
+                        ?? user.Identity.Name 
+                        ?? "User";
+            return username;
+        }
+        return "Guest";
+    }
+
+    public void Dispose()
+    {
+        // Implement IDisposable
+    }
+}

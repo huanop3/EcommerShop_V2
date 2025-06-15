@@ -1,0 +1,274 @@
+@using MudBlazor
+@using BlazorWebApp.Services
+@using MainEcommerceService.Models.ViewModel
+@inject ISnackbar Snackbar
+@inject AddressService AddressService
+@inject SignalRService SignalRService
+@implements IDisposable
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.LocationOn" Class="mr-2" />
+            Manage Addresses: @User?.UserName
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            @if (addresses != null && addresses.Any())
+            {
+                @foreach (var address in addresses)
+                {
+                    <MudItem xs="12" md="6">
+                        <MudCard Elevation="2" Class="mb-3">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <div class="d-flex justify-space-between align-center">
+                                        <MudText Typo="Typo.h6">Address #@address.AddressId</MudText>
+                                        @if (address.IsDefault == true)
+                                        {
+                                            <MudChip T="string" Color="Color.Success" Size="Size.Small">Default</MudChip>
+                                        }
+                                    </div>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudText Typo="Typo.body1">@address.AddressLine1</MudText>
+                                @if (!string.IsNullOrEmpty(address.AddressLine2))
+                                {
+                                    <MudText Typo="Typo.body2">@address.AddressLine2</MudText>
+                                }
+                                <MudText Typo="Typo.body2">@address.City, @address.State @address.PostalCode</MudText>
+                                <MudText Typo="Typo.body2">@address.Country</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
+            }
+            else
+            {
+                <MudItem xs="12">
+                    <MudAlert Severity="Severity.Info">This user has no addresses yet.</MudAlert>
+                </MudItem>
+            }
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    
+    [Parameter] public UserVM? User { get; set; }
+    [Parameter] public List<AddressVM> Addresses { get; set; } = new();
+    
+    private List<AddressVM> addresses = new();
+    
+    protected override async Task OnInitializedAsync()
+    {
+        addresses = Addresses?.ToList() ?? new List<AddressVM>();
+        await InitializeSignalRAsync();
+    }
+
+    private async Task InitializeSignalRAsync()
+    {
+        try
+        {
+            // Subscribe to SignalR events
+            SignalRService.AddressCreated += OnAddressCreated;
+            SignalRService.AddressUpdated += OnAddressUpdated;
+            SignalRService.AddressDeleted += OnAddressDeleted;
+            SignalRService.DefaultAddressChanged += OnDefaultAddressChanged;
+
+            // Start connection if not already connected
+            if (!SignalRService.IsMainHubConnected)
+            {
+                await SignalRService.StartConnectionAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing SignalR: {ex.Message}");
+        }
+    }
+
+    private async void OnAddressCreated(int userId, string addressInfo)
+    {
+        if (User?.Id == userId)
+        {
+            await InvokeAsync(async () =>
+            {
+                // Reload addresses for this user
+                await RefreshAddresses();
+                Snackbar.Add($"New address added: {addressInfo}", Severity.Info);
+                StateHasChanged();
+            });
+        }
+    }
+
+    private async void OnAddressUpdated(int userId, string addressInfo)
+    {
+        if (User?.Id == userId)
+        {
+            await InvokeAsync(async () =>
+            {
+                // Reload addresses for this user
+                await RefreshAddresses();
+                Snackbar.Add($"Address updated: {addressInfo}", Severity.Info);
+                StateHasChanged();
+            });
+        }
+    }
+
+    private async void OnAddressDeleted(int addressId)
+    {
+        await InvokeAsync(async () =>
+        {
+            var deletedAddress = addresses.FirstOrDefault(a => a.AddressId == addressId);
+            if (deletedAddress != null)
+            {
+                addresses.Remove(deletedAddress);
+                Snackbar.Add("An address was deleted", Severity.Info);
+                StateHasChanged();
+            }
+        });
+    }
+
+    private async void OnDefaultAddressChanged(int userId, int addressId)
+    {
+        if (User?.Id == userId)
+        {
+            await InvokeAsync(() =>
+            {
+                foreach (var addr in addresses)
+                {
+                    addr.IsDefault = addr.AddressId == addressId;
+                }
+                Snackbar.Add("Default address changed", Severity.Info);
+                StateHasChanged();
+                return Task.CompletedTask;
+            });
+        }
+    }
+
+    private async Task RefreshAddresses()
+    {
+        try
+        {
+            if (User?.Id != null)
+            {
+                var userAddresses = await AddressService.GetAddressesByUserIdAsync(User.Id);
+                addresses = userAddresses?.ToList() ?? new List<AddressVM>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error refreshing addresses: {ex.Message}");
+        }
+    }
+    
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+    
+    private async Task AddNewAddress()
+    {
+        Snackbar.Add("Add address feature will be implemented", Severity.Info);
+    }
+    
+    private async Task EditAddress(AddressVM address)
+    {
+        Snackbar.Add($"Edit address {address.AddressId} feature will be implemented", Severity.Info);
+    }
+    
+    private async Task SetDefaultAddress(AddressVM address)
+    {
+        try
+        {
+            var success = await AddressService.SetDefaultAddressAsync(address.AddressId, address.UserId);
+            if (success)
+            {
+                foreach (var addr in addresses)
+                {
+                    addr.IsDefault = addr.AddressId == address.AddressId;
+                }
+                StateHasChanged();
+                Snackbar.Add("Default address updated successfully", Severity.Success);
+                
+                // Send SignalR notification (don't wait)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await SignalRService.NotifyDefaultAddressChangedAsync(address.UserId, address.AddressId);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"SignalR notification failed: {ex.Message}");
+                    }
+                });
+            }
+            else
+            {
+                Snackbar.Add("Failed to set default address", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+    
+    private async Task DeleteAddress(AddressVM address)
+    {
+        try
+        {
+            if (address.IsDefault == true)
+            {
+                Snackbar.Add("Cannot delete default address", Severity.Warning);
+                return;
+            }
+            
+            var success = await AddressService.DeleteAddressAsync(address.AddressId);
+            if (success)
+            {
+                addresses.Remove(address);
+                StateHasChanged();
+                Snackbar.Add("Address deleted successfully", Severity.Success);
+                
+                // Send SignalR notification (don't wait)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await SignalRService.NotifyAddressDeletedAsync(address.AddressId);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"SignalR notification failed: {ex.Message}");
+                    }
+                });
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete address", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    public void Dispose()
+    {
+        // Unsubscribe from SignalR events
+        SignalRService.AddressCreated -= OnAddressCreated;
+        SignalRService.AddressUpdated -= OnAddressUpdated;
+        SignalRService.AddressDeleted -= OnAddressDeleted;
+        SignalRService.DefaultAddressChanged -= OnDefaultAddressChanged;
+    }
+}

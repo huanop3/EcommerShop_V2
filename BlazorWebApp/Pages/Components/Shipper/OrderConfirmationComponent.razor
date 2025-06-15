@@ -1,0 +1,807 @@
+@using BlazorWebApp.ViewModel
+@using BlazorWebApp.Services
+@using MudBlazor
+@inject ShipmentService ShipmentService
+@inject ISnackbar Snackbar
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudText Typo="Typo.h6" Class="mb-3">
+        <MudIcon Icon="@Icons.Material.Filled.Assignment" Class="mr-2" />
+        Nhận đơn hàng mới
+        @if (ShipperId > 0)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="ml-2">
+                Shipper ID: @ShipperId
+            </MudChip>
+        }
+        @if (isConnected)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Success" Class="ml-2">
+                <MudIcon Icon="@Icons.Material.Filled.Wifi" Size="Size.Small" Class="mr-1" />
+                Live
+            </MudChip>
+        }
+        <!-- ✅ THÊM REAL-TIME INDICATOR -->
+        @if (hasRecentUpdate)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ml-2">
+                <MudIcon Icon="@Icons.Material.Filled.FiberNew" Size="Size.Small" Class="mr-1" />
+                Updated
+            </MudChip>
+        }
+    </MudText>
+    
+    <!-- ✅ INPUT SECTION -->
+    <MudGrid AlignItems="Center" Class="mb-4">
+        <MudItem xs="12" md="6">
+            <MudTextField @bind-Value="orderCodeInput" 
+                         Label="Nhập mã đơn hàng" 
+                         Variant="Variant.Outlined" 
+                         Adornment="Adornment.Start" 
+                         AdornmentIcon="@Icons.Material.Filled.QrCodeScanner"
+                         HelperText="Nhập Order ID hoặc Order Code"
+                         @onkeypress="OnKeyPress" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudButton Variant="Variant.Filled" 
+                      Color="Color.Primary" 
+                      StartIcon="@Icons.Material.Filled.Search"
+                      OnClick="CheckOrder"
+                      Disabled="isChecking || string.IsNullOrWhiteSpace(orderCodeInput) || ShipperId <= 0"
+                      FullWidth="true">
+                @if (isChecking)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                    <span class="ml-2">Đang kiểm tra...</span>
+                }
+                else
+                {
+                    <span>Kiểm tra đơn hàng</span>
+                }
+            </MudButton>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudButton Variant="Variant.Outlined" 
+                      Color="Color.Secondary" 
+                      StartIcon="@Icons.Material.Filled.Clear"
+                      OnClick="ClearForm"
+                      Disabled="isChecking"
+                      FullWidth="true">
+                Xóa
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+
+    <!-- ✅ VALIDATION SECTION -->
+    @if (ShipperId <= 0)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-4">
+            <MudText Typo="Typo.h6">⚠️ Không thể xác định thông tin shipper</MudText>
+            <MudText>Vui lòng đăng nhập lại hoặc liên hệ admin để được cấp quyền shipper.</MudText>
+        </MudAlert>
+        return;
+    }
+
+    <!-- ✅ ORDER PREVIEW SECTION -->
+    @if (orderPreview != null)
+    {
+        <MudDivider Class="mb-4" />
+        
+        <!-- Order Status Summary -->
+        <MudAlert Severity="GetOrderSeverity()" Class="mb-4">
+            <div class="d-flex align-center">
+                <MudIcon Icon="GetOrderIcon()" Size="Size.Large" Class="mr-3" />
+                <div class="flex-grow-1">
+                    <MudText Typo="Typo.h6">@GetOrderStatusMessage()</MudText>
+                    <MudText Typo="Typo.body2">@GetOrderStatusDescription()</MudText>
+                    <div class="d-flex align-center mt-1">
+                        @if (lastCheckTime.HasValue)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Kiểm tra lúc: @lastCheckTime.Value.ToString("HH:mm:ss dd/MM/yyyy")
+                            </MudText>
+                        }
+                        @if (lastSignalRUpdate.HasValue)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Info" Class="ml-3">
+                                <MudIcon Icon="@Icons.Material.Filled.Sync" Size="Size.Small" Class="mr-1" />
+                                Real-time: @lastSignalRUpdate.Value.ToString("HH:mm:ss")
+                            </MudText>
+                        }
+                        @if (hasRecentUpdate)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.FiberNew" Color="Color.Warning" Size="Size.Small" Class="ml-2" />
+                        }
+                    </div>
+                </div>
+            </div>
+        </MudAlert>
+        
+        <MudGrid>
+            <!-- Order Information -->
+            <MudItem xs="12" md="8">
+                <MudPaper Elevation="1" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" />
+                        Thông tin đơn hàng #@orderPreview.OrderInfo.OrderId
+                        <MudChip T="string" 
+                                Size="Size.Small" 
+                                Color="GetStatusColor(orderPreview.OrderInfo.OrderStatusId)"
+                                Class="ml-2">
+                            @orderPreview.OrderInfo.CurrentOrderStatus
+                            @if (hasRecentStatusUpdate)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.FiberNew" Size="Size.Small" Class="ml-1" />
+                            }
+                        </MudChip>
+                    </MudText>
+                    
+                    <MudSimpleTable Dense="true" Hover="true" Class="mb-3">
+                        <tbody>
+                            <tr>
+                                <td width="30%"><strong>Mã đơn hàng:</strong></td>
+                                <td>ORD-@orderPreview.OrderInfo.OrderId.ToString("D4")</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Khách hàng:</strong></td>
+                                <td>@orderPreview.BuyerInfo.FullName</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Số điện thoại:</strong></td>
+                                <td>
+                                    <MudLink Href="@($"tel:{orderPreview.BuyerInfo.PhoneNumber}")">
+                                        <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" Class="mr-1" />
+                                        @orderPreview.BuyerInfo.PhoneNumber
+                                    </MudLink>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Email:</strong></td>
+                                <td>
+                                    <MudLink Href="@($"mailto:{orderPreview.BuyerInfo.Email}")">
+                                        <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" Class="mr-1" />
+                                        @orderPreview.BuyerInfo.Email
+                                    </MudLink>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Địa chỉ giao hàng:</strong></td>
+                                <td>
+                                    <div class="d-flex align-center">
+                                        <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" Class="mr-1" />
+                                        <span>@orderPreview.ShippingAddress.FullAddress</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Ngày đặt hàng:</strong></td>
+                                <td>@orderPreview.OrderInfo.FormattedOrderDate</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Giá trị đơn hàng:</strong></td>
+                                <td>
+                                    <MudText Typo="Typo.h6" Color="Color.Success">
+                                        @orderPreview.OrderInfo.FormattedTotalAmount
+                                    </MudText>
+                                </td>
+                            </tr>
+                            @if (orderPreview.ShipmentInfo != null)
+                            {
+                                <tr>
+                                    <td><strong>Trạng thái vận chuyển:</strong></td>
+                                    <td>
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="mr-2">
+                                            @orderPreview.ShipmentInfo.Status
+                                            @if (hasRecentShipmentUpdate)
+                                            {
+                                                <MudIcon Icon="@Icons.Material.Filled.FiberNew" Size="Size.Small" Class="ml-1" />
+                                            }
+                                        </MudChip>
+                                        @if (orderPreview.ShipmentInfo.ShipperId == ShipperId)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Success">
+                                                Của bạn
+                                            </MudChip>
+                                        }
+                                    </td>
+                                </tr>
+                                @if (!string.IsNullOrEmpty(orderPreview.ShipmentInfo.TrackingNumber))
+                                {
+                                    <tr>
+                                        <td><strong>Mã vận đơn:</strong></td>
+                                        <td>
+                                            <MudText Typo="Typo.body1" Class="font-weight-bold">
+                                                @orderPreview.ShipmentInfo.TrackingNumber
+                                            </MudText>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+
+                    <!-- Order Items Summary -->
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Inventory" Class="mr-2" />
+                        Sản phẩm (@orderPreview.OrderItems.Count items)
+                    </MudText>
+                    <MudList T="string" Dense="true" Class="pa-0">
+                        @foreach (var item in orderPreview.OrderItems)
+                        {
+                            <MudListItem T="string" Class="pa-2" Style="border-bottom: 1px solid #eee;">
+                                <div class="d-flex justify-space-between align-center">
+                                    <div>
+                                        <MudText Typo="Typo.body2" Class="font-weight-bold">@item.ProductName</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @item.Quantity x @item.FormattedUnitPrice
+                                        </MudText>
+                                    </div>
+                                    <MudText Typo="Typo.body2" Class="font-weight-bold">
+                                        @item.FormattedTotalPrice
+                                    </MudText>
+                                </div>
+                            </MudListItem>
+                        }
+                    </MudList>
+                </MudPaper>
+            </MudItem>
+            
+            <!-- Eligibility Check -->
+            <MudItem xs="12" md="4">
+                <MudPaper Elevation="1" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.ChecklistRtl" Class="mr-2" />
+                        Kiểm tra điều kiện
+                        @if (isAutoRefreshing)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="ml-2" />
+                        }
+                    </MudText>
+                    
+                    <MudList T="string" Dense="true">
+                        <!-- Order Status Check -->
+                        <MudListItem T="string" 
+                                   Icon="@(canShip ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                                   IconColor="@(canShip ? Color.Success : Color.Error)">
+                            <MudText Typo="Typo.body2" Color="@(canShip ? Color.Success : Color.Error)">
+                                @(canShip ? "✅ Đơn hàng có thể ship" : "❌ Đơn hàng không thể ship")
+                            </MudText>
+                        </MudListItem>
+                        
+                        <!-- Shipment Assignment Check -->
+                        <MudListItem T="string" 
+                                   Icon="@GetShipmentIcon()"
+                                   IconColor="@GetShipmentIconColor()">
+                            <MudText Typo="Typo.body2" Color="@GetShipmentIconColor()">
+                                @GetShipmentStatusText()
+                            </MudText>
+                        </MudListItem>
+
+                        <!-- Shipper Info -->
+                        <MudListItem T="string" Icon="@Icons.Material.Filled.Person" IconColor="Color.Info">
+                            <MudText Typo="Typo.body2" Color="Color.Info">
+                                Shipper hiện tại: #@ShipperId
+                            </MudText>
+                        </MudListItem>
+
+                        <!-- ✅ THÊM SIGNALR STATUS TRACKING -->
+                        @if (signalREventCount > 0)
+                        {
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.Sync" IconColor="Color.Secondary">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    SignalR events: @signalREventCount
+                                </MudText>
+                            </MudListItem>
+                        }
+
+                        <!-- Status Change Count -->
+                        @if (statusChangeCount > 0)
+                        {
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.History" IconColor="Color.Secondary">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    Đã kiểm tra @statusChangeCount lần
+                                </MudText>
+                            </MudListItem>
+                        }
+                    </MudList>
+                    
+                    <!-- Action Buttons -->
+                    <MudDivider Class="my-3" />
+                    
+                    <MudStack Spacing="2">
+                        <!-- Refresh Button -->
+                        <MudButton StartIcon="@Icons.Material.Filled.Refresh" 
+                                  Variant="Variant.Text" 
+                                  Color="Color.Secondary"
+                                  OnClick="RefreshCurrentOrder"
+                                  Disabled="isAutoRefreshing || isChecking"
+                                  FullWidth="true"
+                                  Size="Size.Small">
+                            Làm mới thông tin
+                        </MudButton>
+
+                        <!-- Main Action Button -->
+                        @if (CanConfirmPickup())
+                        {
+                            <MudButton Color="Color.Success"
+                                      Variant="Variant.Filled"
+                                      StartIcon="@Icons.Material.Filled.TaskAlt"
+                                      OnClick="ConfirmPickupOrder"
+                                      Disabled="isConfirming"
+                                      FullWidth="true">
+                                @if (isConfirming)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                    <span class="ml-2">Đang xác nhận...</span>
+                                }
+                                else
+                                {
+                                    <span>🚚 Xác nhận nhận đơn</span>
+                                }
+                            </MudButton>
+                        }
+                        else if (IsAlreadyAssignedToMe())
+                        {
+                            <MudAlert Severity="Severity.Success" Dense="true">
+                                <MudText Typo="Typo.body2">
+                                    ✅ Bạn đã được assign đơn hàng này
+                                </MudText>
+                            </MudAlert>
+                        }
+                        else if (IsAssignedToOther())
+                        {
+                            <MudAlert Severity="Severity.Warning" Dense="true">
+                                <MudText Typo="Typo.body2">
+                                    ⚠️ Đơn hàng đã được assign cho shipper khác
+                                </MudText>
+                            </MudAlert>
+                        }
+                        else if (!canShip)
+                        {
+                            <MudAlert Severity="Severity.Error" Dense="true">
+                                <MudText Typo="Typo.body2">
+                                    ❌ Đơn hàng chưa sẵn sàng để ship
+                                </MudText>
+                            </MudAlert>
+                        }
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+    else if (!string.IsNullOrWhiteSpace(orderCodeInput) && !isChecking)
+    {
+        <!-- No Results -->
+        <MudAlert Severity="Severity.Info" Class="mt-4">
+            <MudText Typo="Typo.h6">ℹ️ Không tìm thấy đơn hàng</MudText>
+            <MudText>Vui lòng kiểm tra lại mã đơn hàng hoặc bạn không có quyền truy cập đơn hàng này.</MudText>
+        </MudAlert>
+    }
+</MudPaper>
+
+@code {
+    [Parameter] public int ShipperId { get; set; }
+    [Parameter] public EventCallback<ShipmentDashboardVM> OnOrderConfirmed { get; set; }
+    [Parameter] public bool isConnected { get; set; } = false;
+    
+    private string orderCodeInput = string.Empty;
+    private bool isChecking = false;
+    private bool isConfirming = false;
+    private bool isAutoRefreshing = false;
+    private bool canShip = false;
+    private bool hasRecentUpdate = false;
+    private bool hasRecentStatusUpdate = false; // ✅ THÊM FLAG CHO ORDER STATUS UPDATE
+    private bool hasRecentShipmentUpdate = false; // ✅ THÊM FLAG CHO SHIPMENT STATUS UPDATE
+    private ShipmentDashboardVM? orderPreview;
+    private DateTime? lastCheckTime;
+    private DateTime? lastSignalRUpdate; // ✅ THÊM TIMESTAMP CHO SIGNALR UPDATE
+    private int statusChangeCount = 0;
+    private int signalREventCount = 0; // ✅ ĐẾM SỐ LẦN NHẬN SIGNALR EVENT
+
+    // ✅ PUBLIC METHOD FOR SIGNALR ORDER STATUS UPDATES
+    public async Task OnYourOrderStatusChanged(int orderId, int userId, int statusId, string statusName)
+    {
+        Console.WriteLine($"🔔 OrderConfirmation: Received YourOrderStatusChanged - Order: {orderId}, Status: {statusName}, User: {userId}, Status ID: {statusId}");
+
+        if (orderPreview?.OrderInfo.OrderId == orderId)
+        {
+            await InvokeAsync(async () =>
+            {
+                signalREventCount++;
+                hasRecentUpdate = true;
+                hasRecentStatusUpdate = true;
+                lastSignalRUpdate = DateTime.Now;
+                
+                Snackbar.Add($"🔔 Order #{orderId}: {statusName}", Severity.Info);
+                
+                // ✅ TỰ ĐỘNG REFRESH ORDER ĐỂ LẤY DATA MỚI NHẤT
+                await RefreshCurrentOrderSilent();
+                
+                StateHasChanged();
+                
+                // ✅ AUTO-HIDE STATUS UPDATE INDICATOR AFTER 10 SECONDS
+                _ = Task.Delay(10000).ContinueWith(_ =>
+                {
+                    InvokeAsync(() =>
+                    {
+                        hasRecentStatusUpdate = false;
+                        StateHasChanged();
+                    });
+                });
+            });
+        }
+    }
+
+    // ✅ PUBLIC METHOD FOR SIGNALR SHIPMENT STATUS UPDATES
+    public async Task OnShipmentStatusUpdated(int shipmentId, int orderId, string status)
+    {
+        Console.WriteLine($"🔔 OrderConfirmation: Received ShipmentStatusUpdated - Shipment: {shipmentId}, Order: {orderId}, Status: {status}");
+        
+        if (orderPreview?.OrderInfo.OrderId == orderId)
+        {
+            await InvokeAsync(async () =>
+            {
+                signalREventCount++;
+                hasRecentUpdate = true;
+                hasRecentShipmentUpdate = true;
+                lastSignalRUpdate = DateTime.Now;
+                
+                Snackbar.Add($"🚚 Shipment #{shipmentId}: {status}", Severity.Info);
+                
+                // ✅ TỰ ĐỘNG REFRESH ORDER ĐỂ LẤY DATA MỚI NHẤT
+                await RefreshCurrentOrderSilent();
+                
+                StateHasChanged();
+                
+                // ✅ AUTO-HIDE SHIPMENT UPDATE INDICATOR AFTER 10 SECONDS
+                _ = Task.Delay(10000).ContinueWith(_ =>
+                {
+                    InvokeAsync(() =>
+                    {
+                        hasRecentShipmentUpdate = false;
+                        StateHasChanged();
+                    });
+                });
+            });
+        }
+    }
+
+    // ✅ GENERAL REFRESH ORDER METHOD (FROM PARENT SIGNALR)
+    public async Task RefreshOrderIfMatch(int orderId)
+    {
+        if (orderPreview?.OrderInfo.OrderId == orderId)
+        {
+            Console.WriteLine($"🔄 OrderConfirmation: General refresh for order {orderId}");
+            
+            await InvokeAsync(async () =>
+            {
+                signalREventCount++;
+                hasRecentUpdate = true;
+                lastSignalRUpdate = DateTime.Now;
+                
+                await RefreshCurrentOrderSilent();
+                
+                StateHasChanged();
+            });
+        }
+    }
+
+    // ✅ MAIN CHECK ORDER METHOD
+    private async Task CheckOrder()
+    {
+        if (string.IsNullOrWhiteSpace(orderCodeInput))
+        {
+            Snackbar.Add("Vui lòng nhập mã đơn hàng", Severity.Warning);
+            return;
+        }
+
+        if (ShipperId <= 0)
+        {
+            Snackbar.Add("Không xác định được thông tin shipper", Severity.Error);
+            return;
+        }
+
+        isChecking = true;
+        ResetUpdateFlags();
+        
+        try
+        {
+            // Parse order ID from input (support both "123" and "ORD-000123" formats)
+            var orderId = ParseOrderId(orderCodeInput);
+            if (orderId <= 0)
+            {
+                Snackbar.Add("Mã đơn hàng không hợp lệ", Severity.Warning);
+                return;
+            }
+
+            Console.WriteLine($"🔍 Checking order {orderId} for shipper {ShipperId}...");
+            
+            // Get order details
+            orderPreview = await ShipmentService.GetShipmentDashboardByOrderIdAsync(orderId);
+            
+            if (orderPreview == null)
+            {
+                Snackbar.Add("Không tìm thấy đơn hàng hoặc bạn không có quyền truy cập", Severity.Warning);
+                ClearOrderData();
+                return;
+            }
+
+            // Check shipping eligibility
+            canShip = await ShipmentService.CanOrderBeShippedAsync(orderId);
+            lastCheckTime = DateTime.Now;
+            statusChangeCount++;
+
+            // Show appropriate message
+            ShowCheckResult();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error checking order: {ex.Message}");
+            Snackbar.Add($"Lỗi kiểm tra đơn hàng: {ex.Message}", Severity.Error);
+            ClearOrderData();
+        }
+        finally
+        {
+            isChecking = false;
+        }
+    }
+
+    // ✅ REFRESH CURRENT ORDER (MANUAL)
+    private async Task RefreshCurrentOrder()
+    {
+        if (orderPreview == null) return;
+
+        isAutoRefreshing = true;
+        
+        try
+        {
+            await RefreshCurrentOrderInternal(showNotifications: true);
+        }
+        finally
+        {
+            isAutoRefreshing = false;
+        }
+    }
+
+    // ✅ REFRESH CURRENT ORDER (SILENT - FOR SIGNALR)
+    private async Task RefreshCurrentOrderSilent()
+    {
+        if (orderPreview == null) return;
+        
+        await RefreshCurrentOrderInternal(showNotifications: false);
+    }
+
+    // ✅ INTERNAL REFRESH METHOD
+    private async Task RefreshCurrentOrderInternal(bool showNotifications = true)
+    {
+        if (orderPreview == null) return;
+
+        try
+        {
+            var orderId = orderPreview.OrderInfo.OrderId;
+            Console.WriteLine($"🔄 Refreshing order {orderId}... (Notifications: {showNotifications})");
+            
+            var previousStatus = orderPreview.OrderInfo.CurrentOrderStatus;
+            var previousShipmentStatus = orderPreview.ShipmentInfo?.Status;
+            var previousShipperId = orderPreview.ShipmentInfo?.ShipperId;
+            
+            // Reload order data
+            var newOrderData = await ShipmentService.GetShipmentDashboardByOrderIdAsync(orderId);
+            
+            if (newOrderData != null)
+            {
+                orderPreview = newOrderData;
+                canShip = await ShipmentService.CanOrderBeShippedAsync(orderId);
+                lastCheckTime = DateTime.Now;
+
+                // ✅ DETECT CHANGES
+                bool statusChanged = previousStatus != orderPreview.OrderInfo.CurrentOrderStatus;
+                bool shipmentStatusChanged = previousShipmentStatus != orderPreview.ShipmentInfo?.Status;
+                bool shipmentAssignmentChanged = previousShipperId != orderPreview.ShipmentInfo?.ShipperId;
+
+                if (showNotifications)
+                {
+                    if (statusChanged)
+                    {
+                        Console.WriteLine($"✅ Order status changed: {previousStatus} → {orderPreview.OrderInfo.CurrentOrderStatus}");
+                        Snackbar.Add($"📊 Trạng thái đơn hàng: {orderPreview.OrderInfo.CurrentOrderStatus}", Severity.Info);
+                    }
+
+                    if (shipmentStatusChanged)
+                    {
+                        Console.WriteLine($"✅ Shipment status changed: {previousShipmentStatus} → {orderPreview.ShipmentInfo?.Status}");
+                        Snackbar.Add($"🚚 Trạng thái vận chuyển: {orderPreview.ShipmentInfo?.Status}", Severity.Info);
+                    }
+
+                    if (shipmentAssignmentChanged)
+                    {
+                        Console.WriteLine($"✅ Shipment assignment changed: {previousShipperId} → {orderPreview.ShipmentInfo?.ShipperId}");
+                        if (orderPreview.ShipmentInfo?.ShipperId == ShipperId)
+                        {
+                            Snackbar.Add($"🎯 Bạn đã được assign đơn hàng #{orderId}!", Severity.Success);
+                        }
+                        else if (orderPreview.ShipmentInfo?.ShipperId != null)
+                        {
+                            Snackbar.Add($"⚠️ Đơn hàng đã được assign cho shipper #{orderPreview.ShipmentInfo.ShipperId}", Severity.Warning);
+                        }
+                    }
+                }
+                
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error refreshing order: {ex.Message}");
+            if (showNotifications)
+            {
+                Snackbar.Add($"Lỗi làm mới đơn hàng: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    // ✅ CONFIRM PICKUP ORDER
+    private async Task ConfirmPickupOrder()
+    {
+        if (orderPreview == null || ShipperId <= 0 || !CanConfirmPickup()) return;
+
+        isConfirming = true;
+        try
+        {
+            var success = await ShipmentService.AssignShipmentAsync(orderPreview.OrderInfo.OrderId, ShipperId);
+
+            if (success)
+            {
+                Snackbar.Add($"✅ Đã nhận đơn hàng #{orderPreview.OrderInfo.OrderId} thành công!", Severity.Success);
+                
+                // Refresh order data to show updated shipment info
+                await RefreshCurrentOrder();
+                
+                // Notify parent component
+                await OnOrderConfirmed.InvokeAsync(orderPreview);
+            }
+            else
+            {
+                Snackbar.Add("❌ Xác nhận nhận đơn hàng thất bại", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error confirming pickup: {ex.Message}");
+            Snackbar.Add($"❌ Lỗi xác nhận: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isConfirming = false;
+        }
+    }
+
+    // ✅ HELPER METHODS
+    private int ParseOrderId(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return 0;
+        
+        // Remove "ORD-" prefix if present
+        var cleaned = input.Trim().ToUpper().Replace("ORD-", "");
+        
+        return int.TryParse(cleaned, out var orderId) ? orderId : 0;
+    }
+
+    private void ShowCheckResult()
+    {
+        if (orderPreview == null) return;
+
+        if (CanConfirmPickup())
+        {
+            Snackbar.Add("✅ Đơn hàng đủ điều kiện để nhận", Severity.Success);
+        }
+        else if (IsAlreadyAssignedToMe())
+        {
+            Snackbar.Add("ℹ️ Bạn đã được assign đơn hàng này", Severity.Info);
+        }
+        else if (IsAssignedToOther())
+        {
+            Snackbar.Add($"⚠️ Đơn hàng đã được assign cho shipper #{orderPreview.ShipmentInfo.ShipperId}", Severity.Warning);
+        }
+        else if (!canShip)
+        {
+            Snackbar.Add("⚠️ Đơn hàng chưa sẵn sàng để ship", Severity.Warning);
+        }
+    }
+
+    private bool CanConfirmPickup() => canShip && orderPreview?.ShipmentInfo == null;
+    private bool IsAlreadyAssignedToMe() => orderPreview?.ShipmentInfo?.ShipperId == ShipperId;
+    private bool IsAssignedToOther() => orderPreview?.ShipmentInfo != null && orderPreview.ShipmentInfo.ShipperId != ShipperId;
+
+    private void ResetUpdateFlags()
+    {
+        hasRecentUpdate = false;
+        hasRecentStatusUpdate = false;
+        hasRecentShipmentUpdate = false;
+    }
+
+    private void ClearForm()
+    {
+        orderCodeInput = string.Empty;
+        ClearOrderData();
+    }
+
+    private void ClearOrderData()
+    {
+        orderPreview = null;
+        canShip = false;
+        ResetUpdateFlags();
+        statusChangeCount = 0;
+        signalREventCount = 0;
+        lastCheckTime = null;
+        lastSignalRUpdate = null;
+    }
+
+    private async Task OnKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !isChecking && !string.IsNullOrWhiteSpace(orderCodeInput))
+        {
+            await CheckOrder();
+        }
+    }
+
+    // ✅ AUTO-HIDE RECENT UPDATE AFTER 15 SECONDS
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (hasRecentUpdate)
+        {
+            _ = Task.Delay(15000).ContinueWith(_ =>
+            {
+                InvokeAsync(() =>
+                {
+                    hasRecentUpdate = false;
+                    StateHasChanged();
+                });
+            });
+        }
+    }
+
+    // ✅ UI STATE METHODS
+    private Severity GetOrderSeverity() => CanConfirmPickup() ? Severity.Success : 
+                                          IsAlreadyAssignedToMe() ? Severity.Info :
+                                          IsAssignedToOther() ? Severity.Warning : Severity.Error;
+
+    private string GetOrderIcon() => CanConfirmPickup() ? Icons.Material.Filled.CheckCircle :
+                                    IsAlreadyAssignedToMe() ? Icons.Material.Filled.LocalShipping :
+                                    IsAssignedToOther() ? Icons.Material.Filled.Warning :
+                                    Icons.Material.Filled.Error;
+
+    private string GetOrderStatusMessage() => CanConfirmPickup() ? "Có thể nhận đơn hàng" :
+                                             IsAlreadyAssignedToMe() ? "Đơn hàng của bạn" :
+                                             IsAssignedToOther() ? "Đã có shipper khác" :
+                                             "Không thể nhận đơn";
+
+    private string GetOrderStatusDescription() => CanConfirmPickup() ? "Đơn hàng đủ điều kiện để bạn nhận ship" :
+                                                 IsAlreadyAssignedToMe() ? $"Bạn đã được assign đơn hàng này - Tracking: {orderPreview?.ShipmentInfo?.TrackingNumber}" :
+                                                 IsAssignedToOther() ? $"Đơn hàng đã được assign cho shipper #{orderPreview?.ShipmentInfo?.ShipperId}" :
+                                                 "Đơn hàng chưa sẵn sàng hoặc không có quyền truy cập";
+
+    private string GetShipmentIcon() => orderPreview?.ShipmentInfo == null ? Icons.Material.Filled.CheckCircle :
+                                       IsAlreadyAssignedToMe() ? Icons.Material.Filled.CheckCircle :
+                                       Icons.Material.Filled.Cancel;
+
+    private Color GetShipmentIconColor() => orderPreview?.ShipmentInfo == null ? Color.Success :
+                                           IsAlreadyAssignedToMe() ? Color.Success : Color.Error;
+
+    private string GetShipmentStatusText() => orderPreview?.ShipmentInfo == null ? "✅ Chưa có shipment" :
+                                             IsAlreadyAssignedToMe() ? "✅ Đã assign cho bạn" :
+                                             $"❌ Đã assign cho shipper #{orderPreview.ShipmentInfo.ShipperId}";
+
+    private Color GetStatusColor(int statusId) => statusId switch
+    {
+        1 => Color.Secondary,  // Pending
+        2 => Color.Info,       // Processing  
+        3 => Color.Primary,    // Ready for Pickup
+        4 => Color.Warning,    // Shipped
+        5 => Color.Warning,    // In Transit
+        6 => Color.Success,    // Out for Delivery
+        7 => Color.Success,    // Delivered
+        9 => Color.Error,      // Returned
+        _ => Color.Default
+    };
+}

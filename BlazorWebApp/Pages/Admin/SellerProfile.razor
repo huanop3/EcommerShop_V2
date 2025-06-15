@@ -1,0 +1,890 @@
+@page "/admin/sellers"
+@using BlazorWebApp.Pages.Admin.Dialogs
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using System.ComponentModel.DataAnnotations
+@using BlazorWebApp.Services
+@using MainEcommerceService.Models.ViewModel
+@using MainEcommerceService.Models.dbMainEcommer
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject SellerProfileService SellerProfileService
+@inject UserService UserService
+@inject SignalRService SignalRService
+@layout _AdminLayout
+@attribute [Authorize(Roles = "Admin")]
+@implements IDisposable
+
+<PageTitle>Seller Management - Grabit</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12">
+        <MudPaper Elevation="0" Class="d-flex align-center justify-space-between pa-4"
+            Style="background-color: white; border-radius: 4px;">
+            <MudText Typo="Typo.h4">Seller Management</MudText>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" OnClick="RefreshData">
+                Refresh
+            </MudButton>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<!-- Statistics Cards -->
+<MudGrid Class="mt-4">
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.Store" Color="Color.Success" Size="Size.Large" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="mud-text-secondary">Verified Sellers</MudText>
+                    <MudText Typo="Typo.h4" Color="Color.Success">@verifiedSellers.Count</MudText>
+                </div>
+            </div>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.HourglassEmpty" Color="Color.Warning" Size="Size.Large" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="mud-text-secondary">Pending Approval</MudText>
+                    <MudText Typo="Typo.h4" Color="Color.Warning">@pendingSellers.Count</MudText>
+                </div>
+            </div>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.People" Color="Color.Primary" Size="Size.Large" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="mud-text-secondary">Total Sellers</MudText>
+                    <MudText Typo="Typo.h4" Color="Color.Primary">@(verifiedSellers.Count + pendingSellers.Count)</MudText>
+                </div>
+            </div>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Info" Size="Size.Large" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="mud-text-secondary">New This Month</MudText>
+                    <MudText Typo="Typo.h4" Color="Color.Info">@GetNewSellersThisMonth()</MudText>
+                </div>
+            </div>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<!-- Pending Approval Table -->
+<MudGrid Class="mt-6">
+    <MudItem xs="12">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
+            <MudGrid>
+                <MudItem xs="12" md="8">
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.HourglassEmpty" Color="Color.Warning" Class="mr-2" />
+                        <MudText Typo="Typo.h5">Pending Seller Approvals</MudText>
+                        @if (pendingSellers.Any())
+                        {
+                            <MudChip T="int" Color="Color.Warning" Size="Size.Small" Class="ml-2">@pendingSellers.Count</MudChip>
+                        }
+                    </div>
+                </MudItem>
+                <MudItem xs="12" md="4" Class="d-flex justify-end">
+                    <MudTextField @bind-Value="pendingSearchString" Placeholder="Search pending sellers..." 
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                                  Immediate="true" Class="mt-0" />
+                </MudItem>
+            </MudGrid>
+
+            <MudTable Items="@FilteredPendingSellers" Dense="false" Hover="true" Bordered="false" Striped="false"
+                Loading="@isLoadingPending" LoadingProgressColor="Color.Warning" FixedHeader="false" Elevation="0" Class="mt-3"
+                Breakpoint="Breakpoint.Sm" @bind-RowsPerPage="pendingPageSize">
+                <HeaderContent>
+                    <MudTh Style="width: 80px">Seller ID</MudTh>
+                    <MudTh Style="width: 150px">Store Name</MudTh>
+                    <MudTh Style="width: 180px">Owner Name</MudTh>
+                    <MudTh>Email</MudTh>
+                    <MudTh Style="width: 200px">Description</MudTh>
+                    <MudTh Style="width: 120px">Registration Date</MudTh>
+                    <MudTh Style="width: 80px; text-align: center">Status</MudTh>
+                    <MudTh Style="width: 150px; text-align: center">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Seller ID">@context.SellerId</MudTd>
+                    <MudTd DataLabel="Store Name">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.StoreMallDirectory" Color="Color.Primary" Size="Size.Small" Class="mr-2" />
+                            <MudText Typo="Typo.body1" Style="font-weight: 600;">@context.StoreName</MudText>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Owner Name">
+                        <div class="d-flex align-center">
+                            <MudAvatar Size="Size.Small" Class="mr-2">@GetSellerInitials(context)</MudAvatar>
+                            <MudText Typo="Typo.body1">@GetSellerOwnerName(context)</MudText>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Email">@GetSellerEmail(context)</MudTd>
+                    <MudTd DataLabel="Description">
+                        <MudTooltip Text="@(context.Description ?? "No description")">
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                @(string.IsNullOrEmpty(context.Description) ? "No description" : context.Description)
+                            </MudText>
+                        </MudTooltip>
+                    </MudTd>
+                    <MudTd DataLabel="Registration Date">@(context.CreatedAt?.ToString("MMM dd, yyyy") ?? "N/A")</MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Filled">
+                            Pending
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <div class="d-flex gap-1">
+                            <MudTooltip Text="Approve Seller">
+                                <MudIconButton Icon="@Icons.Material.Filled.Check" 
+                                             Color="Color.Success" Size="Size.Small"
+                                             OnClick="@(() => ApproveSeller(context))" />
+                            </MudTooltip>
+                            <MudTooltip Text="View Details">
+                                <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                                             Color="Color.Primary" Size="Size.Small"
+                                             OnClick="@(() => ViewSellerDetails(context))" />
+                            </MudTooltip>
+                            <MudTooltip Text="Reject Application">
+                                <MudIconButton Icon="@Icons.Material.Filled.Close" 
+                                             Color="Color.Error" Size="Size.Small"
+                                             OnClick="@(() => RejectSeller(context))" />
+                            </MudTooltip>
+                        </div>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 5, 10, 25 }" />
+                </PagerContent>
+                <NoRecordsContent>
+                    <MudAlert Severity="Severity.Info" Class="mt-4">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" />
+                            <MudText>No pending seller applications found.</MudText>
+                        </div>
+                    </MudAlert>
+                </NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<!-- Verified Sellers Table -->
+<MudGrid Class="mt-6">
+    <MudItem xs="12">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
+            <MudGrid>
+                <MudItem xs="12" md="8">
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.VerifiedUser" Color="Color.Success" Class="mr-2" />
+                        <MudText Typo="Typo.h5">Verified Sellers</MudText>
+                        @if (verifiedSellers.Any())
+                        {
+                            <MudChip T="int" Color="Color.Success" Size="Size.Small" Class="ml-2">@verifiedSellers.Count</MudChip>
+                        }
+                    </div>
+                </MudItem>
+                <MudItem xs="12" md="4" Class="d-flex justify-end">
+                    <MudTextField @bind-Value="verifiedSearchString" Placeholder="Search verified sellers..." 
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                                  Immediate="true" Class="mt-0" />
+                </MudItem>
+            </MudGrid>
+
+            <MudTable Items="@FilteredVerifiedSellers" Dense="false" Hover="true" Bordered="false" Striped="false"
+                Loading="@isLoadingVerified" LoadingProgressColor="Color.Success" FixedHeader="false" Elevation="0" Class="mt-3"
+                Breakpoint="Breakpoint.Sm" @bind-RowsPerPage="verifiedPageSize">
+                <HeaderContent>
+                    <MudTh Style="width: 80px">Seller ID</MudTh>
+                    <MudTh Style="width: 150px">Store Name</MudTh>
+                    <MudTh Style="width: 180px">Owner Name</MudTh>
+                    <MudTh>Email</MudTh>
+                    <MudTh Style="width: 200px">Description</MudTh>
+                    <MudTh Style="width: 120px">Verified Date</MudTh>
+                    <MudTh Style="width: 120px">Last Updated</MudTh>
+                    <MudTh Style="width: 80px; text-align: center">Status</MudTh>
+                    <MudTh Style="width: 150px; text-align: center">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Seller ID">@context.SellerId</MudTd>
+                    <MudTd DataLabel="Store Name">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Store" Color="Color.Success" Size="Size.Small" Class="mr-2" />
+                            <MudText Typo="Typo.body1" Style="font-weight: 600;">@context.StoreName</MudText>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Owner Name">
+                        <div class="d-flex align-center">
+                            <MudAvatar Size="Size.Small" Class="mr-2">@GetSellerInitials(context)</MudAvatar>
+                            <MudText Typo="Typo.body1">@GetSellerOwnerName(context)</MudText>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Email">@GetSellerEmail(context)</MudTd>
+                    <MudTd DataLabel="Description">
+                        <MudTooltip Text="@(context.Description ?? "No description")">
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                @(string.IsNullOrEmpty(context.Description) ? "No description" : context.Description)
+                            </MudText>
+                        </MudTooltip>
+                    </MudTd>
+                    <MudTd DataLabel="Verified Date">@(context.CreatedAt?.ToString("MMM dd, yyyy") ?? "N/A")</MudTd>
+                    <MudTd DataLabel="Last Updated">@(context.UpdatedAt?.ToString("MMM dd, yyyy") ?? "Never")</MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">
+                            <MudIcon Icon="@Icons.Material.Filled.Verified" Size="Size.Small" Class="mr-1" />
+                            Verified
+                        </MudChip>
+                    </MudTd>
+
+                    <MudTd DataLabel="Actions">
+                        <div class="d-flex gap-1">
+                            <MudTooltip Text="View Details">
+                                <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                                             Color="Color.Primary" Size="Size.Small"
+                                             OnClick="@(() => ViewSellerDetails(context))" />
+                            </MudTooltip>
+                            <MudTooltip Text="Edit Seller">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                             Color="Color.Secondary" Size="Size.Small"
+                                             OnClick="@(() => EditSeller(context))" />
+                            </MudTooltip>
+                            <MudTooltip Text="Revoke Verification">
+                                <MudIconButton Icon="@Icons.Material.Filled.RemoveCircle" 
+                                             Color="Color.Warning" Size="Size.Small"
+                                             OnClick="@(() => RevokeSeller(context))" />
+                            </MudTooltip>
+                            <MudTooltip Text="Delete Seller">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                             Color="Color.Error" Size="Size.Small"
+                                             OnClick="@(() => DeleteSeller(context))" />
+                            </MudTooltip>
+                        </div>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 5, 10, 25 }" />
+                </PagerContent>
+                <NoRecordsContent>
+                    <MudAlert Severity="Severity.Info" Class="mt-4">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" />
+                            <MudText>No verified sellers found.</MudText>
+                        </div>
+                    </MudAlert>
+                </NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private bool isLoadingPending = true;
+    private bool isLoadingVerified = true;
+    private string pendingSearchString = "";
+    private string verifiedSearchString = "";
+    private int pendingPageSize = 5;
+    private int verifiedPageSize = 10;
+
+    private List<SellerProfileVM> pendingSellers = new();
+    private List<SellerProfileVM> verifiedSellers = new();
+    private List<UserVM> allUsers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await InitializeSignalRAsync();
+        await LoadAllData();
+    }
+
+    private async Task InitializeSignalRAsync()
+    {
+        try
+        {
+            Console.WriteLine("🔔 Admin SellerProfile - Initializing SignalR...");
+            
+            // Subscribe to SignalR events for seller profile changes
+            SignalRService.SellerProfileCreated += OnSellerProfileCreated;
+            SignalRService.SellerProfileUpdated += OnSellerProfileUpdated;
+            SignalRService.SellerProfileDeleted += OnSellerProfileDeleted;
+            SignalRService.SellerProfileVerified += OnSellerProfileVerified;
+            SignalRService.SellerProfileUnverified += OnSellerProfileUnverified;
+
+            // Start connection if not already connected
+            if (!SignalRService.IsMainHubConnected)
+            {
+                Console.WriteLine("🔔 Starting SignalR connection...");
+                await SignalRService.StartConnectionAsync();
+            }
+
+            Console.WriteLine($"🔔 SignalR connection status: {SignalRService.IsMainHubConnected}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error initializing SignalR: {ex.Message}");
+        }
+    }
+
+    private async Task LoadAllData()
+    {
+        Console.WriteLine("🔄 LoadAllData started");
+        
+        await Task.WhenAll(
+            LoadPendingSellers(),
+            LoadVerifiedSellers(),
+            LoadUsers()
+        );
+        
+        Console.WriteLine($"🔄 LoadAllData completed - Pending: {pendingSellers.Count}, Verified: {verifiedSellers.Count}");
+    }
+
+    private async Task LoadPendingSellers()
+    {
+        try
+        {
+            Console.WriteLine("🔄 Loading pending sellers...");
+            isLoadingPending = true;
+            var pendingProfiles = await SellerProfileService.GetPendingVerificationProfilesAsync();
+            pendingSellers = pendingProfiles?.ToList() ?? new List<SellerProfileVM>();
+            Console.WriteLine($"🔄 Loaded {pendingSellers.Count} pending sellers");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading pending sellers: {ex.Message}");
+            Snackbar.Add($"Error loading pending sellers: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoadingPending = false;
+        }
+    }
+
+    private async Task LoadVerifiedSellers()
+    {
+        try
+        {
+            Console.WriteLine("🔄 Loading verified sellers...");
+            isLoadingVerified = true;
+            var verifiedProfiles = await SellerProfileService.GetVerifiedSellerProfilesAsync();
+            verifiedSellers = verifiedProfiles?.ToList() ?? new List<SellerProfileVM>();
+            Console.WriteLine($"🔄 Loaded {verifiedSellers.Count} verified sellers");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading verified sellers: {ex.Message}");
+            Snackbar.Add($"Error loading verified sellers: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoadingVerified = false;
+        }
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            var users = await UserService.GetAllUserAsync();
+            allUsers = users?.ToList() ?? new List<UserVM>();
+            Console.WriteLine($"🔄 Loaded {allUsers.Count} users");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading users: {ex.Message}");
+        }
+    }
+
+    private async Task RefreshData()
+    {
+        Console.WriteLine("🔄 Manual refresh triggered");
+        await LoadAllData();
+        Snackbar.Add("Data refreshed successfully", Severity.Success);
+    }
+
+    // 🔥 IMPROVED SignalR Event Handlers với full data synchronization
+    private async void OnSellerProfileCreated(string storeName)
+    {
+        Console.WriteLine($"🔔 Admin received SellerProfileCreated: {storeName}");
+        
+        await InvokeAsync(async () =>
+        {
+            // Reload pending sellers để có data mới nhất
+            await LoadPendingSellers();
+            Snackbar.Add($"New seller application: {storeName}", Severity.Info);
+            StateHasChanged();
+        });
+    }
+
+    private async void OnSellerProfileUpdated(int sellerId, string storeName)
+    {
+        Console.WriteLine($"🔔 Admin received SellerProfileUpdated: SellerId={sellerId}, StoreName={storeName}");
+        
+        await InvokeAsync(async () =>
+        {
+            try
+            {
+                // 🔥 IMPROVED: Fetch updated seller profile từ server để có full data
+                var updatedSeller = await SellerProfileService.GetSellerProfileByIdAsync(sellerId);
+                if (updatedSeller != null)
+                {
+                    Console.WriteLine($"🔔 Fetched updated seller data: {updatedSeller.StoreName}, Description: {updatedSeller.Description}");
+                    
+                    // Update trong pending list
+                    var pendingIndex = pendingSellers.FindIndex(s => s.SellerId == sellerId);
+                    if (pendingIndex >= 0)
+                    {
+                        pendingSellers[pendingIndex] = updatedSeller;
+                        Console.WriteLine($"🔔 Updated seller in pending list: {updatedSeller.StoreName}");
+                    }
+                    
+                    // Update trong verified list
+                    var verifiedIndex = verifiedSellers.FindIndex(s => s.SellerId == sellerId);
+                    if (verifiedIndex >= 0)
+                    {
+                        verifiedSellers[verifiedIndex] = updatedSeller;
+                        Console.WriteLine($"🔔 Updated seller in verified list: {updatedSeller.StoreName}");
+                    }
+                    
+                    if (pendingIndex >= 0 || verifiedIndex >= 0)
+                    {
+                        Snackbar.Add($"Seller profile updated: {updatedSeller.StoreName}", Severity.Info);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"🔔 Seller {sellerId} not found in local lists, doing full reload");
+                        await LoadAllData();
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"🔔 Could not fetch updated seller {sellerId}, doing full reload");
+                    await LoadAllData();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error in OnSellerProfileUpdated: {ex.Message}");
+                // Fallback: reload toàn bộ data
+                await LoadAllData();
+            }
+            
+            StateHasChanged();
+        });
+    }
+
+    private async void OnSellerProfileDeleted(int sellerId)
+    {
+        Console.WriteLine($"🔔 Admin received SellerProfileDeleted: SellerId={sellerId}");
+        
+        await InvokeAsync(() =>
+        {
+            // 🔥 XỬ LÝ LOCAL: Xóa seller khỏi cả 2 list
+            var removedFromPending = pendingSellers.RemoveAll(s => s.SellerId == sellerId);
+            var removedFromVerified = verifiedSellers.RemoveAll(s => s.SellerId == sellerId);
+            
+            Console.WriteLine($"🔔 Removed {removedFromPending} from pending, {removedFromVerified} from verified");
+            
+            if (removedFromPending > 0 || removedFromVerified > 0)
+            {
+                Snackbar.Add("A seller profile was deleted", Severity.Warning);
+            }
+            
+            StateHasChanged();
+            return Task.CompletedTask;
+        });
+    }
+
+    private async void OnSellerProfileVerified(int sellerId, string storeName)
+    {
+        Console.WriteLine($"🔔 Admin received SellerProfileVerified: SellerId={sellerId}, StoreName={storeName}");
+        
+        await InvokeAsync(async () =>
+        {
+            try
+            {
+                // 🔥 IMPROVED: Fetch fresh data từ server để đảm bảo accuracy
+                var verifiedSeller = await SellerProfileService.GetSellerProfileByIdAsync(sellerId);
+                if (verifiedSeller != null && verifiedSeller.IsVerified == true)
+                {
+                    // Tìm và xóa khỏi pending list
+                    var pendingSeller = pendingSellers.FirstOrDefault(s => s.SellerId == sellerId);
+                    if (pendingSeller != null)
+                    {
+                        pendingSellers.Remove(pendingSeller);
+                        Console.WriteLine($"🔔 Removed seller {storeName} from pending list");
+                    }
+                    
+                    // Thêm vào verified list (hoặc update nếu đã có)
+                    var existingVerified = verifiedSellers.FirstOrDefault(s => s.SellerId == sellerId);
+                    if (existingVerified != null)
+                    {
+                        var index = verifiedSellers.IndexOf(existingVerified);
+                        verifiedSellers[index] = verifiedSeller;
+                        Console.WriteLine($"🔔 Updated existing seller in verified list: {storeName}");
+                    }
+                    else
+                    {
+                        verifiedSellers.Insert(0, verifiedSeller); // Thêm vào đầu list
+                        Console.WriteLine($"🔔 Added seller {storeName} to verified list");
+                    }
+                    
+                    Snackbar.Add($"Seller verified: {storeName}", Severity.Success);
+                }
+                else
+                {
+                    Console.WriteLine($"🔔 Could not fetch verified seller {sellerId} or verification status incorrect, reloading data");
+                    await LoadAllData();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error in OnSellerProfileVerified: {ex.Message}");
+                await LoadAllData();
+            }
+            
+            StateHasChanged();
+        });
+    }
+
+    private async void OnSellerProfileUnverified(int sellerId, string storeName)
+    {
+        Console.WriteLine($"🔔 Admin received SellerProfileUnverified: SellerId={sellerId}, StoreName={storeName}");
+        
+        await InvokeAsync(async () =>
+        {
+            try
+            {
+                // 🔥 IMPROVED: Fetch fresh data từ server
+                var unverifiedSeller = await SellerProfileService.GetSellerProfileByIdAsync(sellerId);
+                if (unverifiedSeller != null && unverifiedSeller.IsVerified != true)
+                {
+                    // Tìm và xóa khỏi verified list
+                    var verifiedSeller = verifiedSellers.FirstOrDefault(s => s.SellerId == sellerId);
+                    if (verifiedSeller != null)
+                    {
+                        verifiedSellers.Remove(verifiedSeller);
+                        Console.WriteLine($"🔔 Removed seller {storeName} from verified list");
+                    }
+                    
+                    // Thêm vào pending list (hoặc update nếu đã có)
+                    var existingPending = pendingSellers.FirstOrDefault(s => s.SellerId == sellerId);
+                    if (existingPending != null)
+                    {
+                        var index = pendingSellers.IndexOf(existingPending);
+                        pendingSellers[index] = unverifiedSeller;
+                        Console.WriteLine($"🔔 Updated existing seller in pending list: {storeName}");
+                    }
+                    else
+                    {
+                        pendingSellers.Insert(0, unverifiedSeller); // Thêm vào đầu list
+                        Console.WriteLine($"🔔 Added seller {storeName} to pending list");
+                    }
+                    
+                    Snackbar.Add($"Seller verification revoked: {storeName}", Severity.Warning);
+                }
+                else
+                {
+                    Console.WriteLine($"🔔 Could not fetch unverified seller {sellerId} or verification status incorrect, reloading data");
+                    await LoadAllData();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error in OnSellerProfileUnverified: {ex.Message}");
+                await LoadAllData();
+            }
+            
+            StateHasChanged();
+        });
+    }
+
+    // Filtering
+    private IEnumerable<SellerProfileVM> FilteredPendingSellers => pendingSellers
+        .Where(s => string.IsNullOrWhiteSpace(pendingSearchString) ||
+            s.StoreName.Contains(pendingSearchString, StringComparison.OrdinalIgnoreCase) ||
+            GetSellerOwnerName(s).Contains(pendingSearchString, StringComparison.OrdinalIgnoreCase) ||
+            GetSellerEmail(s).Contains(pendingSearchString, StringComparison.OrdinalIgnoreCase) ||
+            s.SellerId.ToString().Contains(pendingSearchString, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<SellerProfileVM> FilteredVerifiedSellers => verifiedSellers
+        .Where(s => string.IsNullOrWhiteSpace(verifiedSearchString) ||
+            s.StoreName.Contains(verifiedSearchString, StringComparison.OrdinalIgnoreCase) ||
+            GetSellerOwnerName(s).Contains(verifiedSearchString, StringComparison.OrdinalIgnoreCase) ||
+            GetSellerEmail(s).Contains(verifiedSearchString, StringComparison.OrdinalIgnoreCase) ||
+            s.SellerId.ToString().Contains(verifiedSearchString, StringComparison.OrdinalIgnoreCase));
+
+    // Helper Methods
+    private string GetSellerOwnerName(SellerProfileVM seller)
+    {
+        var user = allUsers.FirstOrDefault(u => u.Id == seller.UserId);
+        return user != null ? $"{user.FirstName} {user.LastName}".Trim() : "Unknown";
+    }
+
+    private string GetSellerEmail(SellerProfileVM seller)
+    {
+        var user = allUsers.FirstOrDefault(u => u.Id == seller.UserId);
+        return user?.Email ?? "Unknown";
+    }
+
+    private string GetSellerInitials(SellerProfileVM seller)
+    {
+        var user = allUsers.FirstOrDefault(u => u.Id == seller.UserId);
+        if (user == null) return "?";
+        
+        var fn = user.FirstName?.Trim() ?? "";
+        var ln = user.LastName?.Trim() ?? "";
+        
+        if (string.IsNullOrEmpty(fn) && string.IsNullOrEmpty(ln)) return "?";
+        if (string.IsNullOrEmpty(ln)) return fn.Length > 0 ? fn[0].ToString().ToUpper() : "?";
+        if (string.IsNullOrEmpty(fn)) return ln.Length > 0 ? ln[0].ToString().ToUpper() : "?";
+        
+        return $"{fn[0]}{ln[0]}".ToUpper();
+    }
+
+    private int GetNewSellersThisMonth()
+    {
+        var thisMonth = DateTime.Now.Month;
+        var thisYear = DateTime.Now.Year;
+        
+        return (verifiedSellers.Count(s => s.CreatedAt?.Month == thisMonth && s.CreatedAt?.Year == thisYear) +
+                pendingSellers.Count(s => s.CreatedAt?.Month == thisMonth && s.CreatedAt?.Year == thisYear));
+    }
+
+    // Action Methods
+    private async Task ApproveSeller(SellerProfileVM seller)
+    {
+        try
+        {
+            Console.WriteLine($"🔄 Approving seller {seller.SellerId} - {seller.StoreName}");
+            //Set role Seller
+            var parameters = new DialogParameters
+            {
+                ["ContentText"] = $"Are you sure you want to approve the seller '{seller.StoreName}'? This will verify their profile.",
+                ["ButtonText"] = "Approve",
+                ["Color"] = Color.Success
+            };
+            var dialog = await DialogService.ShowAsync<ConfirmDialog>("Approve Seller Profile", parameters);
+            var result = await dialog.Result;
+            if (result.Canceled)
+            {
+                Console.WriteLine("🔄 Seller approval canceled by user");
+                return;
+            }
+            var success = await SellerProfileService.VerifySellerProfileAsync(seller.SellerId);
+            if (success)
+            {
+                Snackbar.Add($"Seller '{seller.StoreName}' approved successfully!", Severity.Success);
+                
+                // 🔥 Gửi SignalR notification với full data
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await SignalRService.NotifySellerProfileVerifiedAsync(seller.SellerId, seller.StoreName);
+                        Console.WriteLine($"🔔 Sent SignalR verification notification for {seller.StoreName}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"❌ SignalR notification failed: {ex.Message}");
+                    }
+                });
+            }
+            else
+            {
+                Snackbar.Add("Failed to approve seller", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error approving seller: {ex.Message}");
+            Snackbar.Add($"Error approving seller: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task RevokeSeller(SellerProfileVM seller)
+    {
+        var parameters = new DialogParameters
+        {
+            ["ContentText"] = $"Are you sure you want to revoke verification for '{seller.StoreName}'? The seller will lose verified status.",
+            ["ButtonText"] = "Revoke",
+            ["Color"] = Color.Warning
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Revoke Seller Verification", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                Console.WriteLine($"🔄 Revoking seller {seller.SellerId} - {seller.StoreName}");
+                var success = await SellerProfileService.UnverifySellerProfileAsync(seller.SellerId);
+                if (success)
+                {
+                    Snackbar.Add($"Verification revoked for '{seller.StoreName}'", Severity.Warning);
+                    
+                    // 🔥 Gửi SignalR notification
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await SignalRService.NotifySellerProfileUnverifiedAsync(seller.SellerId, seller.StoreName);
+                            Console.WriteLine($"🔔 Sent SignalR unverification notification for {seller.StoreName}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"❌ SignalR notification failed: {ex.Message}");
+                        }
+                    });
+                }
+                else
+                {
+                    Snackbar.Add("Failed to revoke seller verification", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error revoking seller: {ex.Message}");
+                Snackbar.Add($"Error revoking seller: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task RejectSeller(SellerProfileVM seller)
+    {
+        var parameters = new DialogParameters
+        {
+            ["ContentText"] = $"Are you sure you want to reject the seller application for '{seller.StoreName}'? This action cannot be undone.",
+            ["ButtonText"] = "Reject",
+            ["Color"] = Color.Error
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Reject Seller Application", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                Console.WriteLine($"🔄 Rejecting seller {seller.SellerId} - {seller.StoreName}");
+                var success = await SellerProfileService.DeleteSellerProfileAsync(seller.SellerId);
+                if (success)
+                {
+                    Snackbar.Add($"Seller application for '{seller.StoreName}' rejected", Severity.Warning);
+                    
+                    // 🔥 Gửi SignalR notification
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await SignalRService.NotifySellerProfileDeletedAsync(seller.SellerId);
+                            Console.WriteLine($"🔔 Sent SignalR deletion notification for seller {seller.SellerId}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"❌ SignalR notification failed: {ex.Message}");
+                        }
+                    });
+                }
+                else
+                {
+                    Snackbar.Add("Failed to reject seller application", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error rejecting seller: {ex.Message}");
+                Snackbar.Add($"Error rejecting seller: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeleteSeller(SellerProfileVM seller)
+    {
+        var parameters = new DialogParameters
+        {
+            ["ContentText"] = $"Are you sure you want to permanently delete the seller profile for '{seller.StoreName}'? This action cannot be undone.",
+            ["ButtonText"] = "Delete",
+            ["Color"] = Color.Error
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Seller Profile", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                Console.WriteLine($"🔄 Deleting seller {seller.SellerId} - {seller.StoreName}");
+                var success = await SellerProfileService.DeleteSellerProfileAsync(seller.SellerId);
+                if (success)
+                {
+                    Snackbar.Add($"Seller profile '{seller.StoreName}' deleted permanently", Severity.Error);
+                    
+                    // 🔥 Gửi SignalR notification
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await SignalRService.NotifySellerProfileDeletedAsync(seller.SellerId);
+                            Console.WriteLine($"🔔 Sent SignalR deletion notification for seller {seller.SellerId}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"❌ SignalR notification failed: {ex.Message}");
+                        }
+                    });
+                }
+                else
+                {
+                    Snackbar.Add("Failed to delete seller profile", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error deleting seller: {ex.Message}");
+                Snackbar.Add($"Error deleting seller: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ViewSellerDetails(SellerProfileVM seller)
+    {
+        var user = allUsers.FirstOrDefault(u => u.Id == seller.UserId);
+        var message = $"Store: {seller.StoreName}\n" +
+                     $"Owner: {GetSellerOwnerName(seller)}\n" +
+                     $"Email: {GetSellerEmail(seller)}\n" +
+                     $"Registration: {seller.CreatedAt?.ToString("MMMM dd, yyyy") ?? "Unknown"}\n" +
+                     $"Description: {seller.Description ?? "No description"}\n" +
+                     $"Verified: {(seller.IsVerified == true ? "Yes" : "No")}";
+        
+        var parameters = new DialogParameters
+        {
+            ["ContentText"] = message,
+            ["ButtonText"] = "Close",
+            ["Color"] = Color.Primary
+        };
+
+        await DialogService.ShowAsync<ConfirmDialog>($"Seller Details - {seller.StoreName}", parameters);
+    }
+
+    private async Task EditSeller(SellerProfileVM seller)
+    {
+        Snackbar.Add("Edit seller functionality coming soon", Severity.Info);
+    }
+
+    public void Dispose()
+    {
+        // Unsubscribe from SignalR events
+        SignalRService.SellerProfileCreated -= OnSellerProfileCreated;
+        SignalRService.SellerProfileUpdated -= OnSellerProfileUpdated;
+        SignalRService.SellerProfileDeleted -= OnSellerProfileDeleted;
+        SignalRService.SellerProfileVerified -= OnSellerProfileVerified;
+        SignalRService.SellerProfileUnverified -= OnSellerProfileUnverified;
+    }
+}

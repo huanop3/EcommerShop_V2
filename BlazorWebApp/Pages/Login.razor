@@ -1,0 +1,300 @@
+@page "/login"
+@using web_api_base.Models.ViewModel
+@using BlazorWebApp.Services
+@inject NavigationManager NavigationManager
+@inject LoginService LoginService
+
+<PageTitle>Login - Grocery Shop</PageTitle>
+
+<link href="css/auth.css" rel="stylesheet" />
+
+<!-- Success Modal -->
+@if (showSuccessModal)
+{
+    <div class="success-modal-overlay fade-in">
+        <div class="success-modal">
+            <div class="success-modal-content">
+                <div class="success-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h3>Welcome Back!</h3>
+                <p class="success-message">
+                    Welcome <strong>@currentUserName</strong>! You have successfully logged in.
+                </p>
+                <div class="countdown-info">
+                    <p>Redirecting to home page in <span class="countdown">@redirectCountdown</span> seconds...</p>
+                </div>
+                <div class="success-actions">
+                    <button class="btn-submit" @onclick="RedirectToHome">
+                        <i class="fas fa-home mr-2"></i>
+                        Go to Home
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="auth-container">
+    @if (isLoggingIn)
+    {
+        <div class="loading-overlay fade-in">
+            <div class="loading-spinner-large"></div>
+            <p class="loading-text-large">Logging in to your account...</p>
+        </div>
+    }
+
+    <div class="auth-box">
+        <div class="auth-header">
+            <h2>Login to Your Account</h2>
+            <p>Welcome back! Please enter your credentials to access your account</p>
+        </div>
+
+        @if (isCheckingAuth)
+        {
+            <div class="loading-indicator">
+                <div class="loading-spinner"></div>
+                <p class="loading-text">Đang kiểm tra trạng thái đăng nhập...</p>
+            </div>
+        }
+        else
+        {
+            <div class="auth-form fade-in">
+                <!-- Error message display -->
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="error-message">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <span>@errorMessage</span>
+                    </div>
+                }
+
+                <EditForm Model="loginModel" OnValidSubmit="HandleLogin" OnInvalidSubmit="HandleInvalidSubmit">
+                    <DataAnnotationsValidator />
+
+                    <div class="form-group @(formSubmitted && string.IsNullOrEmpty(loginModel.Username) ? "input-validation-error" : "")">
+                        <label for="username">Username</label>
+                        <div class="input-group">
+                            <i class="fas fa-user"></i>
+                            <InputText id="username" placeholder="Enter your username" @bind-Value="loginModel.Username" />
+                        </div>
+                        <ValidationMessage For="@(() => loginModel.Username)" class="field-validation-error" />
+                    </div>
+
+                    <div class="form-group @(formSubmitted && string.IsNullOrEmpty(loginModel.Password) ? "input-validation-error" : "")">
+                        <label for="password">Password</label>
+                        <div class="input-group">
+                            <i class="fas fa-lock"></i>
+                            <InputText type="@(ShowPassword ? "text" : "password")" id="password"
+                                placeholder="Enter your password" @bind-Value="loginModel.Password" />
+                            <button type="button" class="password-toggle" @onclick="TogglePasswordVisibility">
+                                <i class="@(ShowPassword ? "fas fa-eye-slash" : "fas fa-eye")"></i>
+                            </button>
+                        </div>
+                        <ValidationMessage For="@(() => loginModel.Password)" class="field-validation-error" />
+                    </div>
+
+                    <div class="form-options">
+                        <a href="/forget-password" class="forgot-link">Forgot Password?</a>
+                    </div>
+
+                    <div class="form-submit">
+                        <button type="submit" class="btn-submit" disabled="@isLoggingIn">
+                            @if (isLoggingIn)
+                            {
+                                <span class="spinner-border spinner-border-sm mr-2" role="status" aria-hidden="true"></span>
+                                <span>Logging in...</span>
+                            }
+                            else
+                            {
+                                <span>Log In</span>
+                            }
+                        </button>
+                    </div>
+                </EditForm>
+
+                <div class="auth-divider">
+                    <span>OR</span>
+                </div>
+
+                <div class="social-auth">
+                    <button class="btn-social btn-google" @onclick="HandleGoogleLogin">
+                        <i class="fab fa-google"></i>
+                        <span>Login with Google</span>
+                    </button>
+                    <button class="btn-social btn-facebook" @onclick="HandleFacebookLogin">
+                        <i class="fab fa-facebook-f"></i>
+                        <span>Login with Facebook</span>
+                    </button>
+                </div>
+
+                <div class="auth-footer">
+                    <p>Don't have an account? <a href="/register">Register Now</a></p>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private UserLoginVM loginModel = new UserLoginVM();
+    private bool ShowPassword { get; set; } = false;
+    private bool isCheckingAuth = true;
+    private bool isLoggingIn = false;
+    private bool formSubmitted = false;
+    private bool showSuccessModal = false;
+    private string errorMessage = string.Empty;
+    private string currentUserName = string.Empty;
+    private int redirectCountdown = 3;
+    private Timer? countdownTimer;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await CheckAuthenticationStatus();
+            StateHasChanged();
+        }
+    }
+
+    private async Task CheckAuthenticationStatus()
+    {
+        try
+        {
+            isCheckingAuth = true;
+            await Task.Delay(500);
+            bool isLoggedIn = await LoginService.CheckAuthenticationStatus();
+
+            if (isLoggedIn)
+            {
+                NavigationManager.NavigateTo("/");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Lỗi kiểm tra đăng nhập: {ex.Message}");
+        }
+        finally
+        {
+            isCheckingAuth = false;
+            StateHasChanged();
+        }
+    }
+
+    private void TogglePasswordVisibility()
+    {
+        ShowPassword = !ShowPassword;
+    }
+
+    private async Task HandleLogin()
+    {
+        formSubmitted = true;
+        errorMessage = string.Empty; // Clear previous errors
+        
+        // Validate input fields
+        if (string.IsNullOrWhiteSpace(loginModel.Username) || string.IsNullOrWhiteSpace(loginModel.Password))
+        {
+            errorMessage = "Please enter both username and password";
+            return;
+        }
+        
+        isLoggingIn = true;
+        
+        try
+        {
+            // Thực hiện đăng nhập với phản hồi chi tiết
+            var (success, error) = await LoginService.Login(loginModel);
+            
+            if (success)
+            {
+                // Lưu tên user để hiển thị trong success modal
+                currentUserName = loginModel.Username;
+                
+                // Chờ một chút để UI update xong trước khi hiển thị modal
+                await Task.Delay(500);
+                
+                // Hiển thị success modal
+                await ShowSuccessModalAsync();
+            }
+            else
+            {
+                errorMessage = error; // Directly use the error message from service
+                loginModel.Password = string.Empty; // Xóa mật khẩu đã nhập để bảo mật
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred during login. Please try again later.";
+            Console.WriteLine($"Login error: {ex.Message}");
+            loginModel.Password = string.Empty;
+        }
+        finally
+        {
+            isLoggingIn = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ShowSuccessModalAsync()
+    {
+        // Đảm bảo loading overlay đã tắt trước khi hiển thị modal
+        isLoggingIn = false;
+        StateHasChanged();
+        
+        // Chờ một chút để UI render
+        await Task.Delay(100);
+        
+        showSuccessModal = true;
+        redirectCountdown = 3; // 3 giây cho login (ngắn hơn register)
+        StateHasChanged();
+
+        // Bắt đầu countdown timer
+        countdownTimer = new Timer(async _ =>
+        {
+            await InvokeAsync(() =>
+            {
+                redirectCountdown--;
+                if (redirectCountdown <= 0)
+                {
+                    countdownTimer?.Dispose();
+                    RedirectToHome();
+                }
+                else
+                {
+                    StateHasChanged();
+                }
+            });
+        }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+
+    private void RedirectToHome()
+    {
+        countdownTimer?.Dispose();
+        showSuccessModal = false;
+        NavigationManager.NavigateTo("/", true);
+    }
+
+    private void HandleInvalidSubmit()
+    {
+        formSubmitted = true;
+        errorMessage = "Please enter valid username and password";
+    }
+
+    private void HandleGoogleLogin()
+    {
+        // Placeholder for Google login
+        errorMessage = "Google login will be implemented soon!";
+    }
+
+    private void HandleFacebookLogin()
+    {
+        // Placeholder for Facebook login
+        errorMessage = "Facebook login will be implemented soon!";
+    }
+
+    public void Dispose()
+    {
+        countdownTimer?.Dispose();
+    }
+}
