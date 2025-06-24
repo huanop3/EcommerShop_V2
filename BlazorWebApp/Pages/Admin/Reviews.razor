@@ -1,0 +1,279 @@
+@page "/admin/reviews"
+@using MudBlazor
+@layout _AdminLayout
+
+<PageTitle>Reviews Management - Grabit</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12">
+        <MudPaper Elevation="0" Class="d-flex align-center justify-space-between pa-4" Style="background-color: white; border-radius: 4px;">
+            <MudText Typo="Typo.h4">Reviews</MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.GetApp">Export</MudButton>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudGrid Class="mt-4">
+    <MudItem xs="12">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
+            <MudGrid>
+                <MudItem xs="12" md="8">
+                    <MudTextField @bind-Value="searchString" Placeholder="Search reviews..." 
+                                 Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                                 Immediate="true" Class="mt-0" />
+                </MudItem>
+                <MudItem xs="12" md="4" Class="d-flex justify-end">
+                    <MudSelect T="string" Label="Product" @bind-Value="selectedProduct" Class="mr-2">
+                        <MudSelectItem Value="@("")">All Products</MudSelectItem>
+                        @foreach (var product in products)
+                        {
+                            <MudSelectItem Value="@product">@product</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudSelect T="int" Label="Rating" @bind-Value="selectedRating">
+                        <MudSelectItem Value="0">All Ratings</MudSelectItem>
+                        <MudSelectItem Value="5">5 Stars</MudSelectItem>
+                        <MudSelectItem Value="4">4 Stars</MudSelectItem>
+                        <MudSelectItem Value="3">3 Stars</MudSelectItem>
+                        <MudSelectItem Value="2">2 Stars</MudSelectItem>
+                        <MudSelectItem Value="1">1 Star</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+            
+            <MudTable Items="@FilteredReviews" Dense="false" Hover="true" Bordered="false" Striped="false" 
+                     Loading="@isLoading" LoadingProgressColor="Color.Primary" FixedHeader="true" Height="calc(100vh - 300px)"
+                     Class="mt-3">
+                <HeaderContent>
+                    <MudTh Style="width: 100px">ID</MudTh>
+                    <MudTh Style="width: 180px">Customer</MudTh>
+                    <MudTh Style="width: 180px">Product</MudTh>
+                    <MudTh Style="width: 120px">Rating</MudTh>
+                    <MudTh>Review</MudTh>
+                    <MudTh Style="width: 120px">Date</MudTh>
+                    <MudTh Style="width: 120px; text-align: center">Status</MudTh>
+                    <MudTh Style="width: 80px; text-align: center">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="ID">@context.Id</MudTd>
+                    <MudTd DataLabel="Customer">
+                        <div class="d-flex align-center">
+                            <MudAvatar Size="Size.Small" Class="mr-2" Image="@context.CustomerAvatarUrl">@context.CustomerInitial</MudAvatar>
+                            <MudText Typo="Typo.body1">@context.CustomerName</MudText>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Product">
+                        <div class="d-flex align-center">
+                            <MudAvatar Size="Size.Small" Square="true" Class="mr-2" Style="border-radius: 4px;" 
+                                      Image="@context.ProductImageUrl"></MudAvatar>
+                            <MudText Typo="Typo.body1">@context.ProductName</MudText>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Rating">
+                        <MudRating ReadOnly="true" SelectedValue="@context.Rating" />
+                    </MudTd>
+                    <MudTd DataLabel="Review">
+                        <MudText Typo="Typo.body2" Style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            @context.Comment
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Date">@context.Date.ToShortDateString()</MudTd>
+                    <MudTd DataLabel="Status" Style="text-align: center">
+                        <MudSwitch T="bool" @bind-Checked="@context.IsApproved" Color="Color.Primary" 
+                                  OnChanged="@(() => UpdateReviewStatus(context))" />
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                            <MudMenuItem Icon="@Icons.Material.Filled.Visibility" OnClick="@(() => OpenReviewDialog(context))">View</MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Reply">Reply</MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">Delete</MudMenuItem>
+                        </MudMenu>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] {10, 25, 50}" />
+                </PagerContent>
+            </MudTable>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudDialog @bind-IsVisible="dialogVisible" Options="dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Review Details</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (selectedReview != null)
+        {
+            <div class="d-flex flex-column">
+                <div class="d-flex mb-4">
+                    <MudAvatar Size="Size.Large" Square="true" Class="mr-3" Style="border-radius: 4px;" 
+                              Image="@selectedReview.ProductImageUrl"></MudAvatar>
+                    <div>
+                        <MudText Typo="Typo.h6">@selectedReview.ProductName</MudText>
+                        <MudRating ReadOnly="true" SelectedValue="@selectedReview.Rating" Size="Size.Medium" Class="my-1" />
+                        <MudText Typo="Typo.caption">@selectedReview.Date.ToString("MMMM dd, yyyy")</MudText>
+                    </div>
+                </div>
+                
+                <div class="d-flex align-center mb-4">
+                    <MudAvatar Size="Size.Medium" Class="mr-2" Image="@selectedReview.CustomerAvatarUrl">
+                        @selectedReview.CustomerInitial
+                    </MudAvatar>
+                    <MudText Typo="Typo.body1"><strong>@selectedReview.CustomerName</strong></MudText>
+                </div>
+                
+                <MudPaper Elevation="0" Class="pa-4 mb-4" Style="background-color: #f8f9fa; border-radius: 4px;">
+                    <MudText Typo="Typo.body1">@selectedReview.Comment</MudText>
+                </MudPaper>
+                
+                @if (!string.IsNullOrEmpty(selectedReview.AdminReply))
+                {
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">Admin Reply:</MudText>
+                    <MudPaper Elevation="0" Class="pa-4 mb-4" Style="background-color: #edf7ed; border-radius: 4px;">
+                        <MudText Typo="Typo.body1">@selectedReview.AdminReply</MudText>
+                    </MudPaper>
+                }
+                else
+                {
+                    <MudTextField T="string" Label="Reply to this review" Variant="Variant.Outlined" Lines="4" 
+                                 @bind-Value="replyText" />
+                }
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (selectedReview != null && string.IsNullOrEmpty(selectedReview.AdminReply))
+        {
+            <MudButton Color="Color.Primary" OnClick="@(() => SaveReply())">Post Reply</MudButton>
+        }
+        <MudButton Color="Color.Default" OnClick="@(() => dialogVisible = false)">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool isLoading = false;
+    private string searchString = "";
+    private string selectedProduct = "";
+    private int selectedRating = 0;
+    private ReviewModel selectedReview = null;
+    private bool dialogVisible = false;
+    private string replyText = "";
+    
+    private DialogOptions dialogOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
+    
+    private List<string> products = new List<string> {
+        "Organic Apples", "Mixed Nuts Berries Pack", "Fresh Mango Juice Pack", "Multi Grain Combo Cookies", 
+        "Organic Broccoli", "Almond Butter Jar", "Organic Bananas", "Fresh Orange Juice"
+    };
+    
+    private List<ReviewModel> reviews = new List<ReviewModel>
+    {
+        new ReviewModel 
+        { 
+            Id = "REV-001", 
+            CustomerName = "John Doe", 
+            CustomerAvatarUrl = "/images/admin/avatar1.jpg", 
+            ProductName = "Mixed Nuts Berries Pack", 
+            ProductImageUrl = "/images/products/mixed-nuts.jpg", 
+            Rating = 5, 
+            Comment = "Absolutely delicious! The mix of nuts and berries is perfect. I've been buying these for months now and they're always fresh. Highly recommended for anyone who wants a healthy snack option.", 
+            Date = DateTime.Now.AddDays(-5), 
+            IsApproved = true,
+            AdminReply = "Thank you for your continued support, John! We're glad you're enjoying our Mixed Nuts Berries Pack."
+        },
+        new ReviewModel 
+        { 
+            Id = "REV-002", 
+            CustomerName = "Jane Smith", 
+            CustomerAvatarUrl = "/images/admin/avatar2.jpg", 
+            ProductName = "Multi Grain Combo Cookies", 
+            ProductImageUrl = "/images/products/cookies.jpg", 
+            Rating = 4, 
+            Comment = "These cookies are very good. They're not too sweet and have a nice crunch. I would have given 5 stars but a few cookies in my pack were broken.", 
+            Date = DateTime.Now.AddDays(-7), 
+            IsApproved = true
+        },
+        new ReviewModel 
+        { 
+            Id = "REV-003", 
+            CustomerName = "Robert Johnson", 
+            CustomerAvatarUrl = "/images/admin/avatar3.jpg", 
+            ProductName = "Fresh Mango Juice Pack", 
+            ProductImageUrl = "/images/products/mango-juice.jpg", 
+            Rating = 2, 
+            Comment = "The juice tasted watered down and not as fresh as I expected. Not worth the price in my opinion.", 
+            Date = DateTime.Now.AddDays(-10), 
+            IsApproved = true
+        },
+        new ReviewModel 
+        { 
+            Id = "REV-004", 
+            CustomerName = "Emily Davis", 
+            CustomerAvatarUrl = "/images/admin/avatar4.jpg", 
+            ProductName = "Organic Apples", 
+            ProductImageUrl = "/images/products/apple.jpg", 
+            Rating = 5, 
+            Comment = "These apples are amazing! So crisp and juicy. Will definitely order again.", 
+            Date = DateTime.Now.AddDays(-15), 
+            IsApproved = true
+        },
+        new ReviewModel 
+        { 
+            Id = "REV-005", 
+            CustomerName = "Michael Wilson", 
+            CustomerAvatarUrl = "/images/admin/avatar5.jpg", 
+            ProductName = "Organic Broccoli", 
+            ProductImageUrl = "/images/products/broccoli.jpg", 
+            Rating = 4, 
+            Comment = "Fresh and crisp broccoli. Good quality produce.", 
+            Date = DateTime.Now.AddDays(-20), 
+            IsApproved = false
+        }
+    };
+
+    private IEnumerable<ReviewModel> FilteredReviews => reviews
+        .Where(r => string.IsNullOrWhiteSpace(searchString) || 
+                   r.CustomerName.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+                   r.ProductName.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+                   r.Comment.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+        .Where(r => string.IsNullOrWhiteSpace(selectedProduct) || r.ProductName == selectedProduct)
+        .Where(r => selectedRating == 0 || r.Rating == selectedRating)
+        .OrderByDescending(r => r.Date);
+
+    private void UpdateReviewStatus(ReviewModel review)
+    {
+        // In a real app, you'd update the review status in the database
+    }
+    
+    private void OpenReviewDialog(ReviewModel review)
+    {
+        selectedReview = review;
+        replyText = "";
+        dialogVisible = true;
+    }
+    
+    private void SaveReply()
+    {
+        if (selectedReview != null && !string.IsNullOrWhiteSpace(replyText))
+        {
+            selectedReview.AdminReply = replyText;
+            dialogVisible = false;
+        }
+    }
+
+    public class ReviewModel
+    {
+        public string Id { get; set; }
+        public string CustomerName { get; set; }
+        public string CustomerAvatarUrl { get; set; }
+        public string CustomerInitial => string.IsNullOrEmpty(CustomerName) ? "?" : CustomerName[0].ToString();
+        public string ProductName { get; set; }
+        public string ProductImageUrl { get; set; }
+        public int Rating { get; set; }
+        public string Comment { get; set; }
+        public DateTime Date { get; set; }
+        public bool IsApproved { get; set; }
+        public string AdminReply { get; set; }
+    }
+}

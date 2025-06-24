@@ -1,0 +1,314 @@
+@using MudBlazor
+@using MainEcommerceService.Models.ViewModel
+@using ProductService.Models.ViewModel
+@using MainEcommerceService.Models.dbMainEcommer
+@inject ProdService ProdService
+@inject SellerProfileService SellerProfileService // ✅ THÊM: Inject SellerProfileService
+@inject UserService UserService // ✅ THÊM: Inject UserService
+
+<MudDialog>
+    <DialogContent>
+        <div class="pa-4">
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-4" Elevation="2">
+                        <MudText Typo="Typo.h6" Class="mb-3">Order Information</MudText>
+                        <MudText><strong>Order ID:</strong> #ORD-@Order.OrderId</MudText>
+                        <MudText><strong>Date:</strong> @Order.OrderDate.ToString("MMMM dd, yyyy HH:mm")</MudText>
+                        <MudText><strong>Total Amount:</strong> $@Order.TotalAmount.ToString("F2")</MudText>
+                        <MudText><strong>Status:</strong> @GetStatusName(Order.OrderStatusId)</MudText>
+                    </MudPaper>
+                </MudItem>
+                
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-4" Elevation="2">
+                        <MudText Typo="Typo.h6" Class="mb-3">Customer Information</MudText>
+                        @if (Customer != null)
+                        {
+                            <MudText><strong>Name:</strong> @Customer.FirstName @Customer.LastName</MudText>
+                            <MudText><strong>Email:</strong> @Customer.Email</MudText>
+                            <MudText><strong>Phone:</strong> @(Customer.PhoneNumber ?? "N/A")</MudText>
+                        }
+                        else
+                        {
+                            <MudText>Customer information not available</MudText>
+                        }
+                    </MudPaper>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudPaper Class="pa-4" Elevation="2">
+                        <MudText Typo="Typo.h6" Class="mb-3">Order Items</MudText>
+                        <MudTable Items="@OrderItems" Dense="true" Hover="true" Loading="@isLoadingProducts">
+                            <HeaderContent>
+                                <MudTh>Product</MudTh>
+                                <MudTh>Seller Information</MudTh> <!-- ✅ THÊM: Cột seller information -->
+                                <MudTh>Quantity</MudTh>
+                                <MudTh>Unit Price</MudTh>
+                                <MudTh>Total</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>
+                                    <div>
+                                        <MudText Typo="Typo.body2">@GetProductName(context.ProductId)</MudText>
+                                        <MudText Typo="Typo.caption" Class="text-muted">ID: @context.ProductId</MudText>
+                                    </div>
+                                </MudTd>
+                                <!-- ✅ THÊM: Cột hiển thị thông tin seller -->
+                                <MudTd>
+                                    <div>
+                                        <MudText Typo="Typo.body2" Class="font-weight-medium">
+                                            @GetSellerStoreName(context.ProductId)
+                                        </MudText>
+                                        <MudText Typo="Typo.caption" Class="text-muted">
+                                            by @GetSellerName(context.ProductId)
+                                        </MudText>
+                                    </div>
+                                </MudTd>
+                                <MudTd>@context.Quantity</MudTd>
+                                <MudTd>$@context.UnitPrice.ToString("F2")</MudTd>
+                                <MudTd>$@context.TotalPrice.ToString("F2")</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [Parameter] public OrderVM Order { get; set; }
+    [Parameter] public IEnumerable<OrderItemVM> OrderItems { get; set; }
+    [Parameter] public ProfileVM? Customer { get; set; }
+
+    // ✅ THÊM: Properties cho các cache
+    private bool isLoadingProducts = false;
+    private Dictionary<int, string> productNames = new Dictionary<int, string>();
+    private Dictionary<int, PrdVMWithImages> productCache = new Dictionary<int, PrdVMWithImages>(); // ✅ THÊM: Cache sản phẩm
+    private Dictionary<int, SellerProfileVM> sellerProfileCache = new Dictionary<int, SellerProfileVM>(); // ✅ THÊM: Cache seller profile
+    private Dictionary<int, ProfileVM> sellerUserCache = new Dictionary<int, ProfileVM>(); // ✅ THÊM: Cache seller user info
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllProductData();
+    }
+
+    // ✅ SỬA: Method tổng hợp để load tất cả dữ liệu sản phẩm và seller
+    private async Task LoadAllProductData()
+    {
+        try
+        {
+            isLoadingProducts = true;
+            StateHasChanged();
+
+            var productIds = OrderItems.Select(item => item.ProductId).Distinct().ToList();
+            
+            // ✅ SỬA: Load products trước, sau đó load seller data
+            await LoadProducts(productIds);
+            await LoadSellerDataForProducts(productIds);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading product data: {ex.Message}");
+        }
+        finally
+        {
+            isLoadingProducts = false;
+            StateHasChanged();
+        }
+    }
+
+    // ✅ THÊM: Method để load products
+    private async Task LoadProducts(IEnumerable<int> productIds)
+    {
+        var loadTasks = productIds.Select(async productId =>
+        {
+            try
+            {
+                var product = await ProdService.GetProductByIdAsync(productId);
+                if (product != null)
+                {
+                    lock (productCache)
+                    {
+                        productCache[productId] = product;
+                        productNames[productId] = product.ProductName;
+                    }
+                }
+                else
+                {
+                    lock (productNames)
+                    {
+                        productNames[productId] = "Unknown Product";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading product {productId}: {ex.Message}");
+                lock (productNames)
+                {
+                    productNames[productId] = "Error Loading Product";
+                }
+            }
+        });
+
+        await Task.WhenAll(loadTasks);
+    }
+
+    // ✅ SỬA: Method để load seller data cho các products
+    private async Task LoadSellerDataForProducts(IEnumerable<int> productIds)
+    {
+        try
+        {
+            // Lấy danh sách seller IDs từ products đã load
+            var sellerIds = new HashSet<int>();
+
+            foreach (var productId in productIds)
+            {
+                if (productCache.TryGetValue(productId, out var product))
+                {
+                    sellerIds.Add(product.SellerId);
+                }
+            }
+
+            if (!sellerIds.Any()) return;
+
+            // Load seller profiles
+            var sellerProfileTasks = sellerIds.Select(async sellerId =>
+            {
+                try
+                {
+                    var sellerProfile = await SellerProfileService.GetSellerProfileByIdAsync(sellerId);
+                    if (sellerProfile != null)
+                    {
+                        lock (sellerProfileCache)
+                        {
+                            sellerProfileCache[sellerId] = sellerProfile;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error loading seller profile {sellerId}: {ex.Message}");
+                }
+            });
+
+            await Task.WhenAll(sellerProfileTasks);
+
+            // Lấy user IDs từ seller profiles đã load
+            var userIds = new HashSet<int>();
+            foreach (var sellerProfile in sellerProfileCache.Values)
+            {
+                userIds.Add(sellerProfile.UserId);
+            }
+
+            if (!userIds.Any()) return;
+
+            // Load user profiles for sellers
+            var userProfileTasks = userIds.Select(async userId =>
+            {
+                try
+                {
+                    var userProfile = await UserService.GetProfileAsync(userId);
+                    if (userProfile != null)
+                    {
+                        lock (sellerUserCache)
+                        {
+                            sellerUserCache[userId] = userProfile;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error loading user profile {userId}: {ex.Message}");
+                }
+            });
+
+            await Task.WhenAll(userProfileTasks);
+
+            // ✅ THÊM: Refresh UI after loading
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading seller data: {ex.Message}");
+        }
+    }
+
+    // ✅ SỬA: Method để lấy tên shop từ productId
+    private string GetSellerStoreName(int productId)
+    {
+        try
+        {
+            if (productCache.TryGetValue(productId, out var product))
+            {
+                if (sellerProfileCache.TryGetValue(product.SellerId, out var sellerProfile))
+                {
+                    return !string.IsNullOrWhiteSpace(sellerProfile.StoreName) ? sellerProfile.StoreName : "Unknown Store";
+                }
+            }
+            return isLoadingProducts ? "Loading..." : "Unknown Store";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error getting seller store name for product {productId}: {ex.Message}");
+            return "Error Loading";
+        }
+    }
+
+    // ✅ SỬA: Method để lấy tên người bán từ productId
+    private string GetSellerName(int productId)
+    {
+        try
+        {
+            if (productCache.TryGetValue(productId, out var product))
+            {
+                if (sellerProfileCache.TryGetValue(product.SellerId, out var sellerProfile))
+                {
+                    if (sellerUserCache.TryGetValue(sellerProfile.UserId, out var userProfile))
+                    {
+                        var fullName = $"{userProfile.FirstName} {userProfile.LastName}".Trim();
+                        return !string.IsNullOrWhiteSpace(fullName) ? fullName : "Unknown Seller";
+                    }
+                }
+            }
+            return isLoadingProducts ? "Loading..." : "Unknown Seller";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error getting seller name for product {productId}: {ex.Message}");
+            return "Error Loading";
+        }
+    }
+
+    // ✅ GIỮ NGUYÊN: Method để lấy product name
+    private string GetProductName(int productId)
+    {
+        return productNames.TryGetValue(productId, out var name) ? name : (isLoadingProducts ? "Loading..." : "Unknown Product");
+    }
+
+    void Cancel() => MudDialog.Cancel();
+
+    private string GetStatusName(int statusId)
+    {
+        return statusId switch
+        {
+            1 => "Pending",
+            2 => "Confirmed", 
+            3 => "Processing",
+            4 => "Shipped",
+            5 => "In Transit",
+            6 => "Out for Delivery",
+            7 => "Delivered",
+            8 => "Cancelled",
+            9 => "Returned",
+            10 => "Refunded",
+            _ => "Unknown"
+        };
+    }
+}

@@ -1,0 +1,383 @@
+/* Global Reset and Box Sizing */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    overflow-x: hidden; /* Prevent horizontal scroll/stripe */
+    width: 100%;
+}
+
+.body-container{
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px 0;
+}
+
+.container1 {
+    /* Base max-width for screens >= 1400px */
+    max-width: 1320px; 
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 15px;
+    width: 100%;
+}
+
+/* Footer Styles */
+.footer {
+    font-family: 'Poppins', sans-serif;
+    background-color: #FFFFFF;
+    border-top: 1px solid #EEEEEE;
+    padding-top: 60px;
+    overflow-x: hidden; /* Add this */
+    /* Add transition for padding */
+    transition: padding-top 0.3s ease;
+}
+
+.footer-main {
+    padding: 0 0 40px;
+    /* Add transition for padding */
+    transition: padding-bottom 0.3s ease;
+}
+
+.footer-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 30px;
+    /* Add transition for gap */
+    transition: gap 0.3s ease;
+}
+
+.footer-col {
+    flex: 1;
+    min-width: 170px;
+    /* Add transition for flex-basis and text-align */
+    transition: flex-basis 0.3s ease, text-align 0.3s ease;
+}
+
+.footer-col:first-child {
+    flex: 1.5;
+    max-width: 300px;
+    /* Add transition for max-width */
+    transition: max-width 0.3s ease;
+}
+
+.footer-logo {
+    display: block;
+    margin-bottom: 20px;
+}
+
+.footer-logo img {
+    height: 40px;
+}
+
+.footer-heading {
+    color: #4B5966;
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    position: relative;
+    padding-bottom: 10px;
+    /* Add transition for font-size and margin */
+    transition: font-size 0.3s ease, margin-bottom 0.3s ease, padding-bottom 0.3s ease;
+}
+
+.footer-heading:after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 1px;
+    background-color: #EEEEEE;
+}
+
+.footer-description {
+    color: #777777;
+    font-size: 14px;
+    line-height: 1.9;
+    letter-spacing: 0.32px;
+    margin-bottom: 20px;
+    /* Add transition for font-size and line-height */
+    transition: font-size 0.3s ease, line-height 0.3s ease;
+}
+
+.app-buttons {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 25px;
+    /* Add transition for gap and margin */
+    transition: gap 0.3s ease, margin-bottom 0.3s ease, flex-direction 0.3s ease;
+}
+
+.app-button img {
+    border-radius: 5px;
+    height: 40px;
+    /* Add transition for height */
+    transition: height 0.3s ease;
+}
+
+.footer-links {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.footer-links li {
+    margin-bottom: 14px;
+    /* Add transition for margin */
+    transition: margin-bottom 0.3s ease;
+}
+
+.footer-links a {
+    color: #777777;
+    font-size: 14px;
+    text-decoration: none;
+    transition: color 0.3s;
+    line-height: 1.4;
+    display: inline-block;
+}
+
+.footer-links a:hover {
+    color: #5CAF90;
+}
+
+.contact-info {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.contact-info .contact-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 15px;
+    /* Add transition for margin and gap */
+    transition: margin-bottom 0.3s ease, gap 0.3s ease;
+}
+
+.contact-info .contact-item p {
+    color: #777777;
+    font-size: 14px;
+    line-height: 1.8;
+    margin: 0;
+    letter-spacing: 0.32px;
+}
+
+.contact-info .contact-item a {
+    color: #777777;
+    font-size: 14px;
+    text-decoration: none;
+    transition: color 0.3s;
+    line-height: 1.8;
+}
+
+.contact-info .contact-item a:hover {
+    color: #5CAF90;
+}
+
+.location-icon-dark, .phone-icon-dark, .email-icon-dark {
+    width: 20px;
+    height: 20px;
+    display: inline-block;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    flex-shrink: 0;
+    margin-top: 3px;
+    /* Add transition for size and margin */
+    transition: width 0.3s ease, height 0.3s ease, margin-top 0.3s ease;
+}
+
+.location-icon-dark {
+    background-image: url('/images/header/location-dark.svg');
+}
+
+.phone-icon-dark {
+    background-image: url('/images/header/phone-dark.svg');
+}
+
+.email-icon-dark {
+    background-image: url('/images/header/email-dark.svg');
+}
+
+.social-links {
+    display: flex;
+    gap: 10px;
+    margin-top: 25px;
+    /* Add transition for margin and gap */
+    transition: margin-top 0.3s ease, gap 0.3s ease;
+}
+
+.social-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background-color: #4B5966;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+}
+
+.social-link:hover {
+    background-color: #5CAF90;
+}
+
+.facebook-icon, .twitter-icon, .instagram-icon, .linkedin-icon {
+    width: 18px;
+    height: 18px;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    /* Add transition for size */
+    transition: width 0.3s ease, height 0.3s ease;
+}
+
+.facebook-icon {
+    background-image: url('/images/header/facebook.svg');
+}
+
+.twitter-icon {
+    background-image: url('/images/header/twitter.svg');
+}
+
+.instagram-icon {
+    background-image: url('/images/header/instagram.svg');
+}
+
+.linkedin-icon {
+    background-image: url('/images/header/linkedin.svg');
+}
+
+.footer-bottom {
+    background-color: #F8F8FB;
+    padding: 20px 0;
+    border-top: 1px solid #EEEEEE;
+    /* Add transition for padding */
+    transition: padding 0.3s ease;
+}
+
+.footer-bottom .container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    /* Add transition for gap */
+    /* Note: flex-direction cannot be transitioned smoothly */
+    transition: gap 0.3s ease; 
+}
+
+.copyright {
+    color: #777777;
+    font-size: 13px;
+    font-weight: 300;
+    letter-spacing: 1px;
+    margin: 0;
+    text-align: center;
+    /* Add transition for font-size */
+    transition: font-size 0.3s ease;
+}
+
+.copyright a {
+    color: #5CAF90;
+    text-decoration: none;
+}
+
+.payment-methods img {
+    height: 28px;
+    /* Add transition for height */
+    transition: height 0.3s ease;
+}
+
+/* Responsive Styles */
+
+/* XXL Devices (Large Desktops, less than 1400px) */
+@media (max-width: 1399.98px) {
+    .container {
+        max-width: 1140px; 
+    }
+}
+
+/* XL Devices (Desktops, less than 1200px) */
+@media (max-width: 1199.98px) {
+    .container {
+        max-width: 960px;
+    }
+
+    .footer-col:first-child {
+        max-width: 280px; 
+    }
+}
+
+/* LG Devices (Tablets, less than 992px) */
+@media (max-width: 991.98px) {
+    .container {
+        max-width: 720px;
+    }
+
+    .footer-row {
+        gap: 20px; 
+    }
+
+    .footer-col {
+        flex-basis: calc(50% - 10px); 
+        min-width: auto;
+    }
+    .footer-col:first-child {
+        flex-basis: 100%; 
+        max-width: none;
+    }
+}
+
+/* MD Devices (Landscape Phones, less than 768px) */
+@media (max-width: 767.98px) {
+    .container {
+        max-width: 540px;
+    }
+
+    .footer {
+        padding-top: 40px;
+    }
+    .footer-main {
+        padding-bottom: 30px;
+    }
+    .footer-col {
+        flex-basis: 100%; 
+        text-align: left; 
+    }
+    .footer-heading:after {
+        left: 0;
+        transform: none;
+        width: 100%; 
+    }
+    .contact-info .contact-item {
+        justify-content: flex-start; 
+        text-align: left; 
+    }
+    .social-links {
+        justify-content: flex-start; 
+        margin-top: 20px;
+    }
+    .app-buttons {
+        justify-content: flex-start; 
+    }
+
+    .footer-bottom .container {
+        flex-direction: column; 
+        gap: 15px;
+    }
+    .copyright {
+        text-align: center;
+    }
+    .payment-methods img {
+        height: 24px; 
+    }
+}

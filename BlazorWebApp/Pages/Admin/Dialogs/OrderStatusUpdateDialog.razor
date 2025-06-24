@@ -1,0 +1,60 @@
+@using MudBlazor
+@using MainEcommerceService.Models.ViewModel
+@inject SignalRService SignalRService
+@inject ISnackbar Snackbar
+<MudDialog>
+    <DialogContent>
+        <div class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-3">Update Order Status</MudText>
+            <MudText Class="mb-3">Order #ORD-@Order.OrderId</MudText>
+            <MudText Class="mb-4">Current Status: <strong>@CurrentStatus</strong></MudText>
+            
+            <MudSelect T="string" @bind-Value="selectedStatus" Label="New Status" 
+                      Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                @foreach (var status in AvailableStatuses)
+                {
+                    <MudSelectItem Value="@status">@status</MudSelectItem>
+                }
+            </MudSelect>
+
+            @if (UserRole == "Seller")
+            {
+                <MudAlert Severity="Severity.Info" Class="mt-3">
+                    As a seller, you can only progress orders forward. You cannot revert to previous statuses.
+                </MudAlert>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" 
+                  OnClick="Submit" Disabled="@(string.IsNullOrEmpty(selectedStatus))">
+            Update Status
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [Parameter] public OrderVM Order { get; set; }
+    [Parameter] public string CurrentStatus { get; set; }
+    [Parameter] public List<string> AvailableStatuses { get; set; }
+    [Parameter] public string UserRole { get; set; }
+
+    private string selectedStatus = "";
+
+    void Cancel() => MudDialog.Cancel();
+    public async void Submit()
+    {
+        Snackbar.Add($"Loading...", Severity.Info);
+        
+        // ✅ DEBUG: Log parameters trước khi gửi
+        Console.WriteLine($"🚀 Calling NotifyOrderStatusChangedAsync with Order: {Order.OrderId}, Status: {selectedStatus}");
+        
+        // ✅ KIỂM TRA: Method này có tồn tại trong SignalRService không?
+        await SignalRService.NotifyOrderStatusChangedAsync(Order.OrderId, 0, 0, selectedStatus);
+        
+        Snackbar.Add($"Order status updated to '{selectedStatus}'", Severity.Success);
+        MudDialog.Close(DialogResult.Ok(selectedStatus));
+    }
+}

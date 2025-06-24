@@ -1,0 +1,404 @@
+@page "/admin/categories"
+@using BlazorWebApp.Pages.Admin.Dialogs
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using BlazorWebApp.Services
+@using MainEcommerceService.Models.ViewModel
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject CategoryService CategoryService
+@inject SignalRService SignalRService
+@layout _AdminLayout
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Categories Management - Grabit</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12">
+        <MudPaper Elevation="0" Class="d-flex align-center justify-space-between pa-4"
+            Style="background-color: white; border-radius: 4px;">
+            <MudText Typo="Typo.h4">Categories</MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudGrid Class="mt-4">
+    <MudItem xs="12" md="7">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
+            <div class="d-flex align-center justify-space-between mb-4">
+                <MudText Typo="Typo.h5">Categories</MudText>
+                <MudTextField @bind-Value="searchString" Placeholder="Search categories..." 
+                             Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                             Immediate="true" Class="ml-auto mr-2" Style="max-width: 300px;" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" 
+                          OnClick="@(() => OpenCreateDialog())">Add Category</MudButton>
+            </div>
+            
+            <MudTable Items="@FilteredCategories" Dense="false" Hover="true" Bordered="false" Striped="false" 
+                     Loading="@isLoading" LoadingProgressColor="Color.Primary" FixedHeader="true" Height="calc(100vh - 250px)"
+                     Class="mt-3" @bind-RowsPerPage="pageSize">
+                <HeaderContent>
+                    <MudTh>ID</MudTh>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Description</MudTh>
+                    <MudTh Style="width: 120px">Created Date</MudTh>
+                    <MudTh Style="width: 120px">Updated Date</MudTh>
+                    <MudTh Style="width: 100px; text-align: center">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="ID">@context.CategoryId</MudTd>
+                    <MudTd DataLabel="Name">
+                        <div class="d-flex align-center">
+                            <MudAvatar Color="@GetRandomColor(context.CategoryId)" Size="Size.Small" Class="mr-2">
+                                @GetCategoryInitials(context.CategoryName)
+                            </MudAvatar>
+                            @context.CategoryName
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Description">@(context.Description ?? "No description")</MudTd>
+                    <MudTd DataLabel="Created Date">@(context.CreatedAt?.ToShortDateString() ?? "N/A")</MudTd>
+                    <MudTd DataLabel="Updated Date">@(context.UpdatedAt?.ToShortDateString() ?? "N/A")</MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" 
+                                     OnClick="@(() => OpenEditDialog(context))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" 
+                                     OnClick="@(() => ConfirmDeleteCategory(context))" />
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] {5, 10, 25, 50}" />
+                </PagerContent>
+                <NoRecordsContent>
+                    <MudText>No categories found</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+    </MudItem>
+    
+    <MudItem xs="12" md="5">
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border-radius: 4px;">
+            <MudText Typo="Typo.h5" Class="mb-4">
+                @(selectedCategory?.CategoryId == 0 ? "Add New Category" : "Edit Category")
+            </MudText>
+            
+            @if (selectedCategory != null)
+            {
+                <MudForm @ref="form" @bind-IsValid="@isValid">
+                    <MudGrid>
+                        <MudItem xs="12" Class="d-flex justify-center">
+                            <MudAvatar Color="@GetRandomColor(selectedCategory.CategoryId)" Size="Size.Large" Class="mb-3">
+                                @GetCategoryInitials(selectedCategory.CategoryName ?? "NC")
+                            </MudAvatar>
+                        </MudItem>
+                        
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="selectedCategory.CategoryName" Label="Category Name" Required="true" 
+                                        RequiredError="Category name is required" />
+                        </MudItem>
+                        
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="selectedCategory.Description" Label="Description" Lines="3" />
+                        </MudItem>
+                        
+                        <MudItem xs="12" Class="d-flex justify-space-between mt-4">
+                            <MudButton Variant="Variant.Outlined" OnClick="@(() => selectedCategory = null)">Cancel</MudButton>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!isValid)" OnClick="SaveCategory">
+                                @(selectedCategory.CategoryId == 0 ? "Create Category" : "Update Category")
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudForm>
+            }
+            else
+            {
+                <div class="d-flex flex-column justify-center align-center py-8">
+                    <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Large" Class="mb-4" />
+                    <MudText Typo="Typo.h6">No Category Selected</MudText>
+                    <MudText Typo="Typo.body2" Class="mt-2">Select a category to edit or create a new one</MudText>
+                </div>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private bool isLoading = true;
+    private bool isValid = false;
+    private string searchString = "";
+    private CategoryVM selectedCategory = null;
+    private MudForm form;
+    private int pageSize = 10;
+    
+    private Random random = new Random();
+    private List<CategoryVM> categories = new List<CategoryVM>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategoriesAsync();
+        await InitializeSignalRAsync();
+    }
+
+    private async Task InitializeSignalRAsync()
+    {
+        try
+        {
+            // Subscribe to SignalR events
+            SignalRService.CategoryCreated += OnCategoryCreated;
+            SignalRService.CategoryUpdated += OnCategoryUpdated;
+            SignalRService.CategoryDeleted += OnCategoryDeleted;
+
+
+            // Start connection if not already connected
+            if (!SignalRService.IsProductHubConnected)
+            {
+                await SignalRService.StartConnectionAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing SignalR: {ex.Message}");
+        }
+    }
+
+    private async void OnCategoryCreated(string categoryName)
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadCategoriesAsync();
+            Snackbar.Add($"New category '{categoryName}' created by another admin", Severity.Info);
+            StateHasChanged();
+        });
+    }
+
+    private async void OnCategoryUpdated(int categoryId, string categoryName)
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadCategoriesAsync();
+            Snackbar.Add($"Category '{categoryName}' updated by another admin", Severity.Info);
+            StateHasChanged();
+        });
+    }
+
+    private async void OnCategoryDeleted(int categoryId, string categoryName)
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadCategoriesAsync();
+            Snackbar.Add($"Category '{categoryName}' deleted by another admin", Severity.Info);
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadCategoriesAsync()
+    {
+        try
+        {
+            isLoading = true;
+            var fetchedCategories = await CategoryService.GetAllCategoriesAsync();
+            if (fetchedCategories != null)
+            {
+                categories = fetchedCategories.ToList();
+            }
+            isLoading = false;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading categories: {ex.Message}", Severity.Error);
+            isLoading = false;
+        }
+    }
+
+    private IEnumerable<CategoryVM> FilteredCategories => categories
+        .Where(c => string.IsNullOrWhiteSpace(searchString) || 
+                   c.CategoryName.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+                   (c.Description?.Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false))
+        .OrderBy(c => c.CategoryName);
+
+    private Color GetRandomColor(int seed)
+    {
+        return (seed % 5) switch 
+        {
+            0 => Color.Primary,
+            1 => Color.Secondary,
+            2 => Color.Info,
+            3 => Color.Success,
+            _ => Color.Warning
+        };
+    }
+
+    private string GetCategoryInitials(string categoryName)
+    {
+        if (string.IsNullOrEmpty(categoryName))
+            return "NC";
+        
+        var words = categoryName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length == 1)
+            return words[0].Length > 1 ? words[0].Substring(0, 2).ToUpper() : words[0].ToUpper();
+        
+        return $"{words[0][0]}{words[1][0]}".ToUpper();
+    }
+
+    private void OpenCreateDialog()
+    {
+        selectedCategory = new CategoryVM
+        {
+            CategoryId = 0,
+            CategoryName = "",
+            Description = "",
+            CreatedAt = DateTime.Now,
+            IsDeleted = false
+        };
+    }
+
+    private void OpenEditDialog(CategoryVM category)
+    {
+        selectedCategory = new CategoryVM
+        {
+            CategoryId = category.CategoryId,
+            CategoryName = category.CategoryName,
+            Description = category.Description,
+            ParentCategoryId = category.ParentCategoryId,
+            CreatedAt = category.CreatedAt,
+            UpdatedAt = category.UpdatedAt,
+            IsDeleted = category.IsDeleted
+        };
+    }
+
+    private async Task SaveCategory()
+    {
+        try
+        {
+            bool success = false;
+            bool isCreating = selectedCategory.CategoryId == 0;
+            string categoryName = selectedCategory.CategoryName;
+            
+            if (isCreating)
+            {
+                // Create new category
+                success = await CategoryService.CreateCategoryAsync(selectedCategory);
+                if (success)
+                {
+                    Snackbar.Add("Category created successfully!", Severity.Success);
+                    
+                    // Send SignalR notification (don't wait)
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await SignalRService.NotifyCategoryCreatedAsync(categoryName);
+
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"SignalR notification failed: {ex.Message}");
+                        }
+                    });
+                }
+            }
+            else
+            {
+                // Update existing category
+                selectedCategory.UpdatedAt = DateTime.Now;
+                success = await CategoryService.UpdateCategoryAsync(selectedCategory.CategoryId, selectedCategory);
+                if (success)
+                {
+                    Snackbar.Add("Category updated successfully!", Severity.Success);
+                    
+                    // Send SignalR notification (don't wait)
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await SignalRService.NotifyCategoryUpdatedAsync(selectedCategory.CategoryId, categoryName);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"SignalR notification failed: {ex.Message}");
+                        }
+                    });
+                }
+            }
+
+            if (success)
+            {
+                await LoadCategoriesAsync();
+                selectedCategory = null;
+            }
+            else
+            {
+                Snackbar.Add("Operation failed!", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving category: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ConfirmDeleteCategory(CategoryVM category)
+    {
+        var parameters = new DialogParameters
+        {
+            ["ContentText"] = $"Are you sure you want to delete the category '{category.CategoryName}'? This action cannot be undone.",
+            ["ButtonText"] = "Delete",
+            ["Color"] = Color.Error
+        };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Category", parameters, options);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            await DeleteCategory(category);
+        }
+    }
+
+    private async Task DeleteCategory(CategoryVM category)
+    {
+        try
+        {
+            var success = await CategoryService.DeleteCategoryAsync(category.CategoryId);
+            if (success)
+            {
+                Snackbar.Add($"Category '{category.CategoryName}' deleted successfully!", Severity.Success);
+                
+                // Send SignalR notification (don't wait)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await SignalRService.NotifyCategoryDeletedAsync(category.CategoryId,category.CategoryName);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"SignalR notification failed: {ex.Message}");
+                    }
+                });
+                
+                await LoadCategoriesAsync();
+                if (selectedCategory?.CategoryId == category.CategoryId)
+                {
+                    selectedCategory = null;
+                }
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete category!", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error deleting category: {ex.Message}", Severity.Error);
+        }
+    }
+
+    public void Dispose()
+    {
+        // Unsubscribe from SignalR events
+        SignalRService.CategoryCreated -= OnCategoryCreated;
+        SignalRService.CategoryUpdated -= OnCategoryUpdated;
+        SignalRService.CategoryDeleted -= OnCategoryDeleted;
+    }
+}

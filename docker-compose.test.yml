@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: GateWayService/Dockerfile
+    container_name: gateway_test
+    ports:
+      - "5282:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+    networks:
+      - test-net
+
+networks:
+  test-net:
+    driver: bridge

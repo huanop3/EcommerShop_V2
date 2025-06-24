@@ -1,0 +1,541 @@
+@inject LoginService LoginService
+@inject CategoryService CategoryService
+@inject ProdService ProdService
+@using System.Security.Claims
+@using System.Text.Json
+@using MainEcommerceService.Models.ViewModel
+@using ProductService.Models.ViewModel
+@inject NavigationManager _navigationManager
+<link rel="stylesheet" href="css/site.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+<header class="@(_mobileMenuOpen ? "mobile-menu-is-active" : "")">
+    <!-- Main Header -->
+    <div class="main-header">
+        <div class="container1">
+            <button class="mobile-menu-toggle @(_mobileMenuOpen ? "active" : "")" @onclick="ToggleMobileMenu">
+                <span class="mobile-menu-icon"></span>
+            </button>
+
+            <a href="/" class="logo">
+                <img src="/images/header/logo.png" alt="Grabit">
+            </a>
+
+            <div class="search-bar-container">
+                <div class="search-bar">
+                    <input type="text" 
+                           placeholder="Search Products..." 
+                           @bind="searchQuery" 
+                           @bind:event="oninput"
+                           @onfocus="ShowSearchResults"
+                           @onblur="HideSearchResults" />
+                    <button type="button" @onclick="PerformSearch">
+                        <i class="fas fa-search" title="Search" style="color: white; font-size: 16px;"></i>
+                    </button>
+                </div>
+                
+                @if (showSearchResults && (searchResults.Any() || !string.IsNullOrEmpty(searchQuery)))
+                {
+                    <div class="search-results-dropdown">
+                        @if (searchResults.Any())
+                        {
+                            <div class="search-results-grid">
+                                @foreach (var product in searchResults.Take(8))
+                                {
+                                    <div class="search-result-item" @onclick="() => NavigateToProduct(product.ProductId)" @onmousedown:preventDefault="true">
+                                        <img src="@GetProductImageUrl(product)" 
+                                             alt="@product.ProductName" 
+                                             class="search-result-image" />
+                                        <div class="search-result-info">
+                                            <span class="search-result-name">@product.ProductName</span>
+                                            @if (HasDiscount(product))
+                                            {
+                                                <div class="search-result-price-container">
+                                                    <span class="search-result-original-price">@product.Price.ToString("C0")</span>
+                                                    <span class="search-result-discount-price">@product.DiscountPrice.Value.ToString("C0")</span>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <span class="search-result-price">@product.Price.ToString("C0")</span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            @if (searchResults.Count() > 8)
+                            {
+                                <div class="search-result-more" @onclick="PerformSearch" @onmousedown:preventDefault="true">
+                                    View all @searchResults.Count() results
+                                </div>
+                            }
+                        }
+                        else if (!string.IsNullOrEmpty(searchQuery))
+                        {
+                            <div class="search-no-results">
+                                No products found for "@searchQuery"
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="header-actions">             
+                <AuthorizeView>
+                    <Authorized>
+                        <div class="action-item user-dropdown" @onclick="ToggleUserMenu"
+                            style="text-decoration: none; cursor: pointer;">
+                            <div class="action-content">
+                                <span>Hello,</span>
+                                <strong>@GetDisplayName(context.User)</strong>
+                            </div>
+                            <i class="fas fa-user" title="User Account" style="color: #4B5966; font-size: 18px;"></i>
+                            <div class="user-menu @(isUserMenuOpen ? "active" : "")">
+                                <AuthorizeView Roles="Admin,Seller" Context="innerContext">
+                                    <Authorized>
+                                        <a href="/admin" class="action-item">Dashboard</a>
+                                    </Authorized>
+                                </AuthorizeView>
+                                <AuthorizeView Roles="Shipper" Context="innerContext">
+                                    <Authorized>
+                                        <a href="/shipper/dashboard" class="action-item">Dashboard</a>
+                                    </Authorized>
+                                </AuthorizeView>
+                                <a href="/profile">My Profile</a>
+                                <a href="javascript:void(0)" @onclick="Logout">Logout</a>
+                            </div>
+                        </div>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a href="/login" class="action-item" style="text-decoration: none;">
+                            <div class="action-content">
+                                <span>Account</span>
+                                <strong>LOGIN</strong>
+                            </div>
+                            <i class="fas fa-user" title="Login" style="color: #4B5966; font-size: 18px;"></i>
+                        </a>
+                    </NotAuthorized>
+                </AuthorizeView>
+
+                <AuthorizeView>
+                    <Authorized>
+                        <a href="/wishlist" class="action-item" style="text-decoration: none;">
+                            <div class="action-content">
+                                <span>Wishlist</span>
+                                <strong>ITEMS</strong>
+                            </div>
+                            <div class="icon-container">
+                                <i class="fas fa-heart" title="Wishlist" style="color: #4B5966; font-size: 18px;"></i>
+                                <span class="notification-badge @(wishlistCount > 0 ? "has-items" : "")">@wishlistCount</span>
+                            </div>
+                        </a>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a href="/login" class="action-item" style="text-decoration: none;">
+                            <div class="action-content">
+                                <span>Wishlist</span>
+                                <strong>LOGIN REQUIRED</strong>
+                            </div>
+                            <div class="icon-container">
+                                <i class="fas fa-heart" title="Wishlist" style="color: #4B5966; font-size: 18px;"></i>
+                                <span class="notification-badge">0</span>
+                            </div>
+                        </a>
+                    </NotAuthorized>
+                </AuthorizeView>
+
+                <AuthorizeView>
+                    <Authorized>
+                        <a href="/cart" class="action-item" style="text-decoration: none;">
+                            <div class="action-content">
+                                <span>Cart</span>
+                                <strong>ITEMS</strong>
+                            </div>
+                            <div class="icon-container">
+                                <i class="fas fa-shopping-cart" title="Shopping Cart" style="color: #4B5966; font-size: 18px;"></i>
+                                <span class="notification-badge @(cartCount > 0 ? "has-items" : "")">@cartCount</span>
+                            </div>
+                        </a>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a href="/login" class="action-item" style="text-decoration: none;">
+                            <div class="action-content">
+                                <span>Cart</span>
+                                <strong>LOGIN REQUIRED</strong>
+                            </div>
+                            <div class="icon-container">
+                                <i class="fas fa-shopping-cart" title="Shopping Cart" style="color: #4B5966; font-size: 18px;"></i>
+                                <span class="notification-badge">0</span>
+                            </div>
+                        </a>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="main-nav">
+        <div class="container1">
+            <div class="category-dropdown" @onmouseenter="() => showCategoryMenu = true" 
+                 @onmouseleave="() => showCategoryMenu = false">
+                <button>
+                    <i class="fas fa-bars" title="Categories Menu" style="color: white; font-size: 16px;"></i>
+                    <span>All Categories</span>
+                    <i class="fas fa-chevron-down" title="Expand Menu" style="color: white; font-size: 12px;"></i>
+                </button>
+
+                <div class="category-submenu @(showCategoryMenu ? "active" : "")">
+                    @if (categories != null && categories.Any())
+                    {
+                        <div class="category-grid">
+                            @foreach (var parentCategory in categories.Where(c => c.ParentCategoryId == null))
+                            {
+                                <div class="category-column">
+                                    <div class="parent-category">
+                                        <a href="/products/@parentCategory.CategoryName" class="parent-category-link">
+                                            <i class="category-icon1 category-icon-@parentCategory.CategoryName.ToLower().Replace(" ", "-")"></i>
+                                            <span>@parentCategory.CategoryName</span>
+                                        </a>
+                                    </div>
+                                    @{
+                                        var childCategories = categories.Where(c => c.ParentCategoryId == parentCategory.CategoryId).ToList();
+                                    }
+                                    @if (childCategories.Any())
+                                    {
+                                        <div class="child-categories">
+                                            @foreach (var childCategory in childCategories)
+                                            {
+                                                <a href="/products/@childCategory.CategoryName" class="child-category-link">
+                                                    @childCategory.CategoryName
+                                                </a>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                    else if (isLoadingCategories)
+                    {
+                        <div class="category-loading">Loading categories...</div>
+                    }
+                </div>
+            </div>
+
+            <div class="nav-links">
+                <div class="nav-item-wrapper">
+                    <a href="/" class="nav-item">Home</a>
+                </div>
+                <div class="nav-item-wrapper">
+                    <a href="/products" class="nav-item">Products</a>
+                </div>
+                <div class="nav-item-wrapper">
+                    <a href="/my-orders" class="nav-item">My Orders</a>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu @(_mobileMenuOpen ? "active" : "")">
+        <div class="mobile-menu-header">
+            <a href="/" class="logo">
+                <img src="/images/header/logo.png" alt="Grabit">
+            </a>
+            <button class="mobile-menu-close" @onclick="ToggleMobileMenu">×</button>
+        </div>
+        <div class="mobile-nav-links">
+            <a href="/" class="mobile-nav-item">Home</a>
+            <a href="/products" class="mobile-nav-item">Products</a>
+            <a href="/orders" class="mobile-nav-item">Orders</a>
+            
+        </div>
+    </div>
+
+    <div class="mobile-menu-overlay @(_mobileMenuOpen ? "active" : "")" @onclick="ToggleMobileMenu"></div>
+</header>
+
+@code {
+    private bool _mobileMenuOpen = false;
+    private string _openSubmenu = string.Empty;
+    private bool IsAuthenticated { get; set; } = false;
+    private string UserName { get; set; } = string.Empty;
+    private bool isUserMenuOpen { get; set; } = false;
+    private bool _isInitializing = true;
+    
+    // Search functionality
+    private string _searchQuery = string.Empty;
+    private string searchQuery 
+    { 
+        get => _searchQuery;
+        set 
+        {
+            _searchQuery = value;
+            _ = OnSearchInputChanged();
+        }
+    }
+    private string mobileSearchQuery = string.Empty;
+    private IEnumerable<ProductVM> searchResults = new List<ProductVM>();
+    private bool showSearchResults = false;
+    private Timer searchTimer;
+    
+    // Categories
+    private IEnumerable<CategoryVM> categories = new List<CategoryVM>();
+    private bool showCategoryMenu = false;
+    private bool isLoadingCategories = true;
+
+    private int wishlistCount = 0;
+    private int cartCount = 0;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategoriesAsync();
+        UpdateWishlistCount();
+        UpdateCartCount();
+        
+        // Set timer to refresh counts every 2 seconds for real-time updates
+        refreshTimer = new Timer(async _ => 
+        {
+            await InvokeAsync(() =>
+            {
+                UpdateWishlistCount();
+                UpdateCartCount();
+                StateHasChanged();
+            });
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(2));
+    }
+    
+    private Timer refreshTimer;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeAuthenticationAsync();
+        }
+    }
+
+    private async Task LoadCategoriesAsync()
+    {
+        try
+        {
+            isLoadingCategories = true;
+            categories = await CategoryService.GetAllCategoriesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading categories: {ex.Message}");
+            categories = new List<CategoryVM>();
+        }
+        finally
+        {
+            isLoadingCategories = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task InitializeAuthenticationAsync()
+    {
+        try
+        {
+            _isInitializing = true;
+            StateHasChanged();
+            await Task.Delay(100);
+            IsAuthenticated = await LoginService.CheckAuthenticationStatus();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Authentication initialization error: {ex.Message}");
+            IsAuthenticated = false;
+            UserName = string.Empty;
+        }
+        finally
+        {
+            _isInitializing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnSearchInputChanged()
+    {
+        // Cancel previous timer
+        searchTimer?.Dispose();
+        
+        // Thay đổi điều kiện từ < 2 thành < 1 để tìm kiếm ngay từ ký tự đầu
+        if (string.IsNullOrWhiteSpace(searchQuery) || searchQuery.Length < 1)
+        {
+            searchResults = new List<ProductVM>();
+            showSearchResults = false;
+            StateHasChanged();
+            return;
+        }
+        
+        // Set timer for debounce
+        searchTimer = new Timer(async _ => 
+        {
+            await InvokeAsync(async () => await PerformSearchAsync());
+        }, null, 300, Timeout.Infinite);
+    }
+
+    private async Task PerformSearchAsync()
+    {
+        // Cũng thay đổi điều kiện ở đây
+        if (string.IsNullOrWhiteSpace(searchQuery) || searchQuery.Length < 1)
+        {
+            searchResults = new List<ProductVM>();
+            showSearchResults = false;
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            searchResults = await ProdService.SearchProductsAsync(searchQuery);
+            showSearchResults = true;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Search error: {ex.Message}");
+            searchResults = new List<ProductVM>();
+            showSearchResults = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ShowSearchResults()
+    {
+        // Cải thiện logic hiển thị kết quả
+        if (!string.IsNullOrEmpty(searchQuery))
+        {
+            showSearchResults = true;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HideSearchResults()
+    {
+        await Task.Delay(150); // Delay to allow click events
+        showSearchResults = false;
+        StateHasChanged();
+    }
+    
+    private void PerformSearch()
+    {
+        if (!string.IsNullOrEmpty(searchQuery))
+        {
+            _navigationManager.NavigateTo($"/products?search={Uri.EscapeDataString(searchQuery)}",true);
+            showSearchResults = false;
+        }
+    }
+
+    private void NavigateToProduct(int productId)
+    {
+        _navigationManager.NavigateTo($"/product/{productId}");
+        showSearchResults = false;
+    }
+
+    private async Task OnMobileSearchKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await PerformMobileSearch();
+        }
+    }
+
+    private async Task PerformMobileSearch()
+    {
+        if (!string.IsNullOrEmpty(mobileSearchQuery))
+        {
+            _navigationManager.NavigateTo($"/products?search={Uri.EscapeDataString(mobileSearchQuery)}",true);
+            _mobileMenuOpen = false;
+        }
+    }
+
+    private void UpdateWishlistCount()
+    {
+        wishlistCount = WishlistVM.GetAllWishlistItems().Count;
+    }
+    
+    private void UpdateCartCount()
+    {
+        cartCount = CartVM.GetTotalQuantity(); // Sử dụng tổng số lượng sản phẩm
+        // Hoặc sử dụng số items: cartCount = CartVM.GetCartItemCount();
+    }
+    
+    // Existing methods
+    private void ToggleUserMenu()
+    {
+        isUserMenuOpen = !isUserMenuOpen;
+    }
+
+    private async Task Logout()
+    {
+        await LoginService.Logout();
+        CartVM.ClearCart();
+        WishlistVM.ClearWishlist();
+        _navigationManager.NavigateTo("/", true);
+        IsAuthenticated = false;
+        UserName = string.Empty;
+    }
+
+    private void ToggleMobileMenu()
+    {
+        _mobileMenuOpen = !_mobileMenuOpen;
+        if (!_mobileMenuOpen)
+        {
+            _openSubmenu = string.Empty;
+        }
+    }
+
+    private void ToggleSubmenu(string submenu)
+    {
+        if (_openSubmenu == submenu)
+        {
+            _openSubmenu = string.Empty;
+        }
+        else
+        {
+            _openSubmenu = submenu;
+        }
+    }
+
+    private string GetDisplayName(ClaimsPrincipal user)
+    {
+        if (user?.Identity?.IsAuthenticated == true)
+        {
+            var username = user.FindFirst("unique_name")?.Value 
+                        ?? user.FindFirst("username")?.Value 
+                        ?? user.FindFirst("sub")?.Value 
+                        ?? user.Identity.Name 
+                        ?? "User";
+            return username;
+        }
+        return "Guest";
+    }
+
+    private string GetProductImageUrl(ProductVM product)
+    {
+        // Return the first image if available, otherwise return a default image
+        @* if (product.ProductImages != null && product.ProductImages.Any())
+        {
+            var firstImage = product.ProductImages.First();
+            return !string.IsNullOrEmpty(firstImage.ImageUrl) ? firstImage.ImageUrl : "/images/no-image.png";
+        } *@
+        return "/images/no-image.png";
+    }
+
+    private bool HasDiscount(ProductVM product)
+    {
+        // Kiểm tra xem sản phẩm có discount price không
+        return product.DiscountPrice.HasValue && product.DiscountPrice.Value > 0 && product.DiscountPrice.Value < product.Price;
+    }
+
+    public void Dispose()
+    {
+        searchTimer?.Dispose();
+        refreshTimer?.Dispose();
+    }
+}

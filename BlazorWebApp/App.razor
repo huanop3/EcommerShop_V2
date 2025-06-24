@@ -1,0 +1,114 @@
+﻿@inject NavigationManager NavigationManager
+@inject LoginService LoginService
+<link href="css/auth.css" rel="stylesheet" />
+
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(Program).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <Authorizing>
+                    <div class="loading-overlay fade-in">
+                        <div class="loading-spinner-large"></div>
+                        <p class="loading-text-large">Loading Authorization...</p>
+                    </div>
+                </Authorizing>
+                <NotAuthorized>
+                    @if (context.User.Identity?.IsAuthenticated != true)
+                    {
+                        <LayoutView>
+                            <div class="auth-container">
+                                <div class="auth-box">
+                                    <div class="auth-header">
+                                        <div class="unauthorized-icon">
+                                            <i class="fas fa-user-lock"></i>
+                                        </div>
+                                        <h2>Yêu cầu đăng nhập</h2>
+                                        <p>Vui lòng đăng nhập để truy cập trang này</p>
+                                    </div>
+
+                                    <div class="auth-form fade-in">
+                                        <div class="form-submit" style="margin-top: 25px;">
+                                            <a href="/login" class="btn-submit">
+                                                <i class="fas fa-sign-in-alt mr-2"></i> Đăng nhập
+                                            </a>
+                                        </div>
+
+                                        <div class="auth-divider">
+                                            <span>HOẶC</span>
+                                        </div>
+
+                                        <div class="auth-footer">
+                                            <p>Quay lại <a href="/">Trang chủ</a>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </LayoutView>
+                    }
+                    else
+                    {
+                        <LayoutView>
+                            <div class="auth-container">
+                                <div class="auth-box">
+                                    <div class="auth-header">
+                                        <div class="unauthorized-icon" style="background-color: #ffebee; color: #d32f2f;">
+                                            <i class="fas fa-lock"></i>
+                                        </div>
+                                        <h2>Truy cập bị từ chối</h2>
+                                        <p>Bạn không có quyền truy cập vào trang này</p>
+                                    </div>
+
+                                    <div class="auth-form fade-in">
+                                        <div class="error-message">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                            <span>Tài khoản của bạn không có quyền truy cập vào trang này</span>
+                                        </div>
+
+                                        <div class="form-submit" style="margin-top: 25px;">
+                                            <a href="/" class="btn-submit">
+                                                <i class="fas fa-home mr-2"></i> Về trang chủ
+                                            </a>
+                                        </div>
+
+                                        <div class="auth-divider">
+                                            <span>HOẶC</span>
+                                        </div>
+
+                                        <div class="auth-footer">
+                                            <p>
+                                                <a href="#" @onclick="HandleLogout" @onclick:preventDefault>
+                                                    Đăng xuất
+                                                </a> và đăng nhập với tài khoản khác
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </LayoutView>
+                    }
+                </NotAuthorized>
+            </AuthorizeRouteView>
+        </Found>
+        <NotFound>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <p>Không tìm thấy trang</p>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>
+
+@code {
+    private async Task HandleLogout()
+    {
+        try
+        {
+            await LoginService.Logout();
+            NavigationManager.NavigateTo("/login", true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Logout error: {ex.Message}");
+        }
+    }
+}

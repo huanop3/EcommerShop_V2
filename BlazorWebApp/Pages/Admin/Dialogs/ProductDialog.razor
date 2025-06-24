@@ -1,0 +1,587 @@
+@using ProductService.Models.ViewModel
+@using MainEcommerceService.Models.ViewModel
+@using MudBlazor
+@using BlazorWebApp.Services
+@using Microsoft.AspNetCore.Components.Forms
+@inject ISnackbar Snackbar
+@inject ProdService ProdService
+@inject ProductImageService ProductImageService
+@inject SignalRService SignalRService
+
+<MudDialog MaxWidth="MaxWidth.Large" FullWidth="true">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            @(Product?.ProductId > 0 ? "Edit Product" : "Add New Product")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTabs @bind-ActivePanelIndex="activeTab" Elevation="2" Rounded="true" PanelClass="pa-6">
+            <!-- Tab 1: Product Information -->
+            <MudTabPanel Text="Product Info" Icon="@Icons.Material.Filled.Info">
+                <MudGrid>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="productForm.ProductName" Label="Product Name" Required="true" 
+                                     Error="@(!IsValidProductName)" ErrorText="Product name is required" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="productForm.Description" Label="Description" Lines="3" 
+                                     Placeholder="Enter product description..." />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudSelect T="int" @bind-Value="productForm.CategoryId" Label="Category" Required="true"
+                                  Error="@(!IsValidCategory)" ErrorText="Please select a category">
+                            <MudSelectItem T="int" Value="0" Disabled="true">-- Select Category --</MudSelectItem>
+                            @foreach (var category in Categories)
+                            {
+                                <MudSelectItem T="int" Value="@category.CategoryId">@category.CategoryName</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudNumericField T="decimal" @bind-Value="productForm.Price" Label="Price" Format="F2" Required="true" 
+                                        Min="0.01m" Error="@(!IsValidPrice)" ErrorText="Price must be greater than 0"
+                                        Adornment="Adornment.Start" AdornmentText="$" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudNumericField T="int" @bind-Value="productForm.Quantity" Label="Quantity" Required="true" 
+                                        Min="0" Error="@(!IsValidQuantity)" ErrorText="Quantity must be 0 or greater" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudNumericField T="decimal?" @bind-Value="productForm.DiscountPrice" Label="Discount Price" Format="F2" 
+                                        Min="0" Max="@productForm.Price" 
+                                        Adornment="Adornment.Start" AdornmentText="$"
+                                        HelperText="Leave empty if no discount" />
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <!-- Tab 2: Product Images -->
+            <MudTabPanel Text="Images" Icon="@Icons.Material.Filled.Image">
+                <!-- Upload Section -->
+                <MudCard Elevation="2" Style="margin-bottom: 16px;">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Upload New Images</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <!-- File Upload Button -->
+                        <div class="d-flex justify-center mb-4">
+                            <MudFileUpload T="IReadOnlyList<IBrowserFile>" 
+                                          For="@(() => selectedFiles)"
+                                          @bind-Files="selectedFiles"
+                                          OnFilesChanged="OnFilesChanged"
+                                          Hidden="true" 
+                                          Accept="image/*"
+                                          Multiple="true"
+                                          MaximumFileCount="10"
+                                          @ref="fileUpload">
+                                <ActivatorContent>
+                                    <MudButton HtmlTag="label"
+                                              Variant="Variant.Filled"
+                                              Color="Color.Primary"
+                                              StartIcon="@Icons.Material.Filled.CloudUpload"
+                                              >
+                                        Select Images
+                                    </MudButton>
+                                </ActivatorContent>
+                            </MudFileUpload>
+                        </div>
+
+                        <!-- Upload Guidelines -->
+                        <MudAlert Severity="Severity.Info" Class="mb-4">
+                            <MudText>
+                                <strong>Guidelines:</strong><br/>
+                                • Maximum 10 files, 10MB each<br/>
+                                • Supported formats: JPEG, PNG, GIF, WebP<br/>
+                                • Select one image as primary using the radio button
+                            </MudText>
+                        </MudAlert>
+
+                        @if (selectedFiles?.Count > 0)
+                        {
+                            <MudDivider Class="my-4" />
+                            <MudText Typo="Typo.subtitle1" Class="mb-3">
+                                Selected Files (@selectedFiles.Count)
+                            </MudText>
+                            
+                            <MudGrid>
+                                @for (int i = 0; i < selectedFiles.Count; i++)
+                                {
+                                    var file = selectedFiles[i];
+                                    var index = i;
+                                    <MudItem xs="12" sm="6" md="4" lg="3">
+                                        <MudCard Elevation="2">
+                                            <MudCardContent Class="pa-3">
+                                                <div class="d-flex flex-column">
+                                                    <!-- File Info -->
+                                                    <div class="mb-2">
+                                                        <MudText Typo="Typo.body2" Class="text-truncate">
+                                                            @file.Name
+                                                        </MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                            @FormatFileSize(file.Size)
+                                                        </MudText>
+                                                    </div>
+                                                
+                                                    <!-- Primary Selection and Actions -->
+                                                    <div class="d-flex align-center justify-space-between">
+                                                        <div class="d-flex align-center">
+                                                            <MudButton 
+                                                                Variant="@(primaryImageIndex == index ? Variant.Filled : Variant.Outlined)"
+                                                                Color="@(primaryImageIndex == index ? Color.Primary : Color.Default)" 
+                                                                Size="Size.Small" 
+                                                                StartIcon="@(primaryImageIndex == index ? Icons.Material.Filled.RadioButtonChecked : Icons.Material.Outlined.RadioButtonUnchecked)"
+                                                                OnClick="() => SetPrimaryImage(index)">
+                                                                Primary
+                                                            </MudButton>
+                                                        </div>
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                                                      Color="Color.Error" 
+                                                                      Size="Size.Small" 
+                                                                      OnClick="() => RemoveFile(index)" />
+                                                    </div>
+                                                
+                                                    <!-- Primary Indicator -->
+                                                    @if (primaryImageIndex == index)
+                                                    {
+                                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" 
+                                                                Variant="Variant.Filled" Class="mt-2">
+                                                            <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Class="mr-1" />
+                                                            Primary Image
+                                                        </MudChip>
+                                                    }
+                                                </div>
+                                            </MudCardContent>
+                                        </MudCard>
+                                    </MudItem>
+                                }
+                            </MudGrid>
+
+                            @if (!primaryImageIndex.HasValue && selectedFiles.Count > 0)
+                            {
+                                <MudAlert Severity="Severity.Warning" Class="mt-3">
+                                    <MudText>Please select one image as primary by clicking the radio button.</MudText>
+                                </MudAlert>
+                            }
+                        }
+                    </MudCardContent>
+                </MudCard>
+
+                <!-- Existing Images (for edit mode) -->
+                @if (Product?.ProductId > 0 && existingImages?.Count > 0)
+                {
+                    <MudCard Elevation="2">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">Current Images (@existingImages.Count)</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudGrid>
+                                @foreach (var image in existingImages)
+                                {
+                                    <MudItem xs="12" sm="6" md="4" lg="3">
+                                        <MudCard Elevation="2">
+                                            <MudCardMedia Image="@image.ImageUrl" Height="120" />
+                                            <MudCardContent Class="pa-2">
+                                                <div class="d-flex align-center justify-space-between">
+                                                    <div class="flex-grow-1">
+                                                        <MudText Typo="Typo.body2" Class="text-truncate">
+                                                            @image.FileName
+                                                        </MudText>
+                                                        <MudChip T="string" Size="Size.Small" 
+                                                                Color="@(image.IsPrimary ? Color.Primary : Color.Default)" 
+                                                                Variant="@(image.IsPrimary ? Variant.Filled : Variant.Outlined)">
+                                                            @(image.IsPrimary ? "Primary" : "Secondary")
+                                                        </MudChip>
+                                                    </div>
+                                                    <div class="d-flex flex-column">
+                                                        @if (!image.IsPrimary)
+                                                        {
+                                                            <MudTooltip Text="Set as primary">
+                                                                <MudIconButton Icon="@Icons.Material.Filled.Star" 
+                                                                              Color="Color.Warning" 
+                                                                              Size="Size.Small" 
+                                                                              OnClick="() => SetAsPrimary(image.ImageId)" />
+                                                            </MudTooltip>
+                                                        }
+                                                        <MudTooltip Text="Delete image">
+                                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                                                          Color="Color.Error" 
+                                                                          Size="Size.Small" 
+                                                                          OnClick="() => DeleteExistingImage(image.ImageId)" />
+                                                        </MudTooltip>
+                                                    </div>
+                                                </div>
+                                            </MudCardContent>
+                                        </MudCard>
+                                    </MudItem>
+                                }
+                            </MudGrid>
+                        </MudCardContent>
+                    </MudCard>
+                }
+            </MudTabPanel>
+        </MudTabs>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" 
+                  Disabled="@(!IsFormValid || isProcessing)" 
+                  StartIcon="@(Product?.ProductId > 0 ? Icons.Material.Filled.Save : Icons.Material.Filled.Add)">
+            @if (isProcessing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Processing...</MudText>
+            }
+            else
+            {
+                @(Product?.ProductId > 0 ? "Update Product" : "Create Product")
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [Parameter] public ProductVM Product { get; set; }
+    [Parameter] public List<CategoryVM> Categories { get; set; } = new();
+    [Parameter] public int UserId { get; set; }
+
+    private ProductVM productForm = new();
+    private bool isProcessing = false;
+    private int activeTab = 0;
+
+    // Image upload properties
+    private IReadOnlyList<IBrowserFile>? selectedFiles;
+    private int? primaryImageIndex;
+    private List<ProductImageViewModel> existingImages = new();
+    private MudFileUpload<IReadOnlyList<IBrowserFile>> fileUpload;
+
+    // Validation properties
+    private bool IsValidProductName => !string.IsNullOrWhiteSpace(productForm.ProductName);
+    private bool IsValidCategory => productForm.CategoryId > 0;
+    private bool IsValidPrice => productForm.Price > 0;
+    private bool IsValidQuantity => productForm.Quantity >= 0;
+    private bool IsFormValid => IsValidProductName && IsValidCategory && IsValidPrice && IsValidQuantity && !isProcessing;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Product != null)
+        {
+            // Edit mode - copy existing product data
+            productForm = new ProductVM 
+            { 
+                ProductName = Product.ProductName,
+                Description = Product.Description,
+                Price = Product.Price,
+                DiscountPrice = Product.DiscountPrice,
+                Quantity = Product.Quantity,
+                CategoryId = Product.CategoryId,
+                SellerId = Product.SellerId,
+            };
+
+            // Load existing images
+            await LoadExistingImages();
+        }
+        else
+        {
+            // Add mode - create new product with default values
+            productForm = new ProductVM 
+            { 
+                ProductName = "",
+                Description = "",
+                Price = 0,
+                DiscountPrice = null,
+                Quantity = 0,
+                CategoryId = 0,
+                SellerId = UserId,
+                CreatedAt = DateTime.Now
+            };
+        }
+    }
+
+    private async Task LoadExistingImages()
+    {
+        if (Product?.ProductId > 0)
+        {
+            try
+            {
+                var imageList = await ProductImageService.GetProductImagesAsync(Product.ProductId);
+                if (imageList != null)
+                {
+                    existingImages = imageList.Images;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading existing images: {ex.Message}");
+                Snackbar.Add("Failed to load existing images", Severity.Warning);
+            }
+        }
+    }
+
+    private void OnFilesChanged(InputFileChangeEventArgs e)
+    {
+        selectedFiles = e.GetMultipleFiles(10);
+        primaryImageIndex = null; // Reset primary selection when new files are selected
+        StateHasChanged();
+    }
+
+    private void RemoveFile(int index)
+    {
+        if (selectedFiles != null)
+        {
+            var fileList = selectedFiles.ToList();
+            fileList.RemoveAt(index);
+            selectedFiles = fileList.AsReadOnly();
+
+            // Adjust primary index if necessary
+            if (primaryImageIndex == index)
+            {
+                primaryImageIndex = null;
+            }
+            else if (primaryImageIndex > index)
+            {
+                primaryImageIndex--;
+            }
+
+            StateHasChanged();
+        }
+    }
+
+    private void SetPrimaryImage(int index)
+    {
+        primaryImageIndex = index;
+        StateHasChanged();
+    }
+
+    private async Task SetAsPrimary(int imageId)
+    {
+        try
+        {
+            var success = await ProductImageService.SetPrimaryImageAsync(Product.ProductId, imageId);
+            if (success)
+            {
+                Snackbar.Add("Primary image updated successfully", Severity.Success);
+                await LoadExistingImages(); // Reload to reflect changes
+            }
+            else
+            {
+                Snackbar.Add("Failed to set primary image", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error setting primary image: {ex.Message}");
+            Snackbar.Add("An error occurred while setting primary image", Severity.Error);
+        }
+    }
+
+    private async Task DeleteExistingImage(int imageId)
+    {
+        try
+        {
+            var success = await ProductImageService.DeleteImageAsync(imageId);
+            if (success)
+            {
+                Snackbar.Add("Image deleted successfully", Severity.Success);
+                await LoadExistingImages(); // Reload to reflect changes
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete image", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting image: {ex.Message}");
+            Snackbar.Add("An error occurred while deleting image", Severity.Error);
+        }
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+
+    private async Task<bool> ValidateAndUploadImages(int productId)
+    {
+        if (selectedFiles == null || selectedFiles.Count == 0)
+        {
+            return true; // No images to upload is okay
+        }
+
+        try
+        {
+            // Validate all files first
+            foreach (var file in selectedFiles)
+            {
+                if (!ProductImageService.ValidateImageFile(file, out string errorMessage))
+                {
+                    Snackbar.Add($"Invalid file {file.Name}: {errorMessage}", Severity.Error);
+                    return false;
+                }
+            }
+
+            // Upload images
+            var uploadedImages = await ProductImageService.UploadMultipleImagesAsync(
+                productId, 
+                selectedFiles.ToList(), 
+                primaryImageIndex
+            );
+
+            if (uploadedImages.Count > 0)
+            {
+                Snackbar.Add($"Successfully uploaded {uploadedImages.Count} images", Severity.Success);
+                return true;
+            }
+            else
+            {
+                Snackbar.Add("Failed to upload images", Severity.Error);
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error uploading images: {ex.Message}");
+            Snackbar.Add("An error occurred while uploading images", Severity.Error);
+            return false;
+        }
+    }
+
+    private async Task Submit()
+    {
+        try
+        {
+            if (!IsFormValid)
+            {
+                Snackbar.Add("Please fill in all required fields correctly.", Severity.Warning);
+                return;
+            }
+
+            if (productForm.DiscountPrice.HasValue && productForm.DiscountPrice >= productForm.Price)
+            {
+                Snackbar.Add("Discount price must be less than regular price.", Severity.Warning);
+                return;
+            }
+
+            // Validate primary image selection for new files
+            if (selectedFiles?.Count > 0 && !primaryImageIndex.HasValue)
+            {
+                Snackbar.Add("Please select one image as primary before submitting.", Severity.Warning);
+                return;
+            }
+
+            isProcessing = true;
+            StateHasChanged();
+
+            bool result;
+            int productId = 0;
+            
+            if (Product?.ProductId > 0)
+            {
+                // Update existing product
+                productForm.UpdatedAt = DateTime.Now;
+                result = await ProdService.UpdateProductAsync(Product.ProductId, productForm);
+                productId = Product.ProductId;
+
+                if (result)
+                {
+                    // Upload new images if any
+                    if (selectedFiles?.Count > 0)
+                    {
+                        await ValidateAndUploadImages(productId);
+                    }
+
+                    // Send SignalR notifications
+                    var categoryName = Categories.FirstOrDefault(c => c.CategoryId == productForm.CategoryId)?.CategoryName ?? "Unknown";
+                    await SignalRService.NotifyProductUpdatedAsync(Product.ProductId, productForm.ProductName, productForm.Price);
+                    
+                    if (Product.Price != productForm.Price)
+                    {
+                        await SignalRService.NotifyProductPriceChangedAsync(Product.ProductId, productForm.ProductName, Product.Price, productForm.Price);
+                    }
+                    
+                    if (Product.Quantity != productForm.Quantity)
+                    {
+                        await SignalRService.NotifyProductStockChangedAsync(Product.ProductId, productForm.ProductName, productForm.Quantity);
+                        
+                        if (productForm.Quantity < 10)
+                        {
+                            await SignalRService.NotifyLowStockAsync(Product.ProductId, productForm.ProductName, productForm.Quantity, 10);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Create new product
+                productForm.CreatedAt = DateTime.Now;
+                result = await ProdService.CreateProductAsync(productForm, UserId);
+
+                if (result)
+                {
+                    // Get the newly created product to get its ID
+                    // Note: You may need to modify ProdService.CreateProductAsync to return the created product ID
+                    // For now, we'll assume the productForm.ProductId is set after creation
+                    var searchResult = await ProdService.SearchProductsAsync(productForm.ProductName);
+                    //Tìm chính xác sản phẩm vừa tạo
+                    //ProductName = Product.ProductName,
+                //Description = Product.Description,
+                //rice = Product.Price,
+                //DiscountPrice = Product.DiscountPrice,
+                //Quantity = Product.Quantity,
+                //CategoryId = Product.CategoryId,
+                //SellerId = Product.SellerId,
+                    productId = searchResult.FirstOrDefault(x => x.ProductName == productForm.ProductName && x.Description == productForm.Description && x.Price == productForm.Price && x.DiscountPrice == productForm.DiscountPrice && x.Quantity == productForm.Quantity && x.CategoryId == productForm.CategoryId)?.ProductId ?? 0;
+                    // Upload images if any
+                    if (selectedFiles?.Count > 0 && productId > 0)
+                    {
+                        await ValidateAndUploadImages(productId);
+                    }
+
+                    // Send SignalR notification
+                    var categoryName = Categories.FirstOrDefault(c => c.CategoryId == productForm.CategoryId)?.CategoryName ?? "Unknown";
+                    await SignalRService.NotifyProductCreatedAsync(productId, productForm.ProductName, categoryName);
+                }
+            }
+
+            if (result)
+            {
+                var message = Product?.ProductId > 0 ? "Product updated successfully!" : "Product created successfully!";
+                Snackbar.Add(message, Severity.Success);
+                MudDialog.Close(DialogResult.Ok(productForm));
+            }
+            else
+            {
+                var message = Product?.ProductId > 0 ? "Failed to update product" : "Failed to create product";
+                Snackbar.Add(message, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving product: {ex.Message}");
+            Snackbar.Add("An error occurred while saving the product. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

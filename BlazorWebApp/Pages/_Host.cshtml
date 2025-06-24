@@ -1,0 +1,68 @@
+﻿@page "/"
+@namespace BlazorWebApp.Pages
+@using BlazorWebApp
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>Blazor Server</title>
+    <base href="~/" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.1.1/css/all.css"
+        integrity="sha384-O8whS3fhG2OnA5Kas0Y9l3cfpmYjapjI0E4theH4iuMD+pLhbf6JI0jIMfYcK3yZ" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <!-- MudBlazor resources -->
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="css/loading-screen.css" rel="stylesheet" />
+    <script>
+        window.blazorReady = true;
+    </script>
+</head>
+
+<body>
+    <app>
+        <component type="typeof(App)" render-mode="Server" />
+    </app>
+
+    <script src="_framework/blazor.server.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+        crossorigin="anonymous"></script>
+    <!-- MudBlazor JS -->
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="/js/cookieHelper.js"></script>
+    <script src="/js/deviceInfo.js"></script>
+    <!-- Thêm vào _Layout.cshtml -->
+    <script>
+        window.addEventListener('load', function () {
+            console.log('Force reload navigation initialized');
+            
+            // 1. Override tất cả link clicks
+            document.addEventListener('click', function (e) {
+                const link = e.target.closest('a[href]');
+                if (link && link.href && link.href.startsWith(window.location.origin)) {
+                    console.log('Link clicked, forcing reload to:', link.href);
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    window.location.href = link.href;
+                }
+            }, true);
+            
+            // 2. Override browser back/forward buttons (popstate)
+            window.addEventListener('popstate', function(e) {
+                console.log('Browser navigation detected, forcing reload to:', window.location.href);
+                // Force reload when back/forward buttons are used
+                window.location.reload();
+            });            
+        });
+    </script>
+</body>
+
+</html>

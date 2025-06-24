@@ -1,0 +1,57 @@
+@using BlazorWebApp.ViewModel
+@using MudBlazor
+
+<MudPaper Elevation="1" Class="pa-4">
+    <MudText Typo="Typo.h6" Class="mb-3">
+        <MudIcon Icon="@Icons.Material.Filled.Inventory" Class="mr-2" />
+        Danh sách sản phẩm (@Dashboard.OrderItems.Count items)
+    </MudText>
+
+    <MudTable Items="Dashboard.OrderItems" Hover="true" Striped="true" Dense="true">
+        <HeaderContent>
+            <MudTh>Sản phẩm</MudTh>
+            <MudTh Style="text-align:center">Số lượng</MudTh>
+            <MudTh Style="text-align:right">Đơn giá</MudTh>
+            <MudTh Style="text-align:right">Thành tiền</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Sản phẩm">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Inventory2" Class="mr-3" Color="Color.Primary" />
+                    <div>
+                        <MudText Typo="Typo.body1">@context.ProductName</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            ID: @context.ProductId
+                        </MudText>
+                    </div>
+                </div>
+            </MudTd>
+            <MudTd DataLabel="Số lượng" Style="text-align:center">
+                <MudChip T="int" Size="Size.Small" Color="Color.Info">@context.Quantity</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Đơn giá" Style="text-align:right">
+                <MudText>@context.FormattedUnitPrice</MudText>
+            </MudTd>
+            <MudTd DataLabel="Thành tiền" Style="text-align:right">
+                <MudText Typo="Typo.body1" Style="font-weight:600">@context.FormattedTotalPrice</MudText>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+
+    <!-- Summary -->
+    <MudDivider Class="my-4" />
+    <div class="d-flex justify-end">
+        <div class="text-right">
+            <MudText Typo="Typo.h6" Color="Color.Primary">
+                Tổng cộng: @Dashboard.OrderInfo.FormattedTotalAmount
+            </MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                Tổng @Dashboard.OrderItems.Sum(x => x.Quantity) sản phẩm
+            </MudText>
+        </div>
+    </div>
+</MudPaper>
+
+@code {
+    [Parameter] public ShipmentDashboardVM Dashboard { get; set; } = new();
+}

@@ -1,0 +1,169 @@
+version: '3.8'
+
+services:
+  # --- DATABASE SETUP ---
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sql_server_db
+    restart: unless-stopped
+    ports:
+      - "1433:1433"
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=HuanNC231@
+      - MSSQL_PID=Developer
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - ecommerce-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis_cache
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass YourRedisPassword123
+    volumes:
+      - redis_data:/data
+    networks:
+      - ecommerce-net
+
+  # --- KAFKA SETUP ---
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    container_name: zookeeper
+    restart: unless-stopped
+    networks:
+      - ecommerce-net
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    container_name: kafka_broker
+    restart: unless-stopped
+    networks:
+      - ecommerce-net
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_INTERNAL://kafka:29092,PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka_ui
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    networks:
+      - ecommerce-net
+
+  # --- MICROSERVICES ---
+  mainecommerce:
+    build:
+      context: .
+      dockerfile: MainEcommerceService/Dockerfile
+    container_name: main_ecommerce_service
+    restart: unless-stopped
+    ports:
+      - "5166:8080"
+    depends_on:
+      - kafka
+      - sqlserver
+      - redis
+    environment:
+      # 🔥 SỬA: Sử dụng Docker internal connections
+      - ConnectionStrings__MainDbService=Server=sqlserver,1433;Database=MainEcommerceService;User Id=sa;Password=HuanNC231@;TrustServerCertificate=true;
+      - ConnectionStrings__RedisConnection=redis:6379,password=YourRedisPassword123
+      - Kafka__BootstrapServers=kafka:29092
+      - jwt__Secret-Key=${JWT_SECRET_KEY}
+      - jwt__Issuer=${JWT_ISSUER}
+      - jwt__Audience=${JWT_AUDIENCE}
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - ecommerce-net
+
+  productservice:
+    build:
+      context: .
+      dockerfile: ProductService/Dockerfile
+    container_name: product_service
+    restart: unless-stopped
+    ports:
+      - "5079:8080"
+    depends_on:
+      - kafka
+      - sqlserver
+      - redis
+    environment:
+      # 🔥 SỬA: Sử dụng Docker internal connections
+      - ConnectionStrings__ProductDbService=Server=sqlserver,1433;Database=ProductService;User Id=sa;Password=HuanNC231@;TrustServerCertificate=true;
+      - ConnectionStrings__RedisConnection=redis:6379,password=YourRedisPassword123
+      - Kafka__BootstrapServers=kafka:29092
+      - AWS__AccessKey=${AWS_ACCESS_KEY}
+      - AWS__SecretKey=${AWS_SECRET_KEY}
+      - AWS__Region=us-east-1
+      - AWS__BucketName=ecommerce231
+      - jwt__Secret-Key=${JWT_SECRET_KEY}
+      - jwt__Issuer=${JWT_ISSUER}
+      - jwt__Audience=${JWT_AUDIENCE}
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - ecommerce-net
+
+  gateway:
+    build:
+      context: .
+      dockerfile: GateWayService/Dockerfile
+    container_name: gateway_service
+    restart: unless-stopped
+    ports:
+      - "5282:8080"
+    depends_on:
+      - mainecommerce
+      - productservice
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+    networks:
+      - ecommerce-net
+
+  blazorapp:
+    build:
+      context: .
+      dockerfile: BlazorWebApp/Dockerfile
+    container_name: blazor_webapp
+    restart: unless-stopped
+    ports:
+      - "5000:8080"
+    depends_on:
+      - gateway
+    environment:
+      - GatewayBaseUrl=http://gateway_service:8080
+      - ASPNETCORE_ENVIRONMENT=Development
+      - DOTNET_RUNNING_IN_CONTAINER=true
+    networks:
+      - ecommerce-net
+
+# 🔥 THÊM: Volumes để persist data
+volumes:
+  sqlserver_data:
+  redis_data:
+
+networks:
+  ecommerce-net:
+    driver: bridge

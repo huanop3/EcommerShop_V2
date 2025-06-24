@@ -1,0 +1,21 @@
+/AppHost/bin
+/AppHost/obj
+/BlazorWebApp/bin
+/BlazorWebApp/obj
+/GateWayService/bin
+/GateWayService/obj
+/MainEcommerceService/bin
+/MainEcommerceService/obj
+/ProductService/bin
+/ProductService/obj
+
+# Docker
+.env
+docker-compose.override.yml
+**/Dockerfile.dcproj.user
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo

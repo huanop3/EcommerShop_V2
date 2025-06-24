@@ -1,0 +1,867 @@
+@page "/order-detail"
+@page "/order-detail/{orderId:int?}"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using BlazorWebApp.Services
+@using MainEcommerceService.Models.ViewModel
+@using ProductService.Models.ViewModel
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject OrderService OrderService
+@inject ProdService ProdService
+@inject UserService UserService
+@inject AddressService AddressService
+@inject SignalRService SignalRService
+@inject NavigationManager Navigation
+@inject ToastService ToastService
+@attribute [Authorize]
+@implements IAsyncDisposable
+
+<PageTitle>Order Confirmation - Grabit</PageTitle>
+<link href="css/order-confirmation.css" rel="stylesheet" />
+
+<div class="order-confirmation-container">
+    @if (isLoading)
+    {
+        <div class="loading-section">
+            <div class="loading-content">
+                <h3>Loading Order Details...</h3>
+                <p>Please wait while we fetch your order information.</p>
+            </div>
+        </div>
+    }
+    else if (orderDetails == null)
+    {
+        <div class="error-section">
+            <div class="error-content">
+                <div class="error-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h3>Order Not Found</h3>
+                <p>We couldn't find your order information. Please try again.</p>
+                <div class="error-actions">
+                    <a href="/orders" class="btn btn-primary">
+                        <i class="fas fa-list"></i>
+                        View My Orders
+                    </a>
+                    <a href="/cart" class="btn btn-secondary">
+                        <i class="fas fa-shopping-cart"></i>
+                        Back to Cart
+                    </a>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Order Confirmation Header -->
+        <div class="confirmation-header">
+            <div class="success-animation">
+                <div class="checkmark-circle">
+                    <div class="checkmark"></div>
+                </div>
+            </div>
+            <h1 class="confirmation-title">Order Confirmed!</h1>
+            <p class="confirmation-subtitle">Thank you for your order. We're processing it now.</p>
+            <div class="order-number">
+                <span class="label">Order Number:</span>
+                <span class="number">#ORD-@orderDetails.OrderId</span>
+            </div>
+        </div>
+
+        <!-- Current Order Status -->
+        <div class="current-status-section">
+            <h3 class="section-title">
+                <i class="fas fa-info-circle"></i>
+                Trạng thái đơn hàng
+            </h3>
+            
+            <div class="status-card @GetStatusCardClass()">
+                <div class="status-content">
+                    <div class="status-info">
+                        <h4>@GetCurrentStatusName()</h4>
+                        <p>@GetCurrentStatusDescription()</p>
+                        <small class="status-time">
+                            Cập nhật lúc: @GetCurrentStatusTime().ToString("dd/MM/yyyy HH:mm")
+                        </small>
+                        @if (signalRConnected)
+                        {
+                            <div class="live-updates">
+                                <i class="fas fa-circle pulse"></i>
+                                <span>Đang cập nhật trực tiếp</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="live-updates-disabled">
+                                <i class="fas fa-circle-notch fa-spin"></i>
+                                <span>Đang kết nối...</span>
+                            </div>
+                        }
+                    </div>
+                    <div class="status-icon">
+                        @GetCurrentStatusIcon()
+                    </div>
+                </div>
+                
+                <div class="status-badge @GetCurrentStatusBadgeClass()">
+                    @GetCurrentStatusName()
+                </div>
+            </div>
+        </div>
+
+        <!-- Order Progress Tracking -->
+        <div class="order-tracking-section">
+            <h3 class="section-title">
+                <i class="fas fa-truck"></i>
+                Tiến độ đơn hàng
+            </h3>
+            
+            <div class="shopee-progress-tracker">
+                @{
+                    var progressSteps = GetProgressSteps();
+                }
+                
+                @for (int i = 0; i < progressSteps.Count; i++)
+                {
+                    var step = progressSteps[i];
+                    
+                    <div class="progress-step @step.CssClass">
+                        <div class="step-timeline">
+                            @if (i > 0)
+                            {
+                                <div class="timeline-connector @(step.IsCompleted ? "filled" : "")"></div>
+                            }
+                            
+                            <div class="step-indicator">
+                                <div class="step-icon @step.IconClass">
+                                    @step.Icon
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="step-content">
+                            <div class="step-title">@step.Title</div>
+                            <div class="step-description">@step.Description</div>
+                            @if (step.Timestamp.HasValue)
+                            {
+                                <div class="step-time">
+                                    @step.Timestamp.Value.ToString("dd/MM/yyyy HH:mm")
+                                </div>
+                            }
+                            @if (step.IsCurrent && !string.IsNullOrEmpty(latestStatusMessage))
+                            {
+                                <div class="step-additional-info">
+                                    @latestStatusMessage
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Order Details -->
+        <div class="order-details-section">
+            <div class="details-grid">
+                <!-- Order Summary - Super simple version -->
+                <div class="detail-card">
+                    <h3 class="card-title">
+                        <i class="fas fa-receipt"></i>
+                        Order Summary
+                    </h3>
+                    <div class="order-items">
+                        @if (OrderItems?.Any() == true)
+                        {
+                            @foreach (var item in OrderItems)
+                            {
+                                <div class="order-item">
+                                    <div class="item-image">
+                                        <div class="product-placeholder">
+                                            <i class="fas fa-cube"></i>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="item-info">
+                                        <h4 class="product-name">Product #@item.ProductId</h4>
+                                        <p class="product-description">@LoadProductDetail(item.ProductId)</p>
+                                        
+                                        <div class="item-details">
+                                            <span class="quantity">Qty: @item.Quantity</span>
+                                            <span class="unit-price">× $@item.UnitPrice.ToString("F2")</span>
+                                        </div>
+                                        
+                                        <!-- Link to product detail -->
+                                        <div class="product-link">
+                                            <a href="/product/@item.ProductId" target="_blank" class="view-product-link">
+                                                <i class="fas fa-external-link-alt"></i>
+                                                View Product Details
+                                            </a>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="item-total">
+                                        <div class="total-price">$@item.TotalPrice.ToString("F2")</div>
+                                        @if (item.Quantity > 1)
+                                        {
+                                            <div class="unit-info">
+                                                <small>($@item.UnitPrice.ToString("F2") each)</small>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="no-items">
+                                <div class="no-items-icon">
+                                    <i class="fas fa-shopping-cart"></i>
+                                </div>
+                                <p>No order items found</p>
+                            </div>
+                        }
+                    </div>
+                    
+                    <div class="pricing-summary">
+                        <div class="pricing-row total">
+                            <span>Total:</span>
+                            <span>$@orderDetails.TotalAmount.ToString("F2")</span>
+                        </div>
+                        
+                        @if (orderDetails.CouponId.HasValue)
+                        {
+                            <div class="coupon-applied">
+                                <i class="fas fa-ticket-alt"></i>
+                                <span>Coupon applied</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Delivery Information -->
+                <div class="detail-card">
+                    <h3 class="card-title">
+                        <i class="fas fa-map-marker-alt"></i>
+                        Delivery Information
+                    </h3>
+                    
+                    @if (userProfile != null)
+                    {
+                        <div class="customer-info">
+                            <h4>Customer Information</h4>
+                            <div class="customer-details">
+                                <p><strong>@userProfile.FirstName @userProfile.LastName</strong></p>
+                                <p><i class="fas fa-envelope"></i> @userProfile.Email</p>
+                                @if (!string.IsNullOrEmpty(userProfile.PhoneNumber))
+                                {
+                                    <p><i class="fas fa-phone"></i> @userProfile.PhoneNumber</p>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (shippingAddress != null)
+                    {
+                        <div class="address-info">
+                            <h4>Shipping Address</h4>
+                            <p><strong>@shippingAddress.AddressLine1</strong></p>
+                            @if (!string.IsNullOrEmpty(shippingAddress.AddressLine2))
+                            {
+                                <p>@shippingAddress.AddressLine2</p>
+                            }
+                            <p>@shippingAddress.City, @shippingAddress.State @shippingAddress.PostalCode</p>
+                            <p>@shippingAddress.Country</p>
+                        </div>
+                    }
+                    
+                    <div class="delivery-info">
+                        <div class="info-row">
+                            <span class="label">Order Date:</span>
+                            <span class="value">@orderDetails.OrderDate.ToString("MMM dd, yyyy HH:mm")</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Estimated Delivery:</span>
+                            <span class="value">3-5 business days</span>
+                        </div>
+                        @if (orderDetails.UpdatedAt.HasValue)
+                        {
+                            <div class="info-row">
+                                <span class="label">Last Updated:</span>
+                                <span class="value">@orderDetails.UpdatedAt.Value.ToString("MMM dd, yyyy HH:mm")</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="order-actions">
+            <a href="/orders" class="btn btn-primary">
+                <i class="fas fa-list"></i>
+                View All Orders
+            </a>
+            <a href="/products" class="btn btn-secondary">
+                <i class="fas fa-shopping-bag"></i>
+                Continue Shopping
+            </a>
+            <button class="btn btn-info" @onclick="RefreshOrderStatus" disabled="@isRefreshing">
+                @if (isRefreshing)
+                {
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>Refreshing...</span>
+                }
+                else
+                {
+                    <i class="fas fa-sync-alt"></i>
+                    <span>Refresh Status</span>
+                }
+            </button>
+            @if (canCancelOrder)
+            {
+                <button class="btn btn-danger" @onclick="ShowCancelOrderDialog" disabled="@isCancellingOrder">
+                    @if (isCancellingOrder)
+                    {
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>Đang hủy...</span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-times"></i>
+                        <span>Hủy đơn hàng</span>
+                    }
+                </button>
+            }
+        </div>
+
+        <!-- Cancel Order Dialog -->
+        @if (showCancelDialog)
+        {
+            <div class="modal-overlay" @onclick="HideCancelOrderDialog">
+                <div class="cancel-dialog" @onclick:stopPropagation="true">
+                    <div class="dialog-header">
+                        <h3>Hủy đơn hàng</h3>
+                        <button class="close-btn" @onclick="HideCancelOrderDialog">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="dialog-content">
+                        <div class="warning-message">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <p>Bạn có chắc chắn muốn hủy đơn hàng này?</p>
+                            <small>Hành động này không thể hoàn tác.</small>
+                        </div>
+                        
+                        <div class="order-info">
+                            <div class="info-row">
+                                <span class="label">Đơn hàng:</span>
+                                <span class="value">#ORD-@orderDetails.OrderId</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Tổng tiền:</span>
+                                <span class="value">$@orderDetails.TotalAmount.ToString("F2")</span>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="cancelReason">Lý do hủy đơn hàng (không bắt buộc):</label>
+                            <textarea id="cancelReason" @bind="cancelReason" 
+                                     placeholder="Vui lòng cho biết lý do hủy đơn hàng..."
+                                     rows="3" class="form-control"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="dialog-actions">
+                        <button class="btn btn-secondary" @onclick="HideCancelOrderDialog" disabled="@isCancellingOrder">
+                            Giữ đơn hàng
+                        </button>
+                        <button class="btn btn-danger" @onclick="ConfirmCancelOrder" disabled="@isCancellingOrder">
+                            @if (isCancellingOrder)
+                            {
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <span>Đang hủy...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-times"></i>
+                                <span>Xác nhận hủy</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public int? OrderId { get; set; }
+
+    // Core data
+    public OrderVM? orderDetails;
+    public AddressVM? shippingAddress;
+    public ProfileVM? userProfile;
+    public IEnumerable<OrderItemVM>? OrderItems;
+    public int? currentUserId;
+    public List<PrdVMWithImages> productDetails = new List<PrdVMWithImages>();
+    public OrderStatusVM? currentOrderStatus;
+    
+    // UI states
+    public bool isLoading = true;
+    public bool isRefreshing = false;
+    public bool signalRConnected = false;
+    public bool disposed = false;
+    
+    // Cancel order
+    public bool canCancelOrder = false;
+    public bool showCancelDialog = false;
+    public string cancelReason = "";
+    public bool isCancellingOrder = false;
+    
+    // SignalR updates
+    public string latestStatusMessage = "";
+
+    // Progress step model
+    public class ProgressStep
+    {
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public RenderFragment Icon { get; set; } = @<i class="fas fa-circle"></i>;
+        public DateTime? Timestamp { get; set; }
+        public bool IsCompleted { get; set; }
+        public bool IsCurrent { get; set; }
+        public string CssClass { get; set; } = "";
+        public string IconClass { get; set; } = "";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await GetCurrentUserAsync();
+            if (!currentUserId.HasValue)
+            {
+                Navigation.NavigateTo("/login", true);
+                return;
+            }
+
+            await LoadOrderDataAsync();
+            await InitializeSignalRAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error in OnInitializedAsync: {ex.Message}");
+            ToastService?.ShowError("Error loading order confirmation");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    public async Task GetCurrentUserAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState?.User;
+        if (user?.Identity?.IsAuthenticated == true)
+        {
+            var userIdClaim = user.Claims?.FirstOrDefault(c => c.Type == "UserId");
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+            {
+                currentUserId = userId;
+            }
+        }
+    }
+
+    public async Task LoadOrderDataAsync()
+    {
+        try
+        {
+            // 1. Get Order Details
+            if (OrderId.HasValue)
+            {
+                orderDetails = await OrderService.GetOrderByIdAsync(OrderId.Value);
+            }
+            else if (currentUserId.HasValue)
+            {
+                var userOrders = await OrderService.GetOrdersByUserIdAsync(currentUserId.Value);
+                orderDetails = userOrders?.OrderByDescending(o => o.CreatedAt).FirstOrDefault();
+                if (orderDetails != null) OrderId = orderDetails.OrderId;
+            }
+
+            if (orderDetails == null) return;
+
+            // 2. Get current order status
+            currentOrderStatus = await OrderService.GetOrderStatusByIdAsync(orderDetails.OrderStatusId);
+
+            // 3. Get User Profile
+            userProfile = await UserService.GetProfileAsync(orderDetails.UserId);
+
+            // 4. Get Shipping Address
+            if (orderDetails.ShippingAddressId.HasValue)
+            {
+                shippingAddress = await AddressService.GetAddressByIdAsync(orderDetails.ShippingAddressId.Value);
+            }
+            OrderItems = await OrderService.GetOrderItemsByOrderIdAsync(orderDetails.OrderId);
+            //Load product details for each order item
+            if (OrderItems != null)
+            {
+                foreach (var item in OrderItems)
+                {
+                    var product = await ProdService.GetProductByIdAsync(item.ProductId);
+                    if (product != null)
+                    {
+                        productDetails.Add(product);
+                    }
+                }
+            }
+            // 5. Check cancel permission
+            if (OrderId.HasValue)
+            {
+                canCancelOrder = await OrderService.CanCancelOrderAsync(OrderId.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading order data: {ex.Message}");
+        }
+    }
+    public string LoadProductDetail(int productId){
+        return productDetails.Where(p => p.ProductId == productId)
+                             .Select(p => p.ProductName)
+                             .FirstOrDefault() ?? "Product details not available";
+    }
+    /// <summary>
+    /// Calculate subtotal for order (without shipping/tax)
+    /// </summary>
+    public decimal GetSubtotal()
+    {
+        return orderDetails?.OrderItems?.Sum(item => item.TotalPrice) ?? 0m;
+    }
+
+    /// <summary>
+    /// Calculate estimated shipping cost
+    /// </summary>
+    public decimal GetShippingCost()
+    {
+        var subtotal = GetSubtotal();
+        return subtotal > 100 ? 0 : 10; // Free shipping over $100
+    }
+
+    /// <summary>
+    /// Calculate tax amount
+    /// </summary>
+    public decimal GetTaxAmount()
+    {
+        var subtotal = GetSubtotal();
+        return Math.Round(subtotal * 0.085m, 2);
+    }
+
+    public async Task InitializeSignalRAsync()
+    {
+        try
+        {
+            if (SignalRService != null)
+            {
+                SignalRService.YourOrderStatusChanged += OnOrderStatusChanged;
+                
+                if (!SignalRService.IsMainHubConnected)
+                {
+                    await SignalRService.StartConnectionAsync();
+                }
+                
+                signalRConnected = SignalRService.IsMainHubConnected;
+                
+                if (currentUserId.HasValue && signalRConnected)
+                {
+                    await SignalRService.RegisterUserConnectionAsync(currentUserId.Value.ToString());
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ SignalR initialization error: {ex.Message}");
+        }
+    }
+
+    // Status helper methods using only API data
+    public string GetCurrentStatusName()
+    {
+        return currentOrderStatus?.StatusName switch
+        {
+            "Pending" => "Chờ xác nhận",
+            "Confirmed" => "Đã xác nhận",
+            "Processing" => "Đang chuẩn bị hàng",
+            "Shipped" => "Đã giao cho ĐVVC",
+            "In Transit" => "Đang vận chuyển",
+            "Out for Delivery" => "Đang giao hàng",
+            "Delivered" => "Đã giao hàng",
+            "Cancelled" => "Đã hủy",
+            "Returned" => "Đã trả hàng",
+            "Refunded" => "Đã hoàn tiền",
+            _ => "Đang tải..."
+        };
+    }
+
+    public string GetCurrentStatusDescription()
+    {
+        return currentOrderStatus?.Description ?? currentOrderStatus?.StatusName switch
+        {
+            "Pending" => "Đơn hàng đang chờ người bán xác nhận",
+            "Confirmed" => "Người bán đã xác nhận và sẽ chuẩn bị hàng sớm",
+            "Processing" => "Người bán đang đóng gói sản phẩm",
+            "Shipped" => "Đơn hàng đã được giao cho đơn vị vận chuyển",
+            "In Transit" => "Đơn hàng đang trên đường đến địa chỉ của bạn",
+            "Out for Delivery" => "Đơn hàng đang được giao đến bạn",
+            "Delivered" => "Đơn hàng đã được giao thành công",
+            "Cancelled" => "Đơn hàng đã bị hủy",
+            "Returned" => "Đơn hàng đã được trả lại người bán",
+            "Refunded" => "Tiền đã được hoàn vào tài khoản của bạn",
+            _ => "Đang tải thông tin..."
+        };
+    }
+
+    public DateTime GetCurrentStatusTime()
+    {
+        return orderDetails?.UpdatedAt ?? orderDetails?.OrderDate ?? DateTime.Now;
+    }
+
+    public RenderFragment GetCurrentStatusIcon()
+    {
+        return currentOrderStatus?.StatusName switch
+        {
+            "Pending" => @<i class="fas fa-clock text-warning"></i>,
+            "Confirmed" => @<i class="fas fa-check-circle text-success"></i>,
+            "Processing" => @<i class="fas fa-box-open text-info"></i>,
+            "Shipped" => @<i class="fas fa-shipping-fast text-primary"></i>,
+            "In Transit" => @<i class="fas fa-truck text-primary"></i>,
+            "Out for Delivery" => @<i class="fas fa-motorcycle text-success"></i>,
+            "Delivered" => @<i class="fas fa-check-double text-success"></i>,
+            "Cancelled" => @<i class="fas fa-times-circle text-danger"></i>,
+            "Returned" => @<i class="fas fa-undo text-warning"></i>,
+            "Refunded" => @<i class="fas fa-money-bill-wave text-success"></i>,
+            _ => @<i class="fas fa-spinner fa-spin text-muted"></i>
+        };
+    }
+
+    public string GetStatusCardClass()
+    {
+        return currentOrderStatus?.StatusName?.ToLower() switch
+        {
+            "pending" => "status-pending",
+            "confirmed" => "status-confirmed",
+            "processing" => "status-processing",
+            "shipped" => "status-shipped",
+            "in transit" => "status-transit",
+            "out for delivery" => "status-delivery",
+            "delivered" => "status-delivered",
+            "cancelled" => "status-cancelled",
+            "returned" => "status-returned",
+            "refunded" => "status-refunded",
+            _ => "status-default"
+        };
+    }
+
+    public string GetCurrentStatusBadgeClass()
+    {
+        return currentOrderStatus?.StatusName?.ToLower() switch
+        {
+            "pending" => "badge-warning",
+            "confirmed" => "badge-info",
+            "processing" => "badge-primary",
+            "shipped" or "in transit" or "out for delivery" or "delivered" => "badge-success",
+            "cancelled" => "badge-danger",
+            "returned" => "badge-warning",
+            "refunded" => "badge-success",
+            _ => "badge-secondary"
+        };
+    }
+
+    public List<ProgressStep> GetProgressSteps()
+    {
+        var steps = new List<ProgressStep>();
+        var currentStatusName = currentOrderStatus?.StatusName ?? "Pending";
+        
+        var allSteps = new[]
+        {
+            new { Name = "Pending", Title = "Đơn hàng đã đặt", Description = "Đơn hàng đang chờ xử lý", Icon = "fas fa-shopping-cart" },
+            new { Name = "Confirmed", Title = "Đã xác nhận", Description = "Đơn hàng đã được xác nhận", Icon = "fas fa-check-circle" },
+            new { Name = "Processing", Title = "Đang chuẩn bị hàng", Description = "Đơn hàng đang được chuẩn bị", Icon = "fas fa-box-open" },
+            new { Name = "Shipped", Title = "Đã giao cho ĐVVC", Description = "Đơn hàng đã được giao cho đơn vị vận chuyển", Icon = "fas fa-shipping-fast" },
+            new { Name = "In Transit", Title = "Đang vận chuyển", Description = "Đơn hàng đang trên đường giao", Icon = "fas fa-truck" },
+            new { Name = "Out for Delivery", Title = "Đang giao hàng", Description = "Đơn hàng đang được giao đến địa chỉ nhận", Icon = "fas fa-motorcycle" },
+            new { Name = "Delivered", Title = "Đã giao hàng", Description = "Đơn hàng đã được giao thành công", Icon = "fas fa-check-double" }
+        };
+
+        if (currentStatusName == "Cancelled")
+        {
+            steps.Add(new ProgressStep
+            {
+                Title = "Đã hủy",
+                Description = "Đơn hàng đã bị hủy",
+                Icon = @<i class="fas fa-times"></i>,
+                Timestamp = orderDetails?.UpdatedAt ?? orderDetails?.OrderDate,
+                IsCompleted = false,
+                IsCurrent = true,
+                CssClass = "cancelled current",
+                IconClass = "current"
+            });
+        }
+        else
+        {
+            var currentIndex = Array.FindIndex(allSteps, s => s.Name == currentStatusName);
+            if (currentIndex == -1) currentIndex = 0;
+
+            for (int i = 0; i < allSteps.Length; i++)
+            {
+                var stepInfo = allSteps[i];
+                var isCompleted = i < currentIndex;
+                var isCurrent = i == currentIndex;
+                
+                steps.Add(new ProgressStep
+                {
+                    Title = stepInfo.Title,
+                    Description = stepInfo.Description,
+                    Icon = isCurrent && currentStatusName == "Cancelled" 
+                        ? @<i class="fas fa-times"></i> 
+                        : @<i class="@stepInfo.Icon"></i>,
+                    Timestamp = (isCompleted || isCurrent) ? (orderDetails?.UpdatedAt ?? orderDetails?.OrderDate) : null,
+                    IsCompleted = isCompleted,
+                    IsCurrent = isCurrent,
+                    CssClass = $"{(isCompleted ? "completed" : "")} {(isCurrent ? "current" : "")} {(isCompleted || isCurrent ? "active" : "")}",
+                    IconClass = isCompleted ? "completed" : (isCurrent ? "current" : "pending")
+                });
+            }
+        }
+
+        return steps;
+    }
+
+    public async Task RefreshOrderStatus()
+    {
+        if (isRefreshing || !OrderId.HasValue) return;
+        
+        try
+        {
+            isRefreshing = true;
+            StateHasChanged();
+            
+            // Reload order details
+            orderDetails = await OrderService.GetOrderByIdAsync(OrderId.Value);
+            if (orderDetails != null)
+            {
+                currentOrderStatus = await OrderService.GetOrderStatusByIdAsync(orderDetails.OrderStatusId);
+                canCancelOrder = await OrderService.CanCancelOrderAsync(OrderId.Value);
+            }
+            
+            ToastService?.ShowSuccess("Order status refreshed");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error refreshing status: {ex.Message}");
+            ToastService?.ShowError("Unable to refresh order status");
+        }
+        finally
+        {
+            isRefreshing = false;
+            StateHasChanged();
+        }
+    }
+
+    public void OnOrderStatusChanged(int orderId, string statusName, string message)
+    {
+        if (disposed || OrderId != orderId) return;
+        
+        _ = Task.Run(async () =>
+        {
+            if (disposed) return;
+            
+            latestStatusMessage = message;
+            
+            // Reload current status
+            if (orderDetails != null)
+            {
+                var newStatus = await OrderService.GetOrderStatusByNameAsync(statusName);
+                if (newStatus != null)
+                {
+                    currentOrderStatus = newStatus;
+                    orderDetails.OrderStatusId = newStatus.StatusId;
+                }
+                
+                canCancelOrder = await OrderService.CanCancelOrderAsync(OrderId.Value);
+            }
+            
+            await InvokeAsync(StateHasChanged);
+            ToastService?.ShowInfo($"Trạng thái đơn hàng: {GetCurrentStatusName()}");
+        });
+    }
+
+    public void ShowCancelOrderDialog()
+    {
+        if (!canCancelOrder) return;
+        showCancelDialog = true;
+        cancelReason = "";
+        StateHasChanged();
+    }
+
+    public void HideCancelOrderDialog()
+    {
+        showCancelDialog = false;
+        cancelReason = "";
+        StateHasChanged();
+    }
+
+    public async Task ConfirmCancelOrder()
+    {
+        if (!OrderId.HasValue || isCancellingOrder) return;
+
+        try
+        {
+            isCancellingOrder = true;
+            StateHasChanged();
+
+            var (success, message) = await OrderService.CancelOrderAsync(OrderId.Value, cancelReason);
+            
+            if (success)
+            {
+                // Reload order data
+                await LoadOrderDataAsync();
+                showCancelDialog = false;
+                ToastService?.ShowSuccess(message);
+            }
+            else
+            {
+                ToastService?.ShowError(message);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error cancelling order: {ex.Message}");
+            ToastService?.ShowError("An error occurred while cancelling the order");
+        }
+        finally
+        {
+            isCancellingOrder = false;
+            StateHasChanged();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            disposed = true;
+            if (SignalRService != null)
+            {
+                SignalRService.YourOrderStatusChanged -= OnOrderStatusChanged;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error disposing: {ex.Message}");
+        }
+    }
+}

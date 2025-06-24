@@ -1,0 +1,77 @@
+@using BlazorWebApp.ViewModel
+@using MudBlazor
+
+<MudTable Items="Orders" Hover="true" Striped="true" Dense="true" Loading="isLoading">
+    <HeaderContent>
+        <MudTh>Đơn hàng</MudTh>
+        <MudTh>Khách hàng</MudTh>
+        <MudTh>Địa chỉ</MudTh>
+        <MudTh Style="text-align:center">Trạng thái</MudTh>
+        <MudTh Style="text-align:right">Giá trị</MudTh>
+        <MudTh Style="text-align:center">Thao tác</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Đơn hàng">
+            <div>
+                <MudText Typo="Typo.body1" Style="font-weight:600">@context.OrderCode</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.FormattedOrderDate</MudText>
+            </div>
+        </MudTd>
+        <MudTd DataLabel="Khách hàng">
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.Person" Class="mr-2" Color="Color.Secondary" />
+                <MudText>@context.BuyerName</MudText>
+            </div>
+        </MudTd>
+        <MudTd DataLabel="Địa chỉ">
+            <MudText Typo="Typo.body2" Style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                @context.ShippingAddress
+            </MudText>
+        </MudTd>
+        <MudTd DataLabel="Trạng thái" Style="text-align:center">
+            <MudChip T="string" Size="Size.Small" Color="GetStatusColor(context.OrderStatusId)">
+                @context.CurrentStatus
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Giá trị" Style="text-align:right">
+            <MudText Style="font-weight:600">@context.FormattedTotalAmount</MudText>
+        </MudTd>
+        <MudTd DataLabel="Thao tác" Style="text-align:center">
+            <MudButton Variant="Variant.Text" 
+                      Color="Color.Primary" 
+                      Size="Size.Small"
+                      StartIcon="@Icons.Material.Filled.Visibility"
+                      OnClick="() => OnOrderSelected.InvokeAsync(context.OrderId)">
+                Xem
+            </MudButton>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudAlert Severity="Severity.Info" Class="my-4">
+            <MudText>Không có đơn hàng nào được giao</MudText>
+        </MudAlert>
+    </NoRecordsContent>
+    <LoadingContent>
+        <MudText>Đang tải danh sách đơn hàng...</MudText>
+    </LoadingContent>
+</MudTable>
+
+@code {
+    [Parameter] public List<AssignedOrderVM> Orders { get; set; } = new();
+    [Parameter] public EventCallback<int> OnOrderSelected { get; set; }
+    
+    private bool isLoading = false;
+
+    private Color GetStatusColor(int statusId)
+    {
+        return statusId switch
+        {
+            4 => Color.Primary,    // Shipped
+            5 => Color.Info,       // In Transit
+            6 => Color.Warning,    // Out for Delivery
+            7 => Color.Success,    // Delivered
+            9 => Color.Error,      // Returned
+            _ => Color.Default
+        };
+    }
+}

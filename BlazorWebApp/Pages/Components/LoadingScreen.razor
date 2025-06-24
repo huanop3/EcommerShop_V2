@@ -1,0 +1,15 @@
+<div class="app-loading-screen @(IsVisible ? "visible" : "hidden")">
+    <div class="loading-content">
+        <div class="app-logo">
+            <img src="images/header/logo.png" alt="Logo" />
+        </div>
+        <div class="loading-spinner-container">
+            <div class="loading-spinner2"></div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public bool IsVisible { get; set; } = true;
+}

@@ -1,0 +1,688 @@
+@page "/payment"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using BlazorWebApp.Services
+@using MainEcommerceService.Models.ViewModel
+@using ProductService.Models.ViewModel
+@using System.Text.Json
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AddressService AddressService
+@inject UserService UserService
+@inject CouponService CouponService
+@inject ToastService ToastService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@attribute [Authorize]
+
+<PageTitle>Payment Method - Grabit</PageTitle>
+<link href="css/checkout.css" rel="stylesheet" />
+
+<div class="checkout-container">
+    <div class="border-container">
+        <div class="breadcrumb">
+            <div class="container">
+                <a href="/">Home</a> / <a href="/cart">Cart</a> / <a href="/checkout">Checkout</a> / <span>Payment</span>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-section">
+            <div class="loading-content">
+                <div class="loading-spinner1"></div>
+                <h3>Preparing your payment...</h3>
+                <p>Loading order information and payment options</p>
+            </div>
+        </div>
+    }
+    else if (!cartItems.Any())
+    {
+        <div class="empty-checkout">
+            <div class="empty-content">
+                <div class="empty-icon">
+                    <i class="fas fa-shopping-cart"></i>
+                </div>
+                <h3>Your cart is empty</h3>
+                <p>Add some items to your cart before checkout</p>
+                <a href="/products" class="btn btn-primary">
+                    <i class="fas fa-shopping-bag"></i>
+                    Continue Shopping
+                </a>
+            </div>
+        </div>
+    }
+    else if (selectedAddress == null)
+    {
+        <div class="empty-checkout">
+            <div class="empty-content">
+                <div class="empty-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h3>Missing shipping address</h3>
+                <p>Please go back to checkout and select a shipping address</p>
+                <a href="/checkout" class="btn btn-primary">
+                    <i class="fas fa-arrow-left"></i>
+                    Back to Checkout
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="checkout-section">
+            <div class="checkout-main">
+                <h2 class="checkout-title">
+                    <i class="fas fa-credit-card"></i>
+                    Payment Method
+                </h2>
+                
+                <div class="checkout-steps">
+                    <div class="step completed">
+                        <div class="step-number">
+                            <i class="fas fa-check"></i>
+                        </div>
+                        <div class="step-title">Shipping Information</div>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step active">
+                        <div class="step-number">2</div>
+                        <div class="step-title">Payment Method</div>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-title">Order Review</div>
+                    </div>
+                </div>
+
+                <div class="checkout-content">
+                    <div class="checkout-step-content active">
+                        
+                        <!-- Order Review Section -->
+                        <div class="form-section">
+                            <div class="section-header">
+                                <h3 class="form-section-title">
+                                    <i class="fas fa-eye"></i>
+                                    Order Review
+                                </h3>
+                            </div>
+                            
+                            <div class="order-review-grid">
+                                <div class="review-item">
+                                    <div class="review-label">
+                                        <i class="fas fa-box"></i>
+                                        Items
+                                    </div>
+                                    <div class="review-value">@currentPricing.TotalQuantity items</div>
+                                </div>
+                                
+                                <div class="review-item">
+                                    <div class="review-label">
+                                        <i class="fas fa-map-marker-alt"></i>
+                                        Shipping to
+                                    </div>
+                                    <div class="review-value">
+                                        @selectedAddress.City, @selectedAddress.State
+                                        <small class="address-preview">@selectedAddress.AddressLine1</small>
+                                    </div>
+                                </div>
+                                
+                                <div class="review-item">
+                                    <div class="review-label">
+                                        <i class="fas fa-truck"></i>
+                                        Delivery
+                                    </div>
+                                    <div class="review-value">
+                                        @GetDeliveryOptionName(selectedDeliveryOption)
+                                        @if (currentPricing.IsFreeShipping)
+                                        {
+                                            <span class="free-shipping">FREE</span>
+                                        }
+                                    </div>
+                                </div>
+                                
+                                @if (appliedCoupon != null)
+                                {
+                                    <div class="review-item discount">
+                                        <div class="review-label">
+                                            <i class="fas fa-ticket-alt"></i>
+                                            Coupon Applied
+                                        </div>
+                                        <div class="review-value">
+                                            @appliedCoupon.CouponCode
+                                            <small class="discount-amount">-$@currentPricing.CouponDiscount.ToString("F2")</small>
+                                        </div>
+                                    </div>
+                                }
+                                
+                                <div class="review-item total">
+                                    <div class="review-label">
+                                        <i class="fas fa-money-bill-wave"></i>
+                                        Total Amount
+                                    </div>
+                                    <div class="review-value total-amount">
+                                        $@currentPricing.TotalAmount.ToString("F2")
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Payment Method Selection -->
+                        <div class="form-section">
+                            <div class="section-header">
+                                <h3 class="form-section-title">
+                                    <i class="fas fa-credit-card"></i>
+                                    Choose Payment Method
+                                </h3>
+                            </div>
+                            
+                            <div class="payment-info-notice">
+                                <div class="info-box">
+                                    <i class="fas fa-info-circle"></i>
+                                    <div class="info-content">
+                                        <strong>Payment Options</strong>
+                                        <p>Currently, we only accept cash payment upon delivery. More payment options will be available soon!</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="payment-methods">
+                                <!-- Cash on Delivery - Only available option -->
+                                <div class="payment-method @(selectedPaymentMethod == "cash" ? "selected" : "")"
+                                     @onclick="@(() => SelectPaymentMethod("cash"))">
+                                    <div class="payment-radio">
+                                        <input type="radio" 
+                                               id="cash-payment" 
+                                               name="payment-method" 
+                                               value="cash" 
+                                               checked="@(selectedPaymentMethod == "cash")"
+                                               @onchange="@(() => SelectPaymentMethod("cash"))" />
+                                    </div>
+                                    <div class="payment-content">
+                                        <div class="payment-header">
+                                            <div class="payment-icon cash">
+                                                <i class="fas fa-money-bill-wave"></i>
+                                            </div>
+                                            <div class="payment-info">
+                                                <div class="payment-title">Cash on Delivery</div>
+                                                <div class="payment-subtitle">Pay when your order arrives</div>
+                                            </div>
+                                            <div class="payment-status available">
+                                                <i class="fas fa-check-circle"></i>
+                                                Available
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="payment-details @(selectedPaymentMethod == "cash" ? "active" : "")">
+                                            <div class="payment-features">
+                                                <div class="feature-item">
+                                                    <i class="fas fa-shield-alt"></i>
+                                                    <span>Secure and convenient</span>
+                                                </div>
+                                                <div class="feature-item">
+                                                    <i class="fas fa-hand-holding-usd"></i>
+                                                    <span>Pay in cash when delivered</span>
+                                                </div>
+                                                <div class="feature-item">
+                                                    <i class="fas fa-times-circle"></i>
+                                                    <span>No additional fees</span>
+                                                </div>
+                                                <div class="feature-item">
+                                                    <i class="fas fa-clock"></i>
+                                                    <span>Have exact change ready</span>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="cash-preparation">
+                                                <div class="cash-amount-box">
+                                                    <h4>Amount to prepare:</h4>
+                                                    <div class="cash-amount">$@currentPricing.TotalAmount.ToString("F2")</div>
+                                                    <small>Please have this amount ready for the delivery person</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Coming Soon Payment Methods -->
+                                <div class="coming-soon-section">
+                                    <h4 class="coming-soon-title">
+                                        <i class="fas fa-clock"></i>
+                                        Coming Soon
+                                    </h4>
+                                    
+                                    <div class="coming-soon-methods">
+                                        <div class="payment-method disabled">
+                                            <div class="payment-content">
+                                                <div class="payment-header">
+                                                    <div class="payment-icon paypal">
+                                                        <i class="fab fa-paypal"></i>
+                                                    </div>
+                                                    <div class="payment-info">
+                                                        <div class="payment-title">PayPal</div>
+                                                    </div>
+                                                    <div class="payment-status coming-soon">
+                                                        Coming Soon
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="payment-method disabled">
+                                            <div class="payment-content">
+                                                <div class="payment-header">
+                                                    <div class="payment-icon stripe">
+                                                        <i class="fab fa-stripe"></i>
+                                                    </div>
+                                                    <div class="payment-info">
+                                                        <div class="payment-title">Credit Card</div>
+                                                    </div>
+                                                    <div class="payment-status coming-soon">
+                                                        Coming Soon
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="payment-method disabled">
+                                            <div class="payment-content">
+                                                <div class="payment-header">
+                                                    <div class="payment-icon bank">
+                                                        <i class="fas fa-university"></i>
+                                                    </div>
+                                                    <div class="payment-info">
+                                                        <div class="payment-title">Bank Transfer</div>
+                                                    </div>
+                                                    <div class="payment-status coming-soon">
+                                                        Coming Soon
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="payment-method disabled">
+                                            <div class="payment-content">
+                                                <div class="payment-header">
+                                                    <div class="payment-icon wallet">
+                                                        <i class="fas fa-mobile-alt"></i>
+                                                    </div>
+                                                    <div class="payment-info">
+                                                        <div class="payment-title">Mobile Wallet</div>
+                                                    </div>
+                                                    <div class="payment-status coming-soon">
+                                                        Coming Soon
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Delivery Instructions -->
+                        <div class="form-section">
+                            <div class="section-header">
+                                <h3 class="form-section-title">
+                                    <i class="fas fa-clipboard-list"></i>
+                                    Delivery Instructions (Optional)
+                                </h3>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="delivery-notes">Special delivery instructions</label>
+                                <textarea @bind="deliveryInstructions" 
+                                         id="delivery-notes"
+                                         class="form-control" 
+                                         rows="3" 
+                                         placeholder="e.g., Leave at front door, Ring doorbell, Call when arrived, etc."
+                                         maxlength="500">
+                                </textarea>
+                                <small class="form-text">@(deliveryInstructions?.Length ?? 0)/500 characters</small>
+                            </div>
+                        </div>
+
+                        <!-- Order Confirmation -->
+                        <div class="form-section">
+                            <div class="section-header">
+                                <h3 class="form-section-title">
+                                    <i class="fas fa-check-square"></i>
+                                    Order Confirmation
+                                </h3>
+                            </div>
+                            
+                            <div class="confirmation-checklist">
+                                <div class="form-group checkbox-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" 
+                                               @bind="termsAccepted" 
+                                               required />
+                                        <span class="checkmark"></span>
+                                        <span class="checkbox-text">
+                                            I agree to the <a href="/terms" target="_blank">Terms of Service</a> 
+                                            and <a href="/privacy" target="_blank">Privacy Policy</a>
+                                        </span>
+                                    </label>
+                                </div>
+                                
+                                <div class="form-group checkbox-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" 
+                                               @bind="orderConfirmed" 
+                                               required />
+                                        <span class="checkmark"></span>
+                                        <span class="checkbox-text">
+                                            I confirm that the order details and shipping address are correct
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Checkout Actions -->
+                        <div class="checkout-actions">
+                            <a href="/checkout" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i>
+                                Back to Shipping
+                            </a>
+                            
+                            <button type="button" 
+                                    class="btn btn-primary btn-continue"
+                                    @onclick="PlaceOrder"
+                                    disabled="@(!CanPlaceOrder() || isPlacingOrder)">
+                                @if (isPlacingOrder)
+                                {
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <span>Processing...</span>
+                                }
+                                else
+                                {
+                                    <span>Continue to Review ($@currentPricing.TotalAmount.ToString("F2"))</span>
+                                    <i class="fas fa-arrow-right"></i>
+                                }
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Order Summary Sidebar - Same as Checkout -->
+            <div class="order-summary-sidebar">
+                <div class="order-summary-box">
+                    <h3>
+                        <i class="fas fa-receipt"></i>
+                        Order Summary
+                    </h3>
+                    
+                    <div class="order-summary-items">
+                        @foreach (var item in cartItems)
+                        {
+                            <div class="summary-item">
+                                <div class="summary-item-image">
+                                    <img src="@GetProductImageUrl(item)" alt="@item.ProductName" />
+                                </div>
+                                <div class="summary-item-info">
+                                    <span class="summary-item-name">@item.ProductName</span>
+                                    <span class="summary-item-quantity">Qty: @item.CartQuantity</span>
+                                </div>
+                                <span class="summary-item-price">$@item.TotalPrice.ToString("F2")</span>
+                            </div>
+                        }
+                    </div>
+                    
+                    <div class="summary-total">
+                        <div class="summary-row">
+                            <span>Subtotal (@currentPricing.TotalQuantity items)</span>
+                            <span>$@currentPricing.Subtotal.ToString("F2")</span>
+                        </div>
+                        
+                        @if (appliedCoupon != null && currentPricing.CouponDiscount > 0)
+                        {
+                            <div class="summary-row discount">
+                                <span>
+                                    <i class="fas fa-ticket-alt"></i>
+                                    Coupon (@appliedCoupon.CouponCode)
+                                </span>
+                                <span>-$@currentPricing.CouponDiscount.ToString("F2")</span>
+                            </div>
+                        }
+                        
+                        <div class="summary-row">
+                            <span>Shipping (@GetDeliveryOptionName(selectedDeliveryOption))</span>
+                            <span>
+                                @if (currentPricing.IsFreeShipping)
+                                {
+                                    <span class="free-shipping">FREE</span>
+                                }
+                                else
+                                {
+                                    <text>$@currentPricing.ShippingCost.ToString("F2")</text>
+                                }
+                            </span>
+                        </div>
+                        
+                        <div class="summary-row order-total">
+                            <span>Total</span>
+                            <span>$@currentPricing.TotalAmount.ToString("F2")</span>
+                        </div>
+                        
+                        @if (currentPricing.TotalSavings > 0)
+                        {
+                            <div class="savings-highlight">
+                                <i class="fas fa-piggy-bank"></i>
+                                You save $@currentPricing.TotalSavings.ToString("F2") on this order!
+                            </div>
+                        }
+                    </div>
+                    
+                    <!-- Shipping Address Display -->
+                    <div class="address-summary">
+                        <h4>
+                            <i class="fas fa-map-marker-alt"></i>
+                            Shipping Address
+                        </h4>
+                        <div class="address-content">
+                            <div class="address-line">@selectedAddress.AddressLine1</div>
+                            @if (!string.IsNullOrEmpty(selectedAddress.AddressLine2))
+                            {
+                                <div class="address-line">@selectedAddress.AddressLine2</div>
+                            }
+                            <div class="address-location">
+                                @selectedAddress.City, @selectedAddress.State @selectedAddress.PostalCode
+                            </div>
+                            <div class="address-country">@selectedAddress.Country</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Payment Method Display -->
+                    <div class="payment-summary">
+                        <h4>
+                            <i class="fas fa-credit-card"></i>
+                            Payment Method
+                        </h4>
+                        <div class="payment-info">
+                            <div class="payment-method-selected">
+                                <i class="fas fa-money-bill-wave"></i>
+                                <span>Cash on Delivery</span>
+                            </div>
+                            <small class="payment-note">Pay $@currentPricing.TotalAmount.ToString("F2") when your order arrives</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    // User and order data
+    private ProfileVM? currentUser;
+    private List<CartVM> cartItems = new();
+    private AddressVM? selectedAddress;
+    private string selectedDeliveryOption = "standard";
+    private string selectedPaymentMethod = "cash";
+    
+    // Form data
+    private string deliveryInstructions = "";
+    private bool termsAccepted = false;
+    private bool orderConfirmed = false;
+    private bool isPlacingOrder = false;
+    
+    // Loading state
+    private bool isLoading = true;
+    
+    // User ID
+    private int? currentUserId;
+    
+    // Use static services for pricing and coupon management
+    private CouponVM? appliedCoupon => CouponStateService.GetAppliedCoupon();
+    private PricingBreakdown currentPricing => CouponStateService.GetCurrentPricingBreakdown(cartItems, selectedDeliveryOption);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPaymentData();
+    }
+
+    private async Task LoadPaymentData()
+    {
+        isLoading = true;
+        StateHasChanged();
+        
+        try
+        {
+            currentUserId = await GetCurrentUserIdAsync();
+            if (!currentUserId.HasValue)
+            {
+                Navigation.NavigateTo("/login",true);
+                return;
+            }
+
+            // Load user profile
+            currentUser = await UserService.GetProfileAsync(currentUserId.Value);
+
+            // Load cart items
+            cartItems = CartVM.GetAllCartItems();
+            
+            // If cart is empty, redirect to cart page
+            if (!cartItems.Any())
+            {
+                ToastService.ShowWarning("Your cart is empty. Add some items before checkout.");
+                Navigation.NavigateTo("/cart",true);
+                return;
+            }
+
+            // Get checkout data from CouponStateService
+            var checkoutData = CouponStateService.GetCheckoutData();
+            selectedDeliveryOption = checkoutData.SelectedDeliveryOption ?? "standard";
+            
+            // Load selected address
+            if (checkoutData.SelectedAddressId.HasValue)
+            {
+                selectedAddress = await AddressService.GetAddressByIdAsync(checkoutData.SelectedAddressId.Value);
+            }
+            
+            // If no address selected, redirect back to checkout
+            if (selectedAddress == null)
+            {
+                ToastService.ShowWarning("Please select a shipping address in checkout.");
+                Navigation.NavigateTo("/checkout",true);
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error loading payment data: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task<int?> GetCurrentUserIdAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity.IsAuthenticated)
+        {
+            var userIdClaim = user.Claims.FirstOrDefault(c => c.Type == "UserId");
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return userId;
+            }
+        }
+        return null;
+    }
+
+    private void SelectPaymentMethod(string method)
+    {
+        selectedPaymentMethod = method;
+        StateHasChanged();
+    }
+
+    private bool CanPlaceOrder()
+    {
+        return termsAccepted && 
+               orderConfirmed && 
+               selectedPaymentMethod == "cash" && 
+               selectedAddress != null && 
+               cartItems.Any() && 
+               !isPlacingOrder;
+    }
+
+    private async Task PlaceOrder()
+    {
+        if (!CanPlaceOrder()) return;
+
+        try
+        {
+            isPlacingOrder = true;
+            StateHasChanged();
+
+            // ✅ Chỉ save payment method vào checkout data - KHÔNG đặt hàng
+            var checkoutData = CouponStateService.GetCheckoutData() ?? new CheckoutDataModel();
+            checkoutData.PaymentMethod = selectedPaymentMethod;
+            checkoutData.DeliveryInstructions = deliveryInstructions;
+            checkoutData.UserNotes = deliveryInstructions;
+            
+            // Save updated checkout data
+            CouponStateService.SaveCheckoutData(checkoutData);
+
+            // Show success message
+            ToastService.ShowSuccess("Payment method selected! Please review your order.");
+
+            // ✅ Chuyển đến ReviewOrder để khách hàng xác nhận cuối cùng
+            await Task.Delay(1000);
+            Navigation.NavigateTo("/revieworder", true);
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error processing payment selection: {ex.Message}");
+        }
+        finally
+        {
+            isPlacingOrder = false;
+            StateHasChanged();
+        }
+    }
+
+    // Utility methods
+    private string GetDeliveryOptionName(string option)
+    {
+        return option switch
+        {
+            "standard" => "Standard Delivery",
+            "express" => "Express Delivery",
+            "next-day" => "Next Day Delivery",
+            _ => "Standard Delivery"
+        };
+    }
+
+    private string GetProductImageUrl(CartVM item)
+    {
+        return $"https://via.placeholder.com/60x60/f8f9fa/6c757d?text=Product+{item.ProductId ?? 0}";
+    }
+}
