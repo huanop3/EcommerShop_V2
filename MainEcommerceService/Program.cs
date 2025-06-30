@@ -148,7 +148,26 @@ builder.Services.AddStackExchangeRedisCache(options =>
     options.Configuration = redisConnectionString;
     options.InstanceName = builder.Configuration["Redis:InstanceName"];
 });
+// Đọc URL của Gateway từ cấu hình
+var gatewayBaseUrl = builder.Configuration["GatewayBaseUrl"];
 
+// 🔥 SỬA: Kiểm tra môi trường để dùng địa chỉ phù hợp
+if (builder.Environment.IsDevelopment() && Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true")
+{
+    // Đang chạy trong Docker container
+    gatewayBaseUrl = "http://gateway_service:8080";
+}
+else if (string.IsNullOrEmpty(gatewayBaseUrl))
+{
+    // Chạy local development
+    gatewayBaseUrl = "http://localhost:5282";
+}
+
+builder.Services.AddScoped(sp => 
+{
+    var httpClient = new HttpClient { BaseAddress = new Uri(gatewayBaseUrl) };
+    return httpClient;
+});
 // Cấu hình ConnectionMultiplexer với cùng một connection string
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 {

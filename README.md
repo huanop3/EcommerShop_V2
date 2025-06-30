@@ -1,5 +1,5 @@
 # DA_Ecommerce_MS - Distributed E-commerce Platform 🛒
-
+File môi trường .env(Cần tải về cài ở máy): https://marvelous-cocoa-f69.notion.site/env-222b1caa1dd7807ead42d1d2d3a16c25?source=copy_link
 [![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg)](https://dotnet.microsoft.com/)
 [![Blazor](https://img.shields.io/badge/Blazor-Server-blue.svg)](https://blazor.net/)
 [![Microservices](https://img.shields.io/badge/Architecture-Microservices-orange.svg)](https://microservices.io/)

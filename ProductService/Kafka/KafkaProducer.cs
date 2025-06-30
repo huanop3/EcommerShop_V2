@@ -42,19 +42,15 @@ public class KafkaProducerService : IKafkaProducerService, IDisposable
             MaxPollIntervalMs = 300000
         };
 
-        _producer = new ProducerBuilder<string, string>(producerConfig)
-            .Build();
-
-        _responseConsumer = new ConsumerBuilder<string, string>(consumerConfig)
-            .Build();
-
+        _producer = new ProducerBuilder<string, string>(producerConfig).Build();
+        _responseConsumer = new ConsumerBuilder<string, string>(consumerConfig).Build();
         _responseListenerTask = Task.Run(async () => await ListenForResponsesAsync(_cancellationTokenSource.Token));
     }
 
     public async Task SendMessageAsync<T>(string topic, string key, T message)
     {
         var serializedMessage = JsonSerializer.Serialize(message);
-        var result = await _producer.ProduceAsync(topic, new Message<string, string>
+        await _producer.ProduceAsync(topic, new Message<string, string>
         {
             Key = key,
             Value = serializedMessage
@@ -81,7 +77,7 @@ public class KafkaProducerService : IKafkaProducerService, IDisposable
         await SendMessageAsync("seller-request", requestId, request);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
-
+        
         var result = await tcs.Task.WaitAsync(cts.Token);
         
         lock (_lockObject)
@@ -107,31 +103,12 @@ public class KafkaProducerService : IKafkaProducerService, IDisposable
             }
         };
 
-        var deliveryResult = await _producer.ProduceAsync("product-update-result", message);
+        await _producer.ProduceAsync("product-update-result", message);
     }
 
     private async Task ListenForResponsesAsync(CancellationToken cancellationToken)
     {
-        var subscribed = false;
-        var retryCount = 0;
-        const int maxRetries = 10;
-
-        while (!subscribed && retryCount < maxRetries && !cancellationToken.IsCancellationRequested)
-        {
-            _responseConsumer.Subscribe("seller-response");
-            subscribed = true;
-            retryCount++;
-
-            if (retryCount < maxRetries)
-            {
-                await Task.Delay(3000, cancellationToken);
-            }
-        }
-
-        if (!subscribed)
-        {
-            return;
-        }
+        _responseConsumer.Subscribe("seller-response");
 
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -153,7 +130,6 @@ public class KafkaProducerService : IKafkaProducerService, IDisposable
                     if (tcs != null)
                     {
                         tcs.SetResult(response);
-
                         lock (_lockObject)
                         {
                             _pendingRequests.Remove(response.RequestId);
@@ -161,8 +137,6 @@ public class KafkaProducerService : IKafkaProducerService, IDisposable
                     }
                 }
             }
-            
-            await Task.Delay(2000, cancellationToken);
         }
     }
 

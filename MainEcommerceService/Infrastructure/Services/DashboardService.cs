@@ -279,7 +279,7 @@ namespace MainEcommerceService.Infrastructure.Services
 
         private async Task<List<ProductApiModel>> GetProductsDataFromApi()
         {
-            var response = await _httpClient.GetAsync("http://localhost:5282/product/api/Product/GetAllProducts");
+            var response = await _httpClient.GetAsync("product/api/Product/GetAllProducts");
             if (response.IsSuccessStatusCode)
             {
                 var jsonString = await response.Content.ReadAsStringAsync();
@@ -292,7 +292,7 @@ namespace MainEcommerceService.Infrastructure.Services
 
         private async Task<List<CategoryApiModel>> GetCategoriesDataFromApi()
         {
-            var response = await _httpClient.GetAsync("http://localhost:5282/product/api/Category/GetAllCategories");
+            var response = await _httpClient.GetAsync("product/api/Category/GetAllCategories");
             if (response.IsSuccessStatusCode)
             {
                 var jsonString = await response.Content.ReadAsStringAsync();
@@ -305,7 +305,7 @@ namespace MainEcommerceService.Infrastructure.Services
 
         private async Task<List<ProductApiModel>> GetSellerProductsFromApi(int sellerId)
         {
-            var response = await _httpClient.GetAsync($"http://localhost:5282/product/api/Product/GetProductsBySeller/{sellerId}");
+            var response = await _httpClient.GetAsync($"product/api/Product/GetProductsBySeller/{sellerId}");
             if (response.IsSuccessStatusCode)
             {
                 var jsonString = await response.Content.ReadAsStringAsync();

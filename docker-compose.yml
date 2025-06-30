@@ -60,6 +60,7 @@ services:
     depends_on:
       - kafka # SỬA: Xóa 'db' và 'redis' khỏi depends_on
     environment:
+      - GatewayBaseUrl=${GATEWAY_BASE_URL}
       # SỬA: Sử dụng biến môi trường cho connection string mới
       - ConnectionStrings__MainDbService=${EXTERNAL_DB_CONNECTION}
       - ConnectionStrings__RedisConnection=${EXTERNAL_REDIS_CONNECTION}
@@ -68,6 +69,7 @@ services:
       - jwt__Issuer=${JWT_ISSUER}
       - jwt__Audience=${JWT_AUDIENCE}
       - ASPNETCORE_ENVIRONMENT=Development
+      
     networks:
       - ecommerce-net
 

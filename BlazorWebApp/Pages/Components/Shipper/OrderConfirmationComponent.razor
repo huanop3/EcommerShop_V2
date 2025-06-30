@@ -35,6 +35,7 @@
     <MudGrid AlignItems="Center" Class="mb-4">
         <MudItem xs="12" md="6">
             <MudTextField @bind-Value="orderCodeInput" 
+                         @oninput="OnOrderCodeInput"
                          Label="Nhập mã đơn hàng" 
                          Variant="Variant.Outlined" 
                          Adornment="Adornment.Start" 
@@ -83,7 +84,7 @@
     }
 
     <!-- ✅ ORDER PREVIEW SECTION -->
-    @if (orderPreview != null)
+    @if (orderPreview != null && hasSearched)
     {
         <MudDivider Class="mb-4" />
         
@@ -369,7 +370,7 @@
             </MudItem>
         </MudGrid>
     }
-    else if (!string.IsNullOrWhiteSpace(orderCodeInput) && !isChecking)
+    else if (hasSearched && orderPreview == null && !isChecking && !string.IsNullOrWhiteSpace(orderCodeInput))
     {
         <!-- No Results -->
         <MudAlert Severity="Severity.Info" Class="mt-4">
@@ -385,6 +386,8 @@
     [Parameter] public bool isConnected { get; set; } = false;
     
     private string orderCodeInput = string.Empty;
+    private string lastCheckedOrderCode = string.Empty; // ✅ TRACK LAST CHECKED ORDER
+    private bool hasSearched = false; // ✅ TRACK IF USER HAS SEARCHED
     private bool isChecking = false;
     private bool isConfirming = false;
     private bool isAutoRefreshing = false;
@@ -501,28 +504,43 @@
             return;
         }
 
+        // Prevent checking the same order multiple times
+        var currentOrderCode = orderCodeInput.Trim();
+        if (currentOrderCode == lastCheckedOrderCode && hasSearched && !isAutoRefreshing)
+        {
+            return;
+        }
+
         isChecking = true;
+        hasSearched = false; // Reset search state during check
         ResetUpdateFlags();
         
         try
         {
             // Parse order ID from input (support both "123" and "ORD-000123" formats)
-            var orderId = ParseOrderId(orderCodeInput);
+            var orderId = ParseOrderId(currentOrderCode);
             if (orderId <= 0)
             {
                 Snackbar.Add("Mã đơn hàng không hợp lệ", Severity.Warning);
+                hasSearched = true;
                 return;
             }
 
             Console.WriteLine($"🔍 Checking order {orderId} for shipper {ShipperId}...");
             
+            // Clear previous order data before new search
+            ClearOrderData();
+            
             // Get order details
             orderPreview = await ShipmentService.GetShipmentDashboardByOrderIdAsync(orderId);
+            
+            // Mark as searched regardless of result
+            hasSearched = true;
+            lastCheckedOrderCode = currentOrderCode;
             
             if (orderPreview == null)
             {
                 Snackbar.Add("Không tìm thấy đơn hàng hoặc bạn không có quyền truy cập", Severity.Warning);
-                ClearOrderData();
                 return;
             }
 
@@ -538,11 +556,13 @@
         {
             Console.WriteLine($"❌ Error checking order: {ex.Message}");
             Snackbar.Add($"Lỗi kiểm tra đơn hàng: {ex.Message}", Severity.Error);
+            hasSearched = true;
             ClearOrderData();
         }
         finally
         {
             isChecking = false;
+            StateHasChanged();
         }
     }
 
@@ -676,6 +696,40 @@
         }
     }
 
+    // ✅ HANDLE ORDER CODE INPUT CHANGES
+    private void OnOrderCodeInput(ChangeEventArgs e)
+    {
+        var newValue = e.Value?.ToString() ?? string.Empty;
+        
+        // If order code changed, clear previous results
+        if (newValue != lastCheckedOrderCode)
+        {
+            if (orderPreview != null)
+            {
+                ClearOrderData();
+                hasSearched = false;
+            }
+        }
+        
+        orderCodeInput = newValue;
+        StateHasChanged();
+    }
+
+    // ✅ IMPROVED KEY PRESS HANDLER
+    private async Task OnKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !isChecking && !string.IsNullOrWhiteSpace(orderCodeInput) && ShipperId > 0)
+        {
+            // Prevent multiple rapid Enter presses
+            if (orderCodeInput.Trim() == lastCheckedOrderCode && hasSearched)
+            {
+                return;
+            }
+            
+            await CheckOrder();
+        }
+    }
+
     // ✅ HELPER METHODS
     private int ParseOrderId(string input)
     {
@@ -723,6 +777,8 @@
     private void ClearForm()
     {
         orderCodeInput = string.Empty;
+        lastCheckedOrderCode = string.Empty;
+        hasSearched = false;
         ClearOrderData();
     }
 
@@ -737,13 +793,6 @@
         lastSignalRUpdate = null;
     }
 
-    private async Task OnKeyPress(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter" && !isChecking && !string.IsNullOrWhiteSpace(orderCodeInput))
-        {
-            await CheckOrder();
-        }
-    }
 
     // ✅ AUTO-HIDE RECENT UPDATE AFTER 15 SECONDS
     protected override async Task OnAfterRenderAsync(bool firstRender)

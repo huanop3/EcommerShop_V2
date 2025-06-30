@@ -382,6 +382,7 @@
 .sorting-options {
   display: flex;
   align-items: center;
+  z-index: 50;
 }
 
 /* Add custom dropdown styles for product sorting */

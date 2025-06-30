@@ -1154,7 +1154,7 @@ public async Task<HTTPResponseClient<IEnumerable<OrderWithDetailsVM>>> GetOrders
     }
     private async Task<IEnumerable<ProductVM>> GetAllProductsFromProductService()
     {
-        var response = await _httpClient.GetAsync("https://localhost:7252/api/Product/GetAllProducts");
+        var response = await _httpClient.GetAsync("product/api/Product/GetAllProducts");
             
             // Call to Product service - you can inject HttpClient or use existing service
         if (response.IsSuccessStatusCode)
@@ -1169,7 +1169,7 @@ public async Task<HTTPResponseClient<IEnumerable<OrderWithDetailsVM>>> GetOrders
     private async Task<IEnumerable<ProductVM>> GetProductsBySellerFromProductService(int sellerId)
     {
         // Call to Product service - you can inject HttpClient or use existing service
-        var response = await _httpClient.GetAsync($"https://localhost:7252/api/Product/GetProductsBySeller/{sellerId}");
+        var response = await _httpClient.GetAsync($"product/api/Product/GetProductsBySeller/{sellerId}");
 
         if (response.IsSuccessStatusCode)
         {

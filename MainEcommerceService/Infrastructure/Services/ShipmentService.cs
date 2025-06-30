@@ -374,7 +374,7 @@ public async Task<HTTPResponseClient<ShipmentDashboardVM>> GetShipmentDashboardB
             try
             {
                 var productDict = new Dictionary<int, ProductVM>();
-                var response = await _httpClient.GetAsync("https://localhost:7252/api/Product/GetAllProducts");
+                var response = await _httpClient.GetAsync("product/api/Product/GetAllProducts");
                 
                 if (response.IsSuccessStatusCode)
                 {
