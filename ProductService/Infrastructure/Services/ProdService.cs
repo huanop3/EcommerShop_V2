@@ -27,7 +27,6 @@ public class ProdService : IProdService
     private readonly IUnitOfWork _unitOfWork;
     private readonly RedisHelper _cacheService;
     private readonly IKafkaProducerService _kafkaProducerService;
-    private readonly ILogger<ProdService> _logger;
     private readonly IHubContext<NotificationHub> _hubContext;
 
     public ProdService(
@@ -40,7 +39,6 @@ public class ProdService : IProdService
         _unitOfWork = unitOfWork;
         _cacheService = cacheService;
         _hubContext = hubContext;
-        _logger = logger;
         _kafkaProducerService = kafkaProducerService;
     }
 
@@ -75,6 +73,7 @@ public class ProdService : IProdService
             IsDeleted = product.IsDeleted,
             SellerId = product.SellerId,
             CategoryName = category?.CategoryName ?? "Unknown",
+            ParentCategoryId = category?.ParentCategoryId ?? 0, // Lấy ID của danh mục cha, nếu có
             PrimaryImageUrl = primaryImage?.ImageUrl,
             TotalImages = productImages.Count,
             Images = productImages.Select(pi => new ProductImageInfo
@@ -97,7 +96,9 @@ public class ProdService : IProdService
         var categories = await _unitOfWork._categoryRepository.Query()
             .Where(c => categoryIds.Contains(c.CategoryId))
             .ToDictionaryAsync(c => c.CategoryId, c => c.CategoryName);
-
+        var ParentCategories = await _unitOfWork._categoryRepository.Query()
+            .Where(c => categoryIds.Contains(c.CategoryId))
+            .ToDictionaryAsync(c => c.CategoryId, c => c.ParentCategoryId);
         // Lấy tất cả product IDs
         var productIds = products.Select(p => p.ProductId).ToList();
         var allImages = await _unitOfWork._productImageRepository.Query()
@@ -130,6 +131,7 @@ public class ProdService : IProdService
                 IsDeleted = product.IsDeleted,
                 SellerId = product.SellerId,
                 CategoryName = categories.GetValueOrDefault(product.CategoryId, "Unknown"),
+                ParentCategoryId = ParentCategories.GetValueOrDefault(product.CategoryId, 0) ?? 0, // Lấy ID của danh mục cha, nếu có
                 PrimaryImageUrl = primaryImage?.ImageUrl,
                 TotalImages = productImages.Count,
                 Images = productImages.Select(pi => new ProductImageInfo
@@ -180,7 +182,7 @@ public class ProdService : IProdService
             var productVMs = await MapToProductVMListAsync(products);
 
             // Lưu vào cache
-            await _cacheService.SetAsync(cacheKey, productVMs, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, productVMs, TimeSpan.FromDays(1));
 
             response.Data = productVMs;
             response.Success = true;
@@ -190,7 +192,6 @@ public class ProdService : IProdService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting all products with images");
             response.Success = false;
             response.StatusCode = 500;
             response.Message = $"Lỗi khi lấy danh sách sản phẩm: {ex.Message}";
@@ -229,8 +230,8 @@ public class ProdService : IProdService
 
             var productVM = await MapToProductVMAsync(product);
 
-            // Cache for 15 minutes
-            await _cacheService.SetAsync(cacheKey, productVM, TimeSpan.FromMinutes(15));
+            // Cache for 1 day
+            await _cacheService.SetAsync(cacheKey, productVM, TimeSpan.FromDays(1));
 
             response.Data = productVM;
             response.Success = true;
@@ -240,7 +241,6 @@ public class ProdService : IProdService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting product by id: {ProductId}", id);
             response.Success = false;
             response.StatusCode = 500;
             response.Message = $"Lỗi khi lấy thông tin sản phẩm: {ex.Message}";
@@ -280,8 +280,6 @@ public class ProdService : IProdService
             if (childCategories.Any())
             {
                 categoryIds.AddRange(childCategories);
-                _logger.LogInformation("Found {ChildCount} child categories for parent category {CategoryId}",
-                    childCategories.Count, categoryId);
             }
 
             // Lấy sản phẩm từ tất cả các category (cha + con)
@@ -300,7 +298,7 @@ public class ProdService : IProdService
             var productVMs = await MapToProductVMListAsync(products);
 
             // Lưu vào cache
-            await _cacheService.SetAsync(cacheKey, productVMs, TimeSpan.FromMinutes(15));
+            await _cacheService.SetAsync(cacheKey, productVMs, TimeSpan.FromDays(1));
 
             response.Data = productVMs;
             response.Success = true;
@@ -308,12 +306,9 @@ public class ProdService : IProdService
             response.Message = $"Lấy danh sách sản phẩm theo danh mục thành công (bao gồm {categoryIds.Count} danh mục)";
             response.DateTime = DateTime.Now;
 
-            _logger.LogInformation("Retrieved {ProductCount} products with images from {CategoryCount} categories (Parent: {ParentId})",
-                productVMs.Count, categoryIds.Count, categoryId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting products by category with images {CategoryId}", categoryId);
             response.Success = false;
             response.StatusCode = 500;
             response.Message = $"Lỗi khi lấy danh sách sản phẩm theo danh mục: {ex.Message}";
@@ -356,7 +351,7 @@ public class ProdService : IProdService
             var productVMs = await MapToProductVMListAsync(products);
 
             // Lưu vào cache
-            await _cacheService.SetAsync(cacheKey, productVMs, TimeSpan.FromMinutes(15));
+            await _cacheService.SetAsync(cacheKey, productVMs, TimeSpan.FromDays(1));
 
             response.Data = productVMs;
             response.Success = true;
@@ -366,7 +361,6 @@ public class ProdService : IProdService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting products by seller with images {SellerId}", sellerId);
             response.Success = false;
             response.StatusCode = 500;
             response.Message = $"Lỗi khi lấy danh sách sản phẩm theo người bán: {ex.Message}";
@@ -414,7 +408,7 @@ public class ProdService : IProdService
             var productVMs = await MapToProductVMListAsync(products);
 
             // Lưu vào cache với thời gian ngắn hơn
-            await _cacheService.SetAsync(cacheKey, productVMs, TimeSpan.FromMinutes(15));
+            await _cacheService.SetAsync(cacheKey, productVMs, TimeSpan.FromDays(1));
 
             response.Data = productVMs;
             response.Success = true;
@@ -424,7 +418,6 @@ public class ProdService : IProdService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting products by page with images: PageIndex={PageIndex}, PageSize={PageSize}", pageIndex, pageSize);
             response.Success = false;
             response.StatusCode = 500;
             response.Message = $"Lỗi khi lấy danh sách sản phẩm theo phân trang: {ex.Message}";
@@ -470,7 +463,6 @@ public class ProdService : IProdService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error searching products with images: SearchTerm={SearchTerm}", searchTerm);
             response.Success = false;
             response.StatusCode = 500;
             response.Message = $"Lỗi khi tìm kiếm sản phẩm: {ex.Message}";
@@ -496,13 +488,11 @@ public class ProdService : IProdService
         {
             await _unitOfWork.BeginTransaction();
 
-            _logger.LogInformation("🔍 Getting seller info for userId: {UserId}", userId);
 
             var sellerResponse = await _kafkaProducerService.GetSellerByUserIdAsync(userId, 15);
 
             if (!sellerResponse.Success)
             {
-                _logger.LogWarning("⚠️ Failed to get seller info: {ErrorMessage}", sellerResponse.ErrorMessage);
                 response.Success = false;
                 response.StatusCode = 404;
                 response.Message = $"Không tìm thấy thông tin người bán: {sellerResponse.ErrorMessage}";
@@ -511,7 +501,6 @@ public class ProdService : IProdService
 
             if (sellerResponse.Data == null)
             {
-                _logger.LogWarning("⚠️ Seller response data is null for userId: {UserId}", userId);
                 response.Success = false;
                 response.StatusCode = 404;
                 response.Message = "Không tìm thấy thông tin seller trong response";
@@ -519,8 +508,6 @@ public class ProdService : IProdService
             }
 
             var sellerId = sellerResponse.Data.SellerId;
-            _logger.LogInformation("✅ Found seller: SellerId={SellerId}, StoreName={StoreName}",
-                sellerId, sellerResponse.Data.StoreName);
 
             var newProduct = new Product
             {
@@ -546,8 +533,6 @@ public class ProdService : IProdService
             // Gửi thông báo realtime qua SignalR
             await _hubContext.Clients.All.SendAsync("ProductCreated", newProduct.ProductId, newProduct.ProductName);
 
-            _logger.LogInformation("✅ Product created successfully: ProductId={ProductId}, SellerId={SellerId}",
-                newProduct.ProductId, sellerId);
 
             response.Success = true;
             response.StatusCode = 201;
@@ -558,7 +543,6 @@ public class ProdService : IProdService
         catch (TimeoutException ex)
         {
             await _unitOfWork.RollbackTransaction();
-            _logger.LogError(ex, "❌ Timeout when getting seller info for userId: {UserId}", userId);
             response.Success = false;
             response.StatusCode = 408;
             response.Message = "Timeout khi lấy thông tin người bán. Vui lòng thử lại.";
@@ -567,7 +551,6 @@ public class ProdService : IProdService
         catch (Exception ex)
         {
             await _unitOfWork.RollbackTransaction();
-            _logger.LogError(ex, "❌ Error creating product for userId: {UserId}", userId);
             response.Success = false;
             response.StatusCode = 500;
             response.Message = $"Lỗi khi tạo sản phẩm: {ex.Message}";
@@ -698,13 +681,11 @@ public class ProdService : IProdService
                 // Clear caches
                 await ClearProductCachesAsync();
 
-                _logger.LogInformation("Successfully deleted {Count} products for seller {SellerId}", products.Count, sellerId);
             }
         }
         catch (Exception ex)
         {
             await _unitOfWork.RollbackTransaction();
-            _logger.LogError(ex, "Error deleting products for seller {SellerId}", sellerId);
             throw;
         }
     }

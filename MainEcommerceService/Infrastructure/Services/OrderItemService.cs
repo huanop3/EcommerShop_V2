@@ -23,21 +23,16 @@ public class OrderItemService : IOrderItemService
     private readonly IUnitOfWork _unitOfWork;
     private readonly RedisHelper _cacheService;
     private readonly IHubContext<NotificationHub> _hubContext;
-    private readonly IKafkaProducerService _kafkaProducer;
-    private readonly ILogger<OrderItemService> _logger;
 
     public OrderItemService(
         IUnitOfWork unitOfWork,
         RedisHelper cacheService,
-        IHubContext<NotificationHub> hubContext,
-        IKafkaProducerService kafkaProducer,
-        ILogger<OrderItemService> logger)
+        IHubContext<NotificationHub> hubContext
+    )
     {
         _unitOfWork = unitOfWork;
         _cacheService = cacheService;
         _hubContext = hubContext;
-        _kafkaProducer = kafkaProducer;
-        _logger = logger;
     }
 
     public async Task<HTTPResponseClient<IEnumerable<OrderItemVM>>> GetAllOrderItems()
@@ -82,7 +77,7 @@ public class OrderItemService : IOrderItemService
                 IsDeleted = oi.IsDeleted
             }).ToList();
 
-            await _cacheService.SetAsync(cacheKey, orderItemVMs, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, orderItemVMs, TimeSpan.FromDays(1));
 
             response.Data = orderItemVMs;
             response.Success = true;
@@ -141,7 +136,7 @@ public class OrderItemService : IOrderItemService
                 IsDeleted = orderItem.IsDeleted
             };
 
-            await _cacheService.SetAsync(cacheKey, orderItemVM, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, orderItemVM, TimeSpan.FromDays(1));
 
             response.Data = orderItemVM;
             response.Success = true;
@@ -193,7 +188,7 @@ public class OrderItemService : IOrderItemService
                 IsDeleted = oi.IsDeleted
             }).ToList();
 
-            await _cacheService.SetAsync(cacheKey, orderItemVMs, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, orderItemVMs, TimeSpan.FromDays(1));
 
             response.Data = orderItemVMs;
             response.Success = true;
@@ -245,7 +240,7 @@ public class OrderItemService : IOrderItemService
                 IsDeleted = oi.IsDeleted
             }).ToList();
 
-            await _cacheService.SetAsync(cacheKey, orderItemVMs, TimeSpan.FromMinutes(15));
+            await _cacheService.SetAsync(cacheKey, orderItemVMs, TimeSpan.FromDays(1));
 
             response.Data = orderItemVMs;
             response.Success = true;
@@ -421,7 +416,7 @@ public class OrderItemService : IOrderItemService
                 .Where(oi => oi.OrderId == orderId && oi.IsDeleted == false)
                 .SumAsync(oi => oi.TotalPrice);
 
-            await _cacheService.SetAsync(cacheKey, totalAmount, TimeSpan.FromMinutes(15));
+            await _cacheService.SetAsync(cacheKey, totalAmount, TimeSpan.FromDays(1));
 
             response.Data = totalAmount;
             response.Success = true;

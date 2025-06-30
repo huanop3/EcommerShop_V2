@@ -29,20 +29,17 @@ public class SellerProfileService : ISellerProfileService
     private readonly RedisHelper _cacheService;
     private readonly IHubContext<NotificationHub> _hubContext;
     private readonly IKafkaProducerService _kafkaProducer;
-    private readonly ILogger<SellerProfileService> _logger;
 
     public SellerProfileService(
         IUnitOfWork unitOfWork,
         RedisHelper cacheService,
         IHubContext<NotificationHub> hubContext,
-        IKafkaProducerService kafkaProducer,
-        ILogger<SellerProfileService> logger)
+        IKafkaProducerService kafkaProducer)
     {
         _unitOfWork = unitOfWork;
         _cacheService = cacheService;
         _hubContext = hubContext;
         _kafkaProducer = kafkaProducer;
-        _logger = logger;
     }
 
     public async Task<HTTPResponseClient<IEnumerable<SellerProfileVM>>> GetAllSellerProfiles()
@@ -91,7 +88,7 @@ public class SellerProfileService : ISellerProfileService
             }).ToList();
 
             // Lưu vào cache
-            await _cacheService.SetAsync(cacheKey, sellerProfileVMs, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, sellerProfileVMs, TimeSpan.FromDays(1));
 
             response.Data = sellerProfileVMs;
             response.Success = true;
@@ -151,7 +148,7 @@ public class SellerProfileService : ISellerProfileService
             };
 
             // Lưu vào cache
-            await _cacheService.SetAsync(cacheKey, sellerProfileVM, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, sellerProfileVM, TimeSpan.FromDays(1));
 
             response.Data = sellerProfileVM;
             response.Success = true;
@@ -211,7 +208,7 @@ public class SellerProfileService : ISellerProfileService
             };
 
             // Lưu vào cache
-            await _cacheService.SetAsync(cacheKey, sellerProfileVM, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, sellerProfileVM, TimeSpan.FromDays(1));
 
             response.Data = sellerProfileVM;
             response.Success = true;
@@ -429,12 +426,10 @@ public class SellerProfileService : ISellerProfileService
                     $"seller-{sellerProfile.SellerId}", 
                     sellerDeletedMessage);
 
-                _logger.LogInformation("Sent seller deleted message to Kafka for seller {SellerId}", sellerId);
             }
             catch (Exception kafkaEx)
             {
                 // Log lỗi Kafka nhưng không rollback transaction
-                _logger.LogError(kafkaEx, "Failed to send seller deleted message to Kafka for seller {SellerId}", sellerId);
                 // Có thể implement retry mechanism hoặc dead letter queue ở đây
             }
 
@@ -587,7 +582,7 @@ public class SellerProfileService : ISellerProfileService
                 IsDeleted = s.IsDeleted
             }).ToList();
 
-            await _cacheService.SetAsync(cacheKey, sellerProfileVMs, TimeSpan.FromMinutes(15));
+            await _cacheService.SetAsync(cacheKey, sellerProfileVMs, TimeSpan.FromDays(1));
 
             response.Data = sellerProfileVMs;
             response.Success = true;
@@ -663,7 +658,7 @@ public class SellerProfileService : ISellerProfileService
                 IsDeleted = s.IsDeleted
             }).ToList();
 
-            await _cacheService.SetAsync(cacheKey, sellerProfileVMs, TimeSpan.FromMinutes(10));
+            await _cacheService.SetAsync(cacheKey, sellerProfileVMs, TimeSpan.FromDays(1));
 
             response.Data = sellerProfileVMs;
             response.Success = true;

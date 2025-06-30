@@ -8,8 +8,8 @@ public interface IUserLoginService
 {
     Task<HTTPResponseClient<UserLoginResponseVM>> Login(LoginRequestVM loginRequest);
     Task<HTTPResponseClient<String>> Register(RegisterLoginVM registerLoginVM);
-    Task<HTTPResponseClient<UserLoginResponseVM>> ForgotPassword(string email);
-    Task<HTTPResponseClient<UserLoginResponseVM>> ResetPassword(string token, string newPassword);
+    Task<HTTPResponseClient<ForgotPasswordResponseVM>> ForgotPassword(ForgotPasswordVM forgotPasswordVM);
+    Task<HTTPResponseClient<ResetPasswordResponseVM>> ResetPassword(ResetPasswordVM resetPasswordVM);
     Task<HTTPResponseClient<int>> CountLoginLog(string username);
     Task<HTTPResponseClient<UserLoginResponseVM>> RefreshToken(string tokenVM, string refreshToken);
     Task<HTTPResponseClient<bool>> UpdateRevokeRefreshToken(string loginRequest);
@@ -182,10 +182,160 @@ public class UserLoginService : IUserLoginService
         return refreshToken;
     }
 
-    public Task<HTTPResponseClient<UserLoginResponseVM>> ForgotPassword(string email)
+/// <summary>
+    /// Xử lý quên mật khẩu - kiểm tra email và tạo reset token
+    /// </summary>
+    public async Task<HTTPResponseClient<ForgotPasswordResponseVM>> ForgotPassword(ForgotPasswordVM forgotPasswordVM)
     {
-        // Khi triển khai, cần thêm các status code: 200, 404, 500
-        throw new NotImplementedException();
+        return await ExecuteInTransaction(async () =>
+        {
+            var response = new HTTPResponseClient<ForgotPasswordResponseVM>();
+
+            try
+            {
+                // Kiểm tra email có tồn tại trong database không
+                var user = await _unitOfWork._userRepository.SingleOrDefaultAsync(x => 
+                    x.Email == forgotPasswordVM.Email && x.IsDeleted != true);
+
+                if (user == null)
+                {
+                    // Vì lý do bảo mật, không tiết lộ email có tồn tại hay không
+                    response.Success = true;
+                    response.StatusCode = 200;
+                    response.Message = "Nếu email tồn tại trong hệ thống, bạn sẽ nhận được email hướng dẫn đặt lại mật khẩu.";
+                    response.Data = new ForgotPasswordResponseVM
+                    {
+                        Message = "Email được xử lý",
+                        IsSuccess = true
+                    };
+                    response.DateTime = DateTime.Now;
+                    return response;
+                }
+                // Tạo reset token
+                var resetToken = _jwtAuthService.GeneratePasswordResetToken(user);
+                response.Success = true;
+                response.StatusCode = 200;
+                response.Message = "Email hướng dẫn đặt lại mật khẩu đã được gửi.";
+                response.Data = new ForgotPasswordResponseVM
+                {
+                    Token = resetToken,
+                    Message = "Reset token đã được gửi đến email của bạn.", // Chỉ để debug, production nên gửi qua email
+                    IsSuccess = true
+                };
+                response.DateTime = DateTime.Now;
+                return response;
+            }
+            catch (Exception ex)
+            {
+                response.Success = false;
+                response.StatusCode = 500;
+                response.Message = "Đã xảy ra lỗi khi xử lý yêu cầu.";
+                response.Data = new ForgotPasswordResponseVM
+                {
+                    Message = "Lỗi hệ thống",
+                    IsSuccess = false
+                };
+                response.DateTime = DateTime.Now;
+                Console.WriteLine($"ForgotPassword Error: {ex.Message}");
+                return response;
+            }
+        }, 500, "Lỗi xử lý quên mật khẩu");
+    }
+
+    /// <summary>
+    /// Xử lý đặt lại mật khẩu với JWT reset token
+    /// </summary>
+    public async Task<HTTPResponseClient<ResetPasswordResponseVM>> ResetPassword(ResetPasswordVM resetPasswordVM)
+    {
+        return await ExecuteInTransaction(async () =>
+        {
+            var response = new HTTPResponseClient<ResetPasswordResponseVM>();
+
+            try
+            {
+                // Validate reset token
+                var tokenInfo = _jwtAuthService.ValidatePasswordResetToken(resetPasswordVM.Token);
+                
+                if (tokenInfo == null)
+                {
+                    response.Success = false;
+                    response.StatusCode = 400;
+                    response.Message = "Token không hợp lệ hoặc đã hết hạn.";
+                    response.Data = new ResetPasswordResponseVM
+                    {
+                        Message = "Token không hợp lệ",
+                        IsSuccess = false
+                    };
+                    response.DateTime = DateTime.Now;
+                    return response;
+                }
+
+                // Tìm user theo thông tin trong token
+                var userId = int.Parse(tokenInfo.UserId);
+                var user = await _unitOfWork._userRepository.GetByIdAsync(userId);
+                
+                if (user == null || user.IsDeleted == true)
+                {
+                    response.Success = false;
+                    response.StatusCode = 404;
+                    response.Message = "Người dùng không tồn tại hoặc đã bị xóa.";
+                    response.Data = new ResetPasswordResponseVM
+                    {
+                        Message = "Người dùng không tồn tại",
+                        IsSuccess = false
+                    };
+                    response.DateTime = DateTime.Now;
+                    return response;
+                }
+
+                // Hash mật khẩu mới
+                var hashedNewPassword = PasswordHelper.HashPassword(resetPasswordVM.NewPassword);
+
+                // Cập nhật mật khẩu user
+                user.PasswordHash = hashedNewPassword;
+                user.UpdatedAt = DateTime.Now;
+                _unitOfWork._userRepository.Update(user);
+
+                // *** ĐĂNG XUẤT TẤT CẢ THIẾT BỊ - Revoke tất cả refresh token ***
+                var userRefreshTokens = await _unitOfWork._refreshTokenRepository
+                    .WhereAsync(x => x.UserId == user.UserId && x.IsRevoked == false);
+
+                foreach (var refreshToken in userRefreshTokens)
+                {
+                    refreshToken.IsRevoked = true;
+                    refreshToken.RevokedAt = DateTime.Now;
+                    _unitOfWork._refreshTokenRepository.Update(refreshToken);
+                }
+
+                await _unitOfWork.SaveChangesAsync();
+
+                response.Success = true;
+                response.StatusCode = 200;
+                response.Message = "Mật khẩu đã được đặt lại thành công. Tất cả phiên đăng nhập đã bị đăng xuất, vui lòng đăng nhập lại.";
+                response.Data = new ResetPasswordResponseVM
+                {
+                    Message = "Đặt lại mật khẩu thành công",
+                    IsSuccess = true
+                };
+                response.DateTime = DateTime.Now;
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                response.Success = false;
+                response.StatusCode = 500;
+                response.Message = "Đã xảy ra lỗi khi đặt lại mật khẩu.";
+                response.Data = new ResetPasswordResponseVM
+                {
+                    Message = "Lỗi hệ thống",
+                    IsSuccess = false
+                };
+                response.DateTime = DateTime.Now;
+                Console.WriteLine($"ResetPassword Error: {ex.Message}");
+                return response;
+            }
+        }, 500, "Lỗi đặt lại mật khẩu");
     }
 
     public async Task<HTTPResponseClient<UserLoginResponseVM>> Login(LoginRequestVM loginRequest)
@@ -394,13 +544,6 @@ public class UserLoginService : IUserLoginService
             return response;
         }, 500, "Đăng ký thất bại");
     }
-
-    public Task<HTTPResponseClient<UserLoginResponseVM>> ResetPassword(string token, string newPassword)
-    {
-        // Khi triển khai, cần thêm các status code: 200, 400, 404
-        throw new NotImplementedException();
-    }
-
     public async Task<HTTPResponseClient<int>> CountLoginLog(string username)
     {
         var response = new HTTPResponseClient<int>();

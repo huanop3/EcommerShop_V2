@@ -5,7 +5,6 @@ using MainEcommerceService.Models.ViewModel;
 using MudBlazor;
 using System;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 
 namespace BlazorWebApp.Services
 {
@@ -14,7 +13,6 @@ namespace BlazorWebApp.Services
         private readonly NavigationManager _navigationManager;
         private readonly ILocalStorageService _localStorage;
         private readonly ISnackbar _snackbar;
-        private readonly ILogger<SignalRService> _logger;
 
         // Hai kết nối hub riêng biệt
         private HubConnection? _mainHubConnection; // MainEcommerceService
@@ -136,46 +134,35 @@ namespace BlazorWebApp.Services
 
         public SignalRService(NavigationManager navigationManager,
                              ILocalStorageService localStorage,
-                             ISnackbar snackbar,
-                             ILogger<SignalRService> logger)
+                             ISnackbar snackbar)
         {
             _navigationManager = navigationManager;
             _localStorage = localStorage;
             _snackbar = snackbar;
-            _logger = logger;
         }
 
         public async Task StartConnectionAsync()
         {
             await _connectionSemaphore.WaitAsync();
-            try
-            {
-                // Khởi tạo kết nối đến MainEcommerceService
-                await StartMainHubConnectionAsync();
+            
+            // Khởi tạo kết nối đến MainEcommerceService
+            await StartMainHubConnectionAsync();
 
-                // Khởi tạo kết nối đến ProductService
-                await StartProductHubConnectionAsync();
+            // Khởi tạo kết nối đến ProductService
+            await StartProductHubConnectionAsync();
 
 #if DEBUG
-                _snackbar.Add("Connected to notification systems", Severity.Success);
+            _snackbar.Add("Connected to notification systems", Severity.Success);
 #endif
 
-                // Đăng ký user connection
-                string userId = await GetCurrentUserIdAsync();
-                if (!string.IsNullOrEmpty(userId))
-                {
-                    await RegisterUserConnectionAsync(userId);
-                }
-            }
-            catch (Exception ex)
+            // Đăng ký user connection
+            string userId = await GetCurrentUserIdAsync();
+            if (!string.IsNullOrEmpty(userId))
             {
-                _snackbar.Add($"Error connecting to notification hubs: {ex.Message}", Severity.Error);
-                Console.WriteLine($"Error connecting to notification hubs: {ex.Message}");
+                await RegisterUserConnectionAsync(userId);
             }
-            finally
-            {
-                _connectionSemaphore.Release();
-            }
+            
+            _connectionSemaphore.Release();
         }
 
         private async Task StartMainHubConnectionAsync()
@@ -195,10 +182,6 @@ namespace BlazorWebApp.Services
                     };
                     options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
                     options.SkipNegotiation = true;
-                })
-                .ConfigureLogging(logging =>
-                {
-                    logging.SetMinimumLevel(LogLevel.Warning);
                 })
                 .Build();
 
@@ -223,10 +206,6 @@ namespace BlazorWebApp.Services
                     };
                     options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
                     options.SkipNegotiation = true;
-                })
-                .ConfigureLogging(logging =>
-                {
-                    logging.SetMinimumLevel(LogLevel.Warning);
                 })
                 .Build();
 
@@ -692,15 +671,8 @@ namespace BlazorWebApp.Services
 
         private async Task<string> GetCurrentUserIdAsync()
         {
-            try
-            {
-                var userId = await _localStorage.GetItemAsStringAsync("userId");
-                return userId ?? string.Empty;
-            }
-            catch
-            {
-                return string.Empty;
-            }
+            var userId = await _localStorage.GetItemAsStringAsync("userId");
+            return userId ?? string.Empty;
         }
 
         // User connection methods (sử dụng cả 2 hub)
@@ -720,14 +692,7 @@ namespace BlazorWebApp.Services
 
             if (tasks.Any())
             {
-                try
-                {
-                    await Task.WhenAll(tasks);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error registering user connection: {ex.Message}");
-                }
+                await Task.WhenAll(tasks);
             }
         }
 
@@ -736,14 +701,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("RegisterSellerConnection", sellerId, userId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error registering seller connection: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("RegisterSellerConnection", sellerId, userId);
             }
         }
 
@@ -752,14 +710,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("UnregisterSellerConnection", sellerId, userId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error unregistering seller connection: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("UnregisterSellerConnection", sellerId, userId);
             }
         }
 
@@ -768,14 +719,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("RegisterShipperConnection", shipperId, userId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error registering shipper connection: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("RegisterShipperConnection", shipperId, userId);
             }
         }
 
@@ -784,14 +728,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("UnregisterShipperConnection", shipperId, userId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error unregistering shipper connection: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("UnregisterShipperConnection", shipperId, userId);
             }
         }
 
@@ -800,14 +737,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("SendMessage", user, message);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error sending message: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("SendMessage", user, message);
             }
         }
 
@@ -816,14 +746,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("SendPrivateMessage", targetUserId, message);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error sending private message: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("SendPrivateMessage", targetUserId, message);
             }
         }
 
@@ -832,28 +755,14 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyOrderCreated", orderId, userId, totalAmount);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying order created: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyOrderCreated", orderId, userId, totalAmount);
             }
         }
         public async Task NotifyOrderUpdatedAsync(int orderId, int userId, decimal totalAmount)
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyOrderUpdated", orderId, userId, totalAmount);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying order updated: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyOrderUpdated", orderId, userId, totalAmount);
             }
         }
 
@@ -862,14 +771,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyOrderDeleted", orderId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying order deleted: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyOrderDeleted", orderId);
             }
         }
 
@@ -878,14 +780,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyOrderStatusChanged", orderId, customerId, statusId, statusName);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying order status changed: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyOrderStatusChanged", orderId, customerId, statusId, statusName);
             }
         }
 
@@ -894,14 +789,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyOrderAssignedToShipper", orderId, shipperId, customerId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying order assigned to shipper: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyOrderAssignedToShipper", orderId, shipperId, customerId);
             }
         }
 
@@ -910,14 +798,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyUserCreated", username);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying user created: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyUserCreated", username);
             }
         }
 
@@ -925,14 +806,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyUserUpdated", userId, name);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying user updated: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyUserUpdated", userId, name);
             }
         }
 
@@ -948,14 +822,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyUserStatusChanged", userId, status);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying user status changed: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyUserStatusChanged", userId, status);
             }
         }
 
@@ -964,14 +831,7 @@ namespace BlazorWebApp.Services
         {
             if (_productHubConnection is not null && IsProductHubConnected)
             {
-                try
-                {
-                    await _productHubConnection.SendAsync("NotifyProductCreated", productId, productName, categoryName);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying product created: {ex.Message}");
-                }
+                await _productHubConnection.SendAsync("NotifyProductCreated", productId, productName, categoryName);
             }
         }
 
@@ -979,14 +839,7 @@ namespace BlazorWebApp.Services
         {
             if (_productHubConnection is not null && IsProductHubConnected)
             {
-                try
-                {
-                    await _productHubConnection.SendAsync("NotifyProductUpdated", productId, productName, price);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying product updated: {ex.Message}");
-                }
+                await _productHubConnection.SendAsync("NotifyProductUpdated", productId, productName, price);
             }
         }
 
@@ -994,14 +847,7 @@ namespace BlazorWebApp.Services
         {
             if (_productHubConnection is not null && IsProductHubConnected)
             {
-                try
-                {
-                    await _productHubConnection.SendAsync("NotifyProductDeleted", productId, productName);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying product deleted: {ex.Message}");
-                }
+                await _productHubConnection.SendAsync("NotifyProductDeleted", productId, productName);
             }
         }
 
@@ -1009,14 +855,7 @@ namespace BlazorWebApp.Services
         {
             if (_productHubConnection is not null && IsProductHubConnected)
             {
-                try
-                {
-                    await _productHubConnection.SendAsync("NotifyProductStockChanged", productId, productName, newStock);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying product stock changed: {ex.Message}");
-                }
+                await _productHubConnection.SendAsync("NotifyProductStockChanged", productId, productName, newStock);
             }
         }
 
@@ -1024,14 +863,7 @@ namespace BlazorWebApp.Services
         {
             if (_productHubConnection is not null && IsProductHubConnected)
             {
-                try
-                {
-                    await _productHubConnection.SendAsync("NotifyProductPriceChanged", productId, productName, oldPrice, newPrice);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying product price changed: {ex.Message}");
-                }
+                await _productHubConnection.SendAsync("NotifyProductPriceChanged", productId, productName, oldPrice, newPrice);
             }
         }
 
@@ -1039,14 +871,7 @@ namespace BlazorWebApp.Services
         {
             if (_productHubConnection is not null && IsProductHubConnected)
             {
-                try
-                {
-                    await _productHubConnection.SendAsync("NotifyLowStock", productId, productName, currentStock, minStock);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying low stock: {ex.Message}");
-                }
+                await _productHubConnection.SendAsync("NotifyLowStock", productId, productName, currentStock, minStock);
             }
         }
 
@@ -1055,14 +880,7 @@ namespace BlazorWebApp.Services
         {
             if (_productHubConnection is not null && IsProductHubConnected)
             {
-                try
-                {
-                    await _productHubConnection.SendAsync("NotifyCategoryCreated", categoryName);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying category created: {ex.Message}");
-                }
+                await _productHubConnection.SendAsync("NotifyCategoryCreated", categoryName);
             }
         }
 
@@ -1070,14 +888,7 @@ namespace BlazorWebApp.Services
         {
             if (_productHubConnection is not null && IsProductHubConnected)
             {
-                try
-                {
-                    await _productHubConnection.SendAsync("NotifyCategoryUpdated", categoryId, categoryName);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying category updated: {ex.Message}");
-                }
+                await _productHubConnection.SendAsync("NotifyCategoryUpdated", categoryId, categoryName);
             }
         }
 
@@ -1085,14 +896,7 @@ namespace BlazorWebApp.Services
         {
             if (_productHubConnection is not null && IsProductHubConnected)
             {
-                try
-                {
-                    await _productHubConnection.SendAsync("NotifyCategoryDeleted", categoryId, categoryName);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying category deleted: {ex.Message}");
-                }
+                await _productHubConnection.SendAsync("NotifyCategoryDeleted", categoryId, categoryName);
             }
         }
 
@@ -1101,14 +905,7 @@ namespace BlazorWebApp.Services
         {
             if (_productHubConnection is not null && IsProductHubConnected)
             {
-                try
-                {
-                    await _productHubConnection.SendAsync("JoinCategoryGroup", categoryId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error joining category group: {ex.Message}");
-                }
+                await _productHubConnection.SendAsync("JoinCategoryGroup", categoryId);
             }
         }
 
@@ -1116,14 +913,7 @@ namespace BlazorWebApp.Services
         {
             if (_productHubConnection is not null && IsProductHubConnected)
             {
-                try
-                {
-                    await _productHubConnection.SendAsync("LeaveCategoryGroup", categoryId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error leaving category group: {ex.Message}");
-                }
+                await _productHubConnection.SendAsync("LeaveCategoryGroup", categoryId);
             }
         }
 
@@ -1131,14 +921,7 @@ namespace BlazorWebApp.Services
         {
             if (_productHubConnection is not null && IsProductHubConnected)
             {
-                try
-                {
-                    await _productHubConnection.SendAsync("SendCategoryNotification", categoryId, message);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error sending category notification: {ex.Message}");
-                }
+                await _productHubConnection.SendAsync("SendCategoryNotification", categoryId, message);
             }
         }
 
@@ -1147,14 +930,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyCouponCreated", couponCode);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying coupon created: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyCouponCreated", couponCode);
             }
         }
 
@@ -1162,14 +938,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyCouponUpdated", couponId, couponCode);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying coupon updated: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyCouponUpdated", couponId, couponCode);
             }
         }
 
@@ -1177,14 +946,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyCouponDeleted", couponId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying coupon deleted: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyCouponDeleted", couponId);
             }
         }
 
@@ -1192,14 +954,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyCouponStatusChanged", couponId, status);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying coupon status changed: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyCouponStatusChanged", couponId, status);
             }
         }
 
@@ -1208,14 +963,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyAddressCreated", userId, addressInfo);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying address created: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyAddressCreated", userId, addressInfo);
             }
         }
 
@@ -1223,14 +971,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyAddressUpdated", userId, addressInfo);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying address updated: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyAddressUpdated", userId, addressInfo);
             }
         }
 
@@ -1238,14 +979,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyAddressDeleted", addressId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying address deleted: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyAddressDeleted", addressId);
             }
         }
 
@@ -1253,14 +987,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyDefaultAddressChanged", userId, addressId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying default address changed: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyDefaultAddressChanged", userId, addressId);
             }
         }
 
@@ -1269,14 +996,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifySellerProfileCreated", storeName);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying seller profile created: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifySellerProfileCreated", storeName);
             }
         }
 
@@ -1284,14 +1004,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifySellerProfileUpdated", sellerId, storeName);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying seller profile updated: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifySellerProfileUpdated", sellerId, storeName);
             }
         }
 
@@ -1299,14 +1012,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifySellerProfileDeleted", sellerId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying seller profile deleted: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifySellerProfileDeleted", sellerId);
             }
         }
 
@@ -1314,14 +1020,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifySellerProfileVerified", sellerId, storeName);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying seller profile verified: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifySellerProfileVerified", sellerId, storeName);
             }
         }
 
@@ -1329,14 +1028,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifySellerProfileUnverified", sellerId, storeName);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying seller profile unverified: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifySellerProfileUnverified", sellerId, storeName);
             }
         }
 
@@ -1345,14 +1037,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyShipperProfileCreated", shipperName);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying shipper profile created: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyShipperProfileCreated", shipperName);
             }
         }
 
@@ -1360,14 +1045,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyShipperProfileUpdated", shipperId, shipperName);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying shipper profile updated: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyShipperProfileUpdated", shipperId, shipperName);
             }
         }
 
@@ -1375,14 +1053,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyShipperProfileDeleted", shipperId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying shipper profile deleted: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyShipperProfileDeleted", shipperId);
             }
         }
 
@@ -1390,14 +1061,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyShipperProfileActivated", shipperId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying shipper profile activated: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyShipperProfileActivated", shipperId);
             }
         }
 
@@ -1405,14 +1069,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyShipperProfileDeactivated", shipperId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying shipper profile deactivated: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyShipperProfileDeactivated", shipperId);
             }
         }
 
@@ -1420,14 +1077,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyUserRoleUpdated", userId, username, newRole);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error notifying user role updated: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyUserRoleUpdated", userId, username, newRole);
             }
         }
         // Thêm vào cuối file (trước DisposeAsync method)
@@ -1437,15 +1087,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyShipmentCreated", shipmentId, orderId, shipperId);
-                    Console.WriteLine($"✅ Shipment created notification sent: {shipmentId}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ Error sending shipment created notification: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyShipmentCreated", shipmentId, orderId, shipperId);
             }
         }
 
@@ -1453,15 +1095,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyShipmentUpdated", shipmentId, orderId, status);
-                    Console.WriteLine($"✅ Shipment updated notification sent: {shipmentId}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ Error sending shipment updated notification: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyShipmentUpdated", shipmentId, orderId, status);
             }
         }
 
@@ -1469,15 +1103,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyShipmentDeleted", shipmentId);
-                    Console.WriteLine($"✅ Shipment deleted notification sent: {shipmentId}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ Error sending shipment deleted notification: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyShipmentDeleted", shipmentId);
             }
         }
 
@@ -1485,15 +1111,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyShipmentStatusUpdated", shipmentId, orderId, status);
-                    Console.WriteLine($"✅ Shipment status updated notification sent: {shipmentId} - {status}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ Error sending shipment status notification: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyShipmentStatusUpdated", shipmentId, orderId, status);
             }
         }
 
@@ -1501,15 +1119,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyShipperAssigned", orderId, shipperId);
-                    Console.WriteLine($"✅ Shipper assigned notification sent: Order {orderId} -> Shipper {shipperId}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ Error sending shipper assigned notification: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyShipperAssigned", orderId, shipperId);
             }
         }
 
@@ -1517,15 +1127,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyTrackingNumberUpdated", shipmentId, trackingNumber);
-                    Console.WriteLine($"✅ Tracking number updated notification sent: {shipmentId} - {trackingNumber}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ Error sending tracking number notification: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyTrackingNumberUpdated", shipmentId, trackingNumber);
             }
         }
 
@@ -1533,15 +1135,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyShipmentDelivered", shipmentId, orderId);
-                    Console.WriteLine($"✅ Shipment delivered notification sent: {shipmentId}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ Error sending shipment delivered notification: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyShipmentDelivered", shipmentId, orderId);
             }
         }
 
@@ -1549,15 +1143,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyShipmentPickedUp", shipmentId, orderId);
-                    Console.WriteLine($"✅ Shipment picked up notification sent: {shipmentId}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ Error sending shipment picked up notification: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyShipmentPickedUp", shipmentId, orderId);
             }
         }
 
@@ -1565,15 +1151,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyShipmentInTransit", shipmentId, orderId);
-                    Console.WriteLine($"✅ Shipment in transit notification sent: {shipmentId}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ Error sending shipment in transit notification: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyShipmentInTransit", shipmentId, orderId);
             }
         }
 
@@ -1581,15 +1159,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyShipmentOutForDelivery", shipmentId, orderId);
-                    Console.WriteLine($"✅ Shipment out for delivery notification sent: {shipmentId}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ Error sending shipment out for delivery notification: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyShipmentOutForDelivery", shipmentId, orderId);
             }
         }
 
@@ -1597,15 +1167,7 @@ namespace BlazorWebApp.Services
         {
             if (_mainHubConnection is not null && IsMainHubConnected)
             {
-                try
-                {
-                    await _mainHubConnection.SendAsync("NotifyShipmentFailedDelivery", shipmentId, orderId, reason);
-                    Console.WriteLine($"✅ Shipment failed delivery notification sent: {shipmentId} - {reason}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ Error sending shipment failed delivery notification: {ex.Message}");
-                }
+                await _mainHubConnection.SendAsync("NotifyShipmentFailedDelivery", shipmentId, orderId, reason);
             }
         }
         public async ValueTask DisposeAsync()
@@ -1618,15 +1180,8 @@ namespace BlazorWebApp.Services
             {
                 disposeTasks.Add(Task.Run(async () =>
                 {
-                    try
-                    {
-                        await _mainHubConnection.StopAsync();
-                        await _mainHubConnection.DisposeAsync();
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Error disposing main hub connection: {ex.Message}");
-                    }
+                    await _mainHubConnection.StopAsync();
+                    await _mainHubConnection.DisposeAsync();
                 }));
             }
 
@@ -1634,15 +1189,8 @@ namespace BlazorWebApp.Services
             {
                 disposeTasks.Add(Task.Run(async () =>
                 {
-                    try
-                    {
-                        await _productHubConnection.StopAsync();
-                        await _productHubConnection.DisposeAsync();
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Error disposing product hub connection: {ex.Message}");
-                    }
+                    await _productHubConnection.StopAsync();
+                    await _productHubConnection.DisposeAsync();
                 }));
             }
 

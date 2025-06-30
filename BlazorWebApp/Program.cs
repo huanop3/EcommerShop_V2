@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.IdentityModel.Tokens;
+using MudBlazor;
 using MudBlazor.Services;
 
 
@@ -94,10 +95,22 @@ builder.Services.AddScoped<ShipperProfileService>();
 builder.Services.AddScoped<ShipmentService>();
 builder.Services.AddScoped<ProductImageService>();
 // Register MudBlazor services
-builder.Services.AddMudServices();
+builder.Services.AddMudServices(config =>
+{
+    config.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.BottomLeft;
+
+    config.SnackbarConfiguration.PreventDuplicates = false;
+    config.SnackbarConfiguration.NewestOnTop = false;
+    config.SnackbarConfiguration.ShowCloseIcon = true;
+    config.SnackbarConfiguration.VisibleStateDuration = 10000;
+    config.SnackbarConfiguration.HideTransitionDuration = 500;
+    config.SnackbarConfiguration.ShowTransitionDuration = 500;
+    config.SnackbarConfiguration.SnackbarVariant = Variant.Filled;
+});
 // Thêm vào Program.cs trước dòng var app = builder.Build()
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ToastService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 // Authorization
 builder.Services.AddAuthorizationCore();
 

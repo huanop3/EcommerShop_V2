@@ -72,4 +72,36 @@ public class LoginRequestVM : DeviceInfoVM
     public string Password { get; set; }
     // Thông tin thiết bị
 }
+public class ForgotPasswordVM
+{
+    [Required(ErrorMessage = "Email là bắt buộc")]
+    [EmailAddress(ErrorMessage = "Email không đúng định dạng")]
+    public string Email { get; set; }
+}
+
+public class ResetPasswordVM
+{
+    [Required(ErrorMessage = "Token là bắt buộc")]
+    public string Token { get; set; }
+    [Required(ErrorMessage = "Mật khẩu mới là bắt buộc")]
+    [MinLength(8, ErrorMessage = "Mật khẩu phải có ít nhất 8 ký tự")]
+    public string NewPassword { get; set; }
+
+    [Required(ErrorMessage = "Xác nhận mật khẩu là bắt buộc")]
+    [Compare("NewPassword", ErrorMessage = "Mật khẩu xác nhận không khớp")]
+    public string ConfirmPassword { get; set; }
+}
+
+public class ForgotPasswordResponseVM
+{
+    public string Token { get; set; }
+    public string Message { get; set; }
+    public bool IsSuccess { get; set; }
+}
+
+public class ResetPasswordResponseVM
+{
+    public string Message { get; set; }
+    public bool IsSuccess { get; set; }
+}
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -14,6 +15,7 @@ public class JwtAuthService
     private readonly string? _issuer;
     private readonly string? _audience;
     private readonly MainEcommerDBContext _context;
+    
     public JwtAuthService(IConfiguration Configuration, MainEcommerDBContext db)
     {
         _key = Configuration["jwt:Secret-Key"];
@@ -177,7 +179,95 @@ public class JwtAuthService
         }
     }
 
+    /// <summary>
+    /// Tạo token đặc biệt cho reset password (thời hạn ngắn, chỉ dùng 1 lần)
+    /// </summary>
+    public string GeneratePasswordResetToken(User user)
+    {
+        var key = Encoding.ASCII.GetBytes(_key);
+        var claims = new List<Claim>
+        {
+            new Claim("UserId", user.UserId.ToString()),
+            new Claim("Email", user.Email),
+            new Claim("TokenType", "PasswordReset"), // Đánh dấu đây là reset token
+            new Claim(JwtRegisteredClaimNames.Sub, user.Username),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim(JwtRegisteredClaimNames.Iat, DateTime.UtcNow.ToString())
+        };
 
+        var credentials = new SigningCredentials(
+            new SymmetricSecurityKey(key),
+            SecurityAlgorithms.HmacSha256Signature
+        );
+
+        var tokenDescriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(claims),
+            Expires = DateTime.UtcNow.AddMinutes(5), // Token reset chỉ có hiệu lực 5 phút
+            SigningCredentials = credentials,
+            Issuer = _issuer,
+            Audience = _audience,
+        };
+
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var token = tokenHandler.CreateToken(tokenDescriptor);
+        return tokenHandler.WriteToken(token);
+    }
+
+    /// <summary>
+    /// Xác thực reset token và lấy thông tin user
+    /// </summary>
+    public TokenResult ValidatePasswordResetToken(string resetToken)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(resetToken))
+            {
+                return null;
+            }
+
+            var handler = new JwtSecurityTokenHandler();
+            var key = Encoding.ASCII.GetBytes(_key);
+
+            // Validate token
+            var validationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(key),
+                ValidateIssuer = true,
+                ValidIssuer = _issuer,
+                ValidateAudience = true,
+                ValidAudience = _audience,
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.Zero
+            };
+
+            var principal = handler.ValidateToken(resetToken, validationParameters, out SecurityToken validatedToken);
+            var jwtToken = validatedToken as JwtSecurityToken;
+
+            // Kiểm tra đây có phải là reset token không
+            var tokenType = jwtToken?.Claims?.FirstOrDefault(c => c.Type == "TokenType")?.Value;
+            if (tokenType != "PasswordReset")
+            {
+                return null;
+            }
+
+            var tokenResult = new TokenResult
+            {
+                UserId = jwtToken.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value,
+                UserName = jwtToken.Claims.FirstOrDefault(c => c.Type == "sub")?.Value,
+                Email = jwtToken.Claims.FirstOrDefault(c => c.Type == "Email")?.Value,
+                Jti = jwtToken.Claims.FirstOrDefault(c => c.Type == "jti")?.Value,
+                Exp = int.TryParse(jwtToken.Claims.FirstOrDefault(c => c.Type == "exp")?.Value, out var exp) ? exp : 0,
+            };
+
+            return tokenResult;
+        }
+        catch (Exception ex)
+        {
+            return null;
+        }
+    }
 
 }
 

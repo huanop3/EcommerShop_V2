@@ -116,9 +116,6 @@
                         </a>
                     </NotAuthorized>
                 </AuthorizeView>
-
-                <AuthorizeView>
-                    <Authorized>
                         <a href="/wishlist" class="action-item" style="text-decoration: none;">
                             <div class="action-content">
                                 <span>Wishlist</span>
@@ -129,23 +126,6 @@
                                 <span class="notification-badge @(wishlistCount > 0 ? "has-items" : "")">@wishlistCount</span>
                             </div>
                         </a>
-                    </Authorized>
-                    <NotAuthorized>
-                        <a href="/login" class="action-item" style="text-decoration: none;">
-                            <div class="action-content">
-                                <span>Wishlist</span>
-                                <strong>LOGIN REQUIRED</strong>
-                            </div>
-                            <div class="icon-container">
-                                <i class="fas fa-heart" title="Wishlist" style="color: #4B5966; font-size: 18px;"></i>
-                                <span class="notification-badge">0</span>
-                            </div>
-                        </a>
-                    </NotAuthorized>
-                </AuthorizeView>
-
-                <AuthorizeView>
-                    <Authorized>
                         <a href="/cart" class="action-item" style="text-decoration: none;">
                             <div class="action-content">
                                 <span>Cart</span>
@@ -156,20 +136,6 @@
                                 <span class="notification-badge @(cartCount > 0 ? "has-items" : "")">@cartCount</span>
                             </div>
                         </a>
-                    </Authorized>
-                    <NotAuthorized>
-                        <a href="/login" class="action-item" style="text-decoration: none;">
-                            <div class="action-content">
-                                <span>Cart</span>
-                                <strong>LOGIN REQUIRED</strong>
-                            </div>
-                            <div class="icon-container">
-                                <i class="fas fa-shopping-cart" title="Shopping Cart" style="color: #4B5966; font-size: 18px;"></i>
-                                <span class="notification-badge">0</span>
-                            </div>
-                        </a>
-                    </NotAuthorized>
-                </AuthorizeView>
             </div>
         </div>
     </div>

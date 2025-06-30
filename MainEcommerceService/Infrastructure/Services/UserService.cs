@@ -94,7 +94,7 @@ public class UserService : IUserService
             }
 
             // Lưu vào cache
-            await _cacheService.SetAsync(cacheKey, userVMs, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, userVMs, TimeSpan.FromDays(1));
 
             response.Data = userVMs;
             response.Success = true;
@@ -167,7 +167,7 @@ public class UserService : IUserService
                 });
             }
             // Lưu vào cache
-            await _cacheService.SetAsync(cacheKey, userVMs, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, userVMs, TimeSpan.FromDays(1));
             // Trả về danh sách người dùng
             response.Data = userVMs;
             response.Success = true;

@@ -34,6 +34,7 @@ public class ProductVM
 public class PrdVMWithImages : ProductVM
 {
     public string CategoryName { get; set; } = null!;
+    public int ParentCategoryId { get; set; } // ID của danh mục cha, nếu có
 
     // Thông tin hình ảnh
     public string? PrimaryImageUrl { get; set; } // Ảnh chính

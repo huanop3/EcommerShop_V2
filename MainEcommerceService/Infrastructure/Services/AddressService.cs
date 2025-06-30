@@ -82,7 +82,7 @@ public class AddressService : IAddressService
             }).ToList();
 
             // Lưu vào cache
-            await _cacheService.SetAsync(cacheKey, addressVMs, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, addressVMs, TimeSpan.FromDays(1));
 
             response.Data = addressVMs;
             response.Success = true;
@@ -127,7 +127,7 @@ public class AddressService : IAddressService
             var addressVMs = addresses.Select(MapToAddressVM).ToList();
 
             // Cache the result (even if empty)
-            await _cacheService.SetAsync(cacheKey, addressVMs, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, addressVMs, TimeSpan.FromDays(1));
 
             var message = addressVMs.Any() ? "Retrieved user addresses successfully" : "User has no addresses yet";
             return CreateSuccessResponse<IEnumerable<AddressVM>>(addressVMs, message);
@@ -183,7 +183,7 @@ public class AddressService : IAddressService
             };
 
             // Lưu vào cache
-            await _cacheService.SetAsync(cacheKey, addressVM, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, addressVM, TimeSpan.FromDays(1));
 
             response.Data = addressVM;
             response.Success = true;

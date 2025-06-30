@@ -8,12 +8,10 @@ namespace ProductService.Controllers
     public class ImageController : ControllerBase
     {
         private readonly IS3Service _s3Service;
-        private readonly ILogger<ImageController> _logger;
 
         public ImageController(IS3Service s3Service, ILogger<ImageController> logger)
         {
             _s3Service = s3Service;
-            _logger = logger;
         }
 
         [HttpGet("test-connection")]
@@ -32,7 +30,6 @@ namespace ProductService.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error testing S3 connection");
                 return StatusCode(500, new
                 {
                     Success = false,
@@ -65,7 +62,6 @@ namespace ProductService.Controllers
 
                 var imageUrl = await _s3Service.UploadImageAsync(file, keyName);
 
-                _logger.LogInformation($"Image uploaded successfully: {file.FileName}");
 
                 return Ok(new
                 {
@@ -80,7 +76,6 @@ namespace ProductService.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error uploading image: {file.FileName}");
                 return StatusCode(500, new
                 {
                     Success = false,
@@ -163,7 +158,6 @@ namespace ProductService.Controllers
 
                 if (success)
                 {
-                    _logger.LogInformation($"Image deleted successfully: {keyName}");
                     return Ok(new { Success = true, Message = "Image deleted successfully", KeyName = keyName });
                 }
                 else
@@ -173,7 +167,6 @@ namespace ProductService.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error deleting image: {keyName}");
                 return StatusCode(500, new
                 {
                     Success = false,
@@ -209,7 +202,6 @@ namespace ProductService.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error generating presigned URL for: {keyName}");
                 return StatusCode(500, new
                 {
                     Success = false,
@@ -245,7 +237,6 @@ namespace ProductService.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error listing images");
                 return StatusCode(500, new
                 {
                     Success = false,

@@ -1,39 +1,13 @@
 version: '3.8'
 
 services:
-  # --- DATABASE SETUP ---
-  sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: sql_server_db
-    restart: unless-stopped
-    ports:
-      - "1433:1433"
-    environment:
-      - ACCEPT_EULA=Y
-      - SA_PASSWORD=HuanNC231@
-      - MSSQL_PID=Developer
-    volumes:
-      - sqlserver_data:/var/opt/mssql
-    networks:
-      - ecommerce-net
-
-  redis:
-    image: redis:7-alpine
-    container_name: redis_cache
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes --requirepass YourRedisPassword123
-    volumes:
-      - redis_data:/data
-    networks:
-      - ecommerce-net
+  # XÓA: Toàn bộ service 'db' đã bị xóa khỏi đây.
+  # XÓA: Toàn bộ service 'redis' đã bị xóa khỏi đây.
 
   # --- KAFKA SETUP ---
   zookeeper:
     image: confluentinc/cp-zookeeper:7.3.0
     container_name: zookeeper
-    restart: unless-stopped
     networks:
       - ecommerce-net
     environment:
@@ -43,53 +17,52 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.3.0
     container_name: kafka_broker
-    restart: unless-stopped
     networks:
       - ecommerce-net
     depends_on:
       - zookeeper
     ports:
+      # Port 9092 để các ứng dụng bên ngoài Docker (trên máy host) có thể kết nối
       - "9092:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      # Listener cho kết nối từ BÊN TRONG Docker (qua service name 'kafka')
+      # Listener cho kết nối từ BÊN NGOÀI Docker (qua localhost)
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_INTERNAL://kafka:29092,PLAINTEXT://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
 
   kafka-ui:
-    image: provectuslabs/kafka-ui:latest
+    image: provectuslabs/kafka-ui:latest # SỬA LỖI: Tên image chính xác
     container_name: kafka_ui
-    restart: unless-stopped
     depends_on:
       - kafka
     ports:
+      # Map cổng 8080 của container sang 8090 của máy host để tránh xung đột
       - "8090:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local-cluster
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092 # Kết nối tới Kafka qua mạng nội bộ
     networks:
       - ecommerce-net
+  # --- END KAFKA SETUP ---
 
-  # --- MICROSERVICES ---
   mainecommerce:
     build:
       context: .
       dockerfile: MainEcommerceService/Dockerfile
     container_name: main_ecommerce_service
-    restart: unless-stopped
     ports:
       - "5166:8080"
     depends_on:
-      - kafka
-      - sqlserver
-      - redis
+      - kafka # SỬA: Xóa 'db' và 'redis' khỏi depends_on
     environment:
-      # 🔥 SỬA: Sử dụng Docker internal connections
-      - ConnectionStrings__MainDbService=Server=sqlserver,1433;Database=MainEcommerceService;User Id=sa;Password=HuanNC231@;TrustServerCertificate=true;
-      - ConnectionStrings__RedisConnection=redis:6379,password=YourRedisPassword123
+      # SỬA: Sử dụng biến môi trường cho connection string mới
+      - ConnectionStrings__MainDbService=${EXTERNAL_DB_CONNECTION}
+      - ConnectionStrings__RedisConnection=${EXTERNAL_REDIS_CONNECTION}
       - Kafka__BootstrapServers=kafka:29092
       - jwt__Secret-Key=${JWT_SECRET_KEY}
       - jwt__Issuer=${JWT_ISSUER}
@@ -103,17 +76,14 @@ services:
       context: .
       dockerfile: ProductService/Dockerfile
     container_name: product_service
-    restart: unless-stopped
     ports:
       - "5079:8080"
     depends_on:
-      - kafka
-      - sqlserver
-      - redis
+      - kafka # SỬA: Xóa 'db' và 'redis' khỏi depends_on
     environment:
-      # 🔥 SỬA: Sử dụng Docker internal connections
-      - ConnectionStrings__ProductDbService=Server=sqlserver,1433;Database=ProductService;User Id=sa;Password=HuanNC231@;TrustServerCertificate=true;
-      - ConnectionStrings__RedisConnection=redis:6379,password=YourRedisPassword123
+      # SỬA: Sử dụng biến môi trường cho connection string mới
+      - ConnectionStrings__ProductDbService=${EXTERNAL_PRODUCT_DB_CONNECTION}
+      - ConnectionStrings__RedisConnection=${EXTERNAL_REDIS_CONNECTION}
       - Kafka__BootstrapServers=kafka:29092
       - AWS__AccessKey=${AWS_ACCESS_KEY}
       - AWS__SecretKey=${AWS_SECRET_KEY}
@@ -131,13 +101,13 @@ services:
       context: .
       dockerfile: GateWayService/Dockerfile
     container_name: gateway_service
-    restart: unless-stopped
     ports:
       - "5282:8080"
     depends_on:
       - mainecommerce
       - productservice
     environment:
+      # Đảm bảo dòng này tồn tại và chính xác
       - ASPNETCORE_ENVIRONMENT=Docker
     networks:
       - ecommerce-net
@@ -147,22 +117,29 @@ services:
       context: .
       dockerfile: BlazorWebApp/Dockerfile
     container_name: blazor_webapp
-    restart: unless-stopped
     ports:
-      - "5000:8080"
+      - "5093:8080"
     depends_on:
       - gateway
     environment:
-      - GatewayBaseUrl=http://gateway_service:8080
+      # 🔥 SỬA: Sử dụng biến môi trường từ .env
+      - GatewayBaseUrl=${GATEWAY_BASE_URL}
       - ASPNETCORE_ENVIRONMENT=Development
       - DOTNET_RUNNING_IN_CONTAINER=true
+      # Email Settings
+      - EmailSettings__SmtpHost=${EMAIL_SMTP_HOST}
+      - EmailSettings__SmtpPort=${EMAIL_SMTP_PORT}
+      - EmailSettings__FromEmail=${EMAIL_FROM_EMAIL}
+      - EmailSettings__Username=${EMAIL_USERNAME}
+      - EmailSettings__Password=${EMAIL_PASSWORD}
+      # JWT Settings
+      - jwt__Secret-Key=${JWT_SECRET_KEY}
+      - jwt__Issuer=${JWT_ISSUER}
+      - jwt__Audience=${JWT_AUDIENCE}
+      # App Settings
+      - AppSettings__BaseUrl=${APP_BASE_URL}
     networks:
       - ecommerce-net
-
-# 🔥 THÊM: Volumes để persist data
-volumes:
-  sqlserver_data:
-  redis_data:
 
 networks:
   ecommerce-net:

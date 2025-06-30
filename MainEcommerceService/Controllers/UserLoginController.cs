@@ -74,6 +74,42 @@ namespace MainEcommerceService.Controllers
                 return BadRequest(response);
             }
         }
+                [HttpPost("forgot")]
+        public async Task<ActionResult> ForgotPassword([FromBody] ForgotPasswordVM forgotPasswordVM)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
 
+            var result = await _userLoginService.ForgotPassword(forgotPasswordVM);
+            if (result.Success)
+            {
+                return Ok(result);
+            }
+            else
+            {
+                return BadRequest(result);
+            }
+        }
+
+        [HttpPost("reset")]
+        public async Task<ActionResult> ResetPassword([FromBody] ResetPasswordVM resetPasswordVM)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var result = await _userLoginService.ResetPassword(resetPasswordVM);
+            if (result.Success)
+            {
+                return Ok(result);
+            }
+            else
+            {
+                return BadRequest(result);
+            }
+        }
     }
 }

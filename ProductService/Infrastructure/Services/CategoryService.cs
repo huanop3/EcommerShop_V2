@@ -72,7 +72,7 @@ public class CategoryService : ICategoryService
             }).ToList();
 
             // Lưu vào cache
-            await _cacheService.SetAsync(cacheKey, categoryVMs, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, categoryVMs, TimeSpan.FromDays(1));
 
             response.Data = categoryVMs;
             response.Success = true;

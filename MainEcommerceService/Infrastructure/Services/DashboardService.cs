@@ -15,20 +15,17 @@ namespace MainEcommerceService.Infrastructure.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly HttpClient _httpClient;
         private readonly IConfiguration _configuration;
-        private readonly ILogger<DashboardService> _logger;
         private readonly RedisHelper _cacheService;
 
         public DashboardService(
             IUnitOfWork unitOfWork,
             HttpClient httpClient,
             IConfiguration configuration,
-            ILogger<DashboardService> logger,
             RedisHelper cacheService)
         {
             _unitOfWork = unitOfWork;
             _httpClient = httpClient;
             _configuration = configuration;
-            _logger = logger;
             _cacheService = cacheService;
         }
 
@@ -105,7 +102,7 @@ namespace MainEcommerceService.Infrastructure.Services
                         .CountAsync(s => s.IsDeleted != true && s.IsVerified != true)
                 };
 
-                await _cacheService.SetAsync(cacheKey, dashboard, TimeSpan.FromMinutes(15));
+                await _cacheService.SetAsync(cacheKey, dashboard, TimeSpan.FromDays(1));
 
                 response.Data = dashboard;
                 response.Success = true;
@@ -119,7 +116,6 @@ namespace MainEcommerceService.Infrastructure.Services
                 response.StatusCode = 500;
                 response.Message = $"Lỗi khi lấy dữ liệu dashboard admin: {ex.Message}";
                 response.DateTime = DateTime.Now;
-                _logger.LogError(ex, "Error in GetAdminDashboardAsync");
             }
             return response;
         }
@@ -203,7 +199,7 @@ namespace MainEcommerceService.Infrastructure.Services
                     IsVerified = seller.IsVerified ?? false,
                 };
 
-                await _cacheService.SetAsync(cacheKey, dashboard, TimeSpan.FromMinutes(15));
+                await _cacheService.SetAsync(cacheKey, dashboard, TimeSpan.FromDays(1));
 
                 response.Data = dashboard;
                 response.Success = true;
@@ -261,7 +257,7 @@ namespace MainEcommerceService.Infrastructure.Services
                         .CountAsync(s => s.IsDeleted != true)
                 };
 
-                await _cacheService.SetAsync(cacheKey, stats, TimeSpan.FromMinutes(10));
+                await _cacheService.SetAsync(cacheKey, stats, TimeSpan.FromDays(1));
 
                 response.Data = stats;
                 response.Success = true;
@@ -275,7 +271,6 @@ namespace MainEcommerceService.Infrastructure.Services
                 response.StatusCode = 500;
                 response.Message = $"Lỗi khi lấy dữ liệu thống kê: {ex.Message}";
                 response.DateTime = DateTime.Now;
-                _logger.LogError(ex, "Error in GetDashboardStatsAsync");
             }
             return response;
         }

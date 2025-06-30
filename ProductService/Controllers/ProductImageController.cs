@@ -10,12 +10,10 @@ namespace ProductService.Controllers
     public class ProductImageController : ControllerBase
     {
         private readonly IProductImageService _productImageService;
-        private readonly ILogger<ProductImageController> _logger;
 
         public ProductImageController(IProductImageService productImageService, ILogger<ProductImageController> logger)
         {
             _productImageService = productImageService;
-            _logger = logger;
         }
 
         /// <summary>
@@ -214,7 +212,6 @@ namespace ProductService.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error uploading image: {file.FileName}");
                 return StatusCode(500, new
                 {
                     Success = false,
@@ -261,7 +258,6 @@ namespace ProductService.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error checking image status: {imageId}");
                 return StatusCode(500, new
                 {
                     Success = false,
@@ -309,7 +305,6 @@ namespace ProductService.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error getting image statistics for product: {productId}");
                 return StatusCode(500, new
                 {
                     Success = false,

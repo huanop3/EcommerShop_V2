@@ -159,7 +159,6 @@ builder.Services.AddCors(options =>
     options.AddPolicy("CorsPolicy", builder =>
         builder
             // 🔥 SỬA LỖI: Thêm origin của Blazor App khi chạy qua Docker
-            .WithOrigins("http://localhost:5000", "http://localhost:5093", "https://localhost:7257","https://localhost:7260","http://localhost:5282")
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials()); // Quan trọng cho SignalR

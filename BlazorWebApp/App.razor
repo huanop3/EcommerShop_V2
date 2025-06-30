@@ -22,24 +22,23 @@
                                         <div class="unauthorized-icon">
                                             <i class="fas fa-user-lock"></i>
                                         </div>
-                                        <h2>Yêu cầu đăng nhập</h2>
-                                        <p>Vui lòng đăng nhập để truy cập trang này</p>
+                                        <h2>Login Required</h2>
+                                        <p>Please log in to access this page</p>
                                     </div>
 
                                     <div class="auth-form fade-in">
                                         <div class="form-submit" style="margin-top: 25px;">
                                             <a href="/login" class="btn-submit">
-                                                <i class="fas fa-sign-in-alt mr-2"></i> Đăng nhập
+                                                <i class="fas fa-sign-in-alt mr-2"></i> Sign In
                                             </a>
                                         </div>
 
                                         <div class="auth-divider">
-                                            <span>HOẶC</span>
+                                            <span>OR</span>
                                         </div>
 
                                         <div class="auth-footer">
-                                            <p>Quay lại <a href="/">Trang chủ</a>
-                                            </p>
+                                            <p>Go back to <a href="/">Home</a></p>
                                         </div>
                                     </div>
                                 </div>
@@ -55,31 +54,31 @@
                                         <div class="unauthorized-icon" style="background-color: #ffebee; color: #d32f2f;">
                                             <i class="fas fa-lock"></i>
                                         </div>
-                                        <h2>Truy cập bị từ chối</h2>
-                                        <p>Bạn không có quyền truy cập vào trang này</p>
+                                        <h2>Access Denied</h2>
+                                        <p>You don't have permission to access this page</p>
                                     </div>
 
                                     <div class="auth-form fade-in">
                                         <div class="error-message">
                                             <i class="fas fa-exclamation-triangle"></i>
-                                            <span>Tài khoản của bạn không có quyền truy cập vào trang này</span>
+                                            <span>Your account doesn't have permission to access this page</span>
                                         </div>
 
                                         <div class="form-submit" style="margin-top: 25px;">
                                             <a href="/" class="btn-submit">
-                                                <i class="fas fa-home mr-2"></i> Về trang chủ
+                                                <i class="fas fa-home mr-2"></i> Go Home
                                             </a>
                                         </div>
 
                                         <div class="auth-divider">
-                                            <span>HOẶC</span>
+                                            <span>OR</span>
                                         </div>
 
                                         <div class="auth-footer">
                                             <p>
                                                 <a href="#" @onclick="HandleLogout" @onclick:preventDefault>
-                                                    Đăng xuất
-                                                </a> và đăng nhập với tài khoản khác
+                                                    Sign Out
+                                                </a> and sign in with a different account
                                             </p>
                                         </div>
                                     </div>
@@ -92,7 +91,53 @@
         </Found>
         <NotFound>
             <LayoutView Layout="@typeof(MainLayout)">
-                <p>Không tìm thấy trang</p>
+                <div class="not-found-container">
+                    <div class="not-found-content">
+                        <div class="not-found-icon">
+                            <i class="fas fa-search"></i>
+                            <span class="error-code">404</span>
+                        </div>
+                        
+                        <div class="not-found-header">
+                            <h1>Page Not Found</h1>
+                            <p>Oops! The page you're looking for doesn't exist or has been moved.</p>
+                        </div>
+                        
+                        <div class="not-found-suggestions">
+                            <h3>What you can do:</h3>
+                            <ul>
+                                <li><i class="fas fa-check"></i> Check the URL for any typos</li>
+                                <li><i class="fas fa-check"></i> Go back to the previous page</li>
+                                <li><i class="fas fa-check"></i> Visit our homepage</li>
+                                <li><i class="fas fa-check"></i> Use the search feature</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="not-found-actions">
+                            <a href="/" class="btn-primary">
+                                <i class="fas fa-home"></i>
+                                Go to Homepage
+                            </a>
+                            <button onclick="history.back()" class="btn-secondary">
+                                <i class="fas fa-arrow-left"></i>
+                                Go Back
+                            </button>
+                        </div>
+                        
+                        <div class="not-found-help">
+                            <p>Still need help? <a href="/contact">Contact our support team</a></p>
+                        </div>
+                    </div>
+                    
+                    <div class="not-found-illustration">
+                        <div class="floating-elements">
+                            <div class="element element-1"></div>
+                            <div class="element element-2"></div>
+                            <div class="element element-3"></div>
+                            <div class="element element-4"></div>
+                        </div>
+                    </div>
+                </div>
             </LayoutView>
         </NotFound>
     </Router>
@@ -101,14 +146,7 @@
 @code {
     private async Task HandleLogout()
     {
-        try
-        {
-            await LoginService.Logout();
-            NavigationManager.NavigateTo("/login", true);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Logout error: {ex.Message}");
-        }
+        await LoginService.Logout();
+        NavigationManager.NavigateTo("/login", true);
     }
 }

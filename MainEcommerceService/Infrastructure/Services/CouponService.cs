@@ -87,7 +87,7 @@ public class CouponService : ICouponService
             }).ToList();
 
             // Lưu vào cache
-            await _cacheService.SetAsync(cacheKey, couponVMs, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, couponVMs, TimeSpan.FromDays(1));
 
             response.Data = couponVMs;
             response.Success = true;
@@ -151,7 +151,7 @@ public class CouponService : ICouponService
             };
 
             // Lưu vào cache
-            await _cacheService.SetAsync(cacheKey, couponVM, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, couponVM, TimeSpan.FromDays(1));
 
             response.Data = couponVM;
             response.Success = true;
@@ -215,7 +215,7 @@ public class CouponService : ICouponService
             };
 
             // Lưu vào cache
-            await _cacheService.SetAsync(cacheKey, couponVM, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, couponVM, TimeSpan.FromDays(1));
 
             response.Data = couponVM;
             response.Success = true;
@@ -557,7 +557,7 @@ public class CouponService : ICouponService
                 UsageCount = c.UsageCount
             }).ToList();
 
-            await _cacheService.SetAsync(cacheKey, couponVMs, TimeSpan.FromMinutes(15));
+            await _cacheService.SetAsync(cacheKey, couponVMs, TimeSpan.FromDays(1));
 
             response.Data = couponVMs;
             response.Success = true;

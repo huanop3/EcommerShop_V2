@@ -34,22 +34,19 @@ public class OrderService : IOrderService
     private readonly IHubContext<NotificationHub> _hubContext;
     private readonly IKafkaProducerService _kafkaProducer;
     private readonly HttpClient _httpClient;
-    private readonly ILogger<OrderService> _logger;
 
     public OrderService(
         IUnitOfWork unitOfWork,
         RedisHelper cacheService,
         IHubContext<NotificationHub> hubContext,
         IKafkaProducerService kafkaProducer,
-        HttpClient httpClient,
-        ILogger<OrderService> logger)
+        HttpClient httpClient)
     {
         _unitOfWork = unitOfWork;
         _cacheService = cacheService;
         _hubContext = hubContext;
         _kafkaProducer = kafkaProducer;
         _httpClient = httpClient;
-        _logger = logger;
     }
 
     public async Task<HTTPResponseClient<IEnumerable<OrderVM>>> GetAllOrders()
@@ -96,7 +93,7 @@ public class OrderService : IOrderService
                 IsDeleted = o.IsDeleted
             }).ToList();
 
-            await _cacheService.SetAsync(cacheKey, orderVMs, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, orderVMs, TimeSpan.FromDays(1));
 
             response.Data = orderVMs;
             response.Success = true;
@@ -110,7 +107,6 @@ public class OrderService : IOrderService
             response.StatusCode = 500;
             response.Message = $"Lỗi khi lấy danh sách đơn hàng: {ex.Message}";
             response.DateTime = DateTime.Now;
-            _logger.LogError(ex, "Error getting all orders");
         }
         return response;
     }
@@ -158,7 +154,7 @@ public class OrderService : IOrderService
                 IsDeleted = order.IsDeleted
             };
 
-            await _cacheService.SetAsync(cacheKey, orderVM, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, orderVM, TimeSpan.FromDays(1));
 
             response.Data = orderVM;
             response.Success = true;
@@ -172,7 +168,6 @@ public class OrderService : IOrderService
             response.StatusCode = 500;
             response.Message = $"Lỗi khi lấy thông tin đơn hàng: {ex.Message}";
             response.DateTime = DateTime.Now;
-            _logger.LogError(ex, "Error getting order by id {OrderId}", orderId);
         }
         return response;
     }
@@ -213,7 +208,7 @@ public class OrderService : IOrderService
                 IsDeleted = o.IsDeleted
             }).ToList();
 
-            await _cacheService.SetAsync(cacheKey, orderVMs, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, orderVMs, TimeSpan.FromDays(1));
 
             response.Data = orderVMs;
             response.Success = true;
@@ -227,7 +222,6 @@ public class OrderService : IOrderService
             response.StatusCode = 500;
             response.Message = $"Lỗi khi lấy danh sách đơn hàng theo người dùng: {ex.Message}";
             response.DateTime = DateTime.Now;
-            _logger.LogError(ex, "Error getting orders by user id {UserId}", userId);
         }
         return response;
     }
@@ -302,11 +296,9 @@ public class OrderService : IOrderService
                     "order-created",
                     order.OrderId.ToString(),
                     orderCreatedMessage);
-                _logger.LogInformation("📤 Sent order created message to Kafka for order {OrderId}", order.OrderId);
             }
             catch (Exception kafkaEx)
             {
-                _logger.LogError(kafkaEx, "❌ Failed to send order created message to Kafka for order {OrderId}", order.OrderId);
                 // Không rollback vì đã commit, để consumer xử lý retry
             }
 
@@ -327,7 +319,6 @@ public class OrderService : IOrderService
             response.Message = $"Lỗi khi tạo đơn hàng: {ex.Message}";
             response.Data = "ORDER_CREATION_FAILED";
             response.DateTime = DateTime.Now;
-            _logger.LogError(ex, "❌ Error creating order for user {UserId}", orderVM.UserId);
         }
         return response;
     }
@@ -389,7 +380,6 @@ public class OrderService : IOrderService
             response.Message = $"Lỗi khi cập nhật đơn hàng: {ex.Message}";
             response.Data = "ORDER_UPDATE_FAILED";
             response.DateTime = DateTime.Now;
-            _logger.LogError(ex, "❌ Error updating order {OrderId}", orderVM.OrderId);
         }
         return response;
     }
@@ -436,7 +426,6 @@ public class OrderService : IOrderService
             response.Message = $"Lỗi khi xóa đơn hàng: {ex.Message}";
             response.Data = "ORDER_DELETE_FAILED";
             response.DateTime = DateTime.Now;
-            _logger.LogError(ex, "❌ Error deleting order {OrderId}", orderId);
         }
         return response;
     }
@@ -495,7 +484,6 @@ public class OrderService : IOrderService
             response.Message = $"Lỗi khi cập nhật trạng thái đơn hàng: {ex.Message}";
             response.Data = "ORDER_STATUS_UPDATE_FAILED";
             response.DateTime = DateTime.Now;
-            _logger.LogError(ex, "❌ Error updating order status {OrderId}", orderId);
         }
         return response;
     }
@@ -536,7 +524,7 @@ public class OrderService : IOrderService
                 IsDeleted = o.IsDeleted
             }).ToList();
 
-            await _cacheService.SetAsync(cacheKey, orderVMs, TimeSpan.FromMinutes(15));
+            await _cacheService.SetAsync(cacheKey, orderVMs, TimeSpan.FromDays(1));
 
             response.Data = orderVMs;
             response.Success = true;
@@ -550,7 +538,6 @@ public class OrderService : IOrderService
             response.StatusCode = 500;
             response.Message = $"Lỗi khi lấy danh sách đơn hàng theo trạng thái: {ex.Message}";
             response.DateTime = DateTime.Now;
-            _logger.LogError(ex, "❌ Error getting orders by status {StatusId}", statusId);
         }
         return response;
     }
@@ -591,7 +578,7 @@ public class OrderService : IOrderService
                 IsDeleted = o.IsDeleted
             }).ToList();
 
-            await _cacheService.SetAsync(cacheKey, orderVMs, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, orderVMs, TimeSpan.FromDays(1));
 
             response.Data = orderVMs;
             response.Success = true;
@@ -605,7 +592,6 @@ public class OrderService : IOrderService
             response.StatusCode = 500;
             response.Message = $"Lỗi khi lấy danh sách đơn hàng theo thời gian: {ex.Message}";
             response.DateTime = DateTime.Now;
-            _logger.LogError(ex, "❌ Error getting orders by date range {StartDate} - {EndDate}", startDate, endDate);
         }
         return response;
     }
@@ -703,11 +689,9 @@ public class OrderService : IOrderService
                     order.OrderId.ToString(),
                     orderCreatedMessage);
 
-                _logger.LogInformation("✅ MainService: Successfully sent order created message to Kafka for order {OrderId}", order.OrderId);
             }
             catch (Exception kafkaEx)
             {
-                _logger.LogError(kafkaEx, "❌ MainService: Failed to send order created message to Kafka for order {OrderId}", order.OrderId);
                 // Không rollback vì đã commit
             }
 
@@ -729,7 +713,6 @@ public class OrderService : IOrderService
             response.Message = $"Lỗi khi tạo đơn hàng: {ex.Message}";
             response.Data = "ORDER_WITH_ITEMS_CREATION_FAILED";
             response.DateTime = DateTime.Now;
-            _logger.LogError(ex, "❌ MainService: Error creating order with items for user {UserId}", orderVM.UserId);
         }
         return response;
     }
@@ -789,8 +772,6 @@ public class OrderService : IOrderService
             response.Data = $"ORDER_STATUS_UPDATED_SUCCESS_{orderId}_{statusName}";
             response.DateTime = DateTime.Now;
 
-            _logger.LogInformation("✅ Updated order {OrderId} status from {OldStatus} to {NewStatus}",
-                orderId, oldStatusId, newStatus.StatusId);
         }
         catch (Exception ex)
         {
@@ -800,7 +781,6 @@ public class OrderService : IOrderService
             response.Message = $"Lỗi khi cập nhật trạng thái đơn hàng: {ex.Message}";
             response.Data = "ORDER_STATUS_UPDATE_BY_NAME_FAILED";
             response.DateTime = DateTime.Now;
-            _logger.LogError(ex, "❌ Error updating order {OrderId} status to {StatusName}", orderId, statusName);
         }
         return response;
     }
@@ -859,7 +839,6 @@ public class OrderService : IOrderService
             response.Message = $"Lỗi khi lấy trạng thái đơn hàng: {ex.Message}";
             response.Data = "ORDER_STATUS_RETRIEVAL_FAILED";
             response.DateTime = DateTime.Now;
-            _logger.LogError(ex, "❌ Error getting order status for order {OrderId}", orderId);
         }
         return response;
     }
@@ -914,11 +893,9 @@ public class OrderService : IOrderService
                     "order-cancelled",
                     order.OrderId.ToString(),
                     orderCancelledMessage);
-                _logger.LogInformation("📤 Sent order cancelled message to Kafka for order {OrderId}", order.OrderId);
             }
             catch (Exception kafkaEx)
             {
-                _logger.LogError(kafkaEx, "❌ Failed to send order cancelled message to Kafka for order {OrderId}", order.OrderId);
             }
             //Nếu message gửi thành công, cập nhật trạng thái đơn hàng
             order.OrderStatusId = (await _unitOfWork._orderStatusRepository.Query()
@@ -935,7 +912,6 @@ public class OrderService : IOrderService
                 response.Message = "Hủy đơn hàng thành công";
                 response.Data = true;
                 response.DateTime = DateTime.Now;
-                _logger.LogInformation("✅ Order {OrderId} cancelled successfully", orderId);
             }
             await _unitOfWork.CommitTransaction();
             await InvalidateAllOrderCaches(orderId, order.UserId, order.OrderStatusId);
@@ -948,7 +924,6 @@ public class OrderService : IOrderService
             response.Message = $"Lỗi khi hủy đơn hàng: {ex.Message}";
             response.Data = false;
             response.DateTime = DateTime.Now;
-            _logger.LogError(ex, "❌ Error cancelling order {OrderId}", orderId);
         }
         return response;
     }
@@ -1038,7 +1013,7 @@ public async Task<HTTPResponseClient<IEnumerable<OrderWithDetailsVM>>> GetOrders
 
         // 🔥 BƯỚC 4: Không cần vòng lặp để filter nữa vì đã filter trong query rồi!
         
-        await _cacheService.SetAsync(cacheKey, ordersWithDetails, TimeSpan.FromMinutes(15));
+        await _cacheService.SetAsync(cacheKey, ordersWithDetails, TimeSpan.FromDays(1));
 
         response.Data = ordersWithDetails;
         response.Success = true;
@@ -1046,8 +1021,6 @@ public async Task<HTTPResponseClient<IEnumerable<OrderWithDetailsVM>>> GetOrders
         response.Message = "Lấy đơn hàng theo seller thành công";
         response.DateTime = DateTime.Now;
         
-        _logger.LogInformation("✅ Retrieved {Count} orders for seller {SellerId} with {ProductCount} products", 
-            ordersWithDetails.Count(), sellerId, sellerProductIds.Count);
     }
     catch (Exception ex)
     {
@@ -1055,7 +1028,6 @@ public async Task<HTTPResponseClient<IEnumerable<OrderWithDetailsVM>>> GetOrders
         response.StatusCode = 500;
         response.Message = $"Lỗi khi lấy đơn hàng theo seller: {ex.Message}";
         response.DateTime = DateTime.Now;
-        _logger.LogError(ex, "❌ Error getting orders by seller {SellerId}", sellerId);
     }
     return response;
 }
@@ -1162,7 +1134,7 @@ public async Task<HTTPResponseClient<IEnumerable<OrderWithDetailsVM>>> GetOrders
             };
 
             // Cache for 10 minutes
-            await _cacheService.SetAsync(cacheKey, completeView, TimeSpan.FromMinutes(10));
+            await _cacheService.SetAsync(cacheKey, completeView, TimeSpan.FromDays(1));
 
             response.Data = completeView;
             response.Success = true;
@@ -1170,8 +1142,6 @@ public async Task<HTTPResponseClient<IEnumerable<OrderWithDetailsVM>>> GetOrders
             response.Message = "Lấy dữ liệu đơn hàng thành công";
             response.DateTime = DateTime.Now;
 
-            _logger.LogInformation("✅ Retrieved {OrderCount} orders with {ProductCount} products for Admin",
-                ordersWithDetails.Count, allProductIds.Count);
         }
         catch (Exception ex)
         {
@@ -1179,7 +1149,6 @@ public async Task<HTTPResponseClient<IEnumerable<OrderWithDetailsVM>>> GetOrders
             response.StatusCode = 500;
             response.Message = $"Lỗi khi lấy dữ liệu đơn hàng: {ex.Message}";
             response.DateTime = DateTime.Now;
-            _logger.LogError(ex, "❌ Error getting complete orders data for admin");
         }
         return response;
     }

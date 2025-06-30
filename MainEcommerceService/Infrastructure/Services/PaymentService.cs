@@ -23,21 +23,14 @@ public class PaymentService : IPaymentService
     private readonly IUnitOfWork _unitOfWork;
     private readonly RedisHelper _cacheService;
     private readonly IHubContext<NotificationHub> _hubContext;
-    private readonly IKafkaProducerService _kafkaProducer;
-    private readonly ILogger<PaymentService> _logger;
-
     public PaymentService(
         IUnitOfWork unitOfWork,
         RedisHelper cacheService,
-        IHubContext<NotificationHub> hubContext,
-        IKafkaProducerService kafkaProducer,
-        ILogger<PaymentService> logger)
+        IHubContext<NotificationHub> hubContext)
     {
         _unitOfWork = unitOfWork;
         _cacheService = cacheService;
         _hubContext = hubContext;
-        _kafkaProducer = kafkaProducer;
-        _logger = logger;
     }
 
     public async Task<HTTPResponseClient<IEnumerable<PaymentVM>>> GetAllPayments()
@@ -83,7 +76,7 @@ public class PaymentService : IPaymentService
                 IsDeleted = p.IsDeleted
             }).ToList();
 
-            await _cacheService.SetAsync(cacheKey, paymentVMs, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, paymentVMs, TimeSpan.FromDays(1));
 
             response.Data = paymentVMs;
             response.Success = true;
@@ -143,7 +136,7 @@ public class PaymentService : IPaymentService
                 IsDeleted = payment.IsDeleted
             };
 
-            await _cacheService.SetAsync(cacheKey, paymentVM, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, paymentVM, TimeSpan.FromDays(1));
 
             response.Data = paymentVM;
             response.Success = true;
@@ -196,7 +189,7 @@ public class PaymentService : IPaymentService
                 IsDeleted = p.IsDeleted
             }).ToList();
 
-            await _cacheService.SetAsync(cacheKey, paymentVMs, TimeSpan.FromMinutes(30));
+            await _cacheService.SetAsync(cacheKey, paymentVMs, TimeSpan.FromDays(1));
 
             response.Data = paymentVMs;
             response.Success = true;
@@ -432,7 +425,7 @@ public class PaymentService : IPaymentService
                 IsDeleted = p.IsDeleted
             }).ToList();
 
-            await _cacheService.SetAsync(cacheKey, paymentVMs, TimeSpan.FromMinutes(15));
+            await _cacheService.SetAsync(cacheKey, paymentVMs, TimeSpan.FromDays(1));
 
             response.Data = paymentVMs;
             response.Success = true;

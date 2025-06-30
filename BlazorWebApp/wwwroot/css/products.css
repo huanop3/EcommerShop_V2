@@ -1528,3 +1528,74 @@
 .badge {
     font-size: 0.65rem;
 }
+
+/* Enhanced dropdown styles for sorting and price range */
+.sorting-view-options {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.sorting-options {
+    min-width: 200px;
+}
+
+/* Stock filter radio buttons */
+.filter-list .form-check input[type="radio"]:checked + label {
+    color: #5caf90;
+    font-weight: 600;
+}
+
+/* Filter buttons enhanced */
+.filter-buttons {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #e9ecef;
+}
+
+.filter-buttons .btn {
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+/* Active filter indicators */
+.filter-section .badge {
+    font-size: 0.6rem;
+    padding: 2px 6px;
+}
+
+/* Responsive adjustments for new filters */
+@media (max-width: 991.98px) {
+    .sorting-view-options {
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+    }
+    
+    .sorting-options {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .view-options {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .products-header {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+    
+    .results-count {
+        text-align: center;
+    }
+    
+    .filter-buttons .btn {
+        font-size: 14px;
+        padding: 10px 16px;
+    }
+}

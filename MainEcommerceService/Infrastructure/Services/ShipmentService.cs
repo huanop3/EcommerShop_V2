@@ -22,20 +22,17 @@ namespace Infrastructure.Interfaces
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly HttpClient _httpClient;
-        private readonly ILogger<ShipmentService> _logger;
         private readonly RedisHelper _cacheService;
         private readonly IHubContext<NotificationHub> _hubContext;
 
         public ShipmentService(
             IUnitOfWork unitOfWork, 
             HttpClient httpClient, 
-            ILogger<ShipmentService> logger,
             RedisHelper cacheService,
             IHubContext<NotificationHub> hubContext)
         {
             _unitOfWork = unitOfWork;
             _httpClient = httpClient;
-            _logger = logger;
             _cacheService = cacheService;
             _hubContext = hubContext;
         }
@@ -132,12 +129,10 @@ public async Task<HTTPResponseClient<ShipmentDashboardVM>> GetShipmentDashboardB
         response.Data = result;
         response.DateTime = DateTime.Now;
 
-        _logger.LogInformation("✅ Retrieved shipment dashboard for order {OrderId}", orderId);
         return response;
     }
     catch (Exception ex)
     {
-        _logger.LogError(ex, "❌ Error getting shipment dashboard for order {OrderId}", orderId);
         
         response.Success = false;
         response.StatusCode = 500;
@@ -229,7 +224,6 @@ public async Task<HTTPResponseClient<ShipmentDashboardVM>> GetShipmentDashboardB
                 response.Data = true;
                 response.DateTime = DateTime.Now;
 
-                _logger.LogInformation("✅ Updated shipment {ShipmentId} status to {StatusId}", shipmentId, newStatusId);
                 return response;
             }
             catch (Exception ex)
@@ -237,7 +231,6 @@ public async Task<HTTPResponseClient<ShipmentDashboardVM>> GetShipmentDashboardB
                 // ✅ ROLLBACK TRANSACTION NẾU CÓ LỖI
                 await _unitOfWork.RollbackTransaction();
 
-                _logger.LogError(ex, "❌ Error updating shipment {ShipmentId} status", shipmentId);
                 
                 response.Success = false;
                 response.StatusCode = 500;
@@ -324,7 +317,6 @@ public async Task<HTTPResponseClient<ShipmentDashboardVM>> GetShipmentDashboardB
                 // ✅ ROLLBACK TRANSACTION
                 await _unitOfWork.RollbackTransaction();
 
-                _logger.LogError(ex, "❌ Error assigning shipment for order {OrderId}", orderId);
                 
                 response.Success = false;
                 response.StatusCode = 500;
@@ -365,7 +357,6 @@ public async Task<HTTPResponseClient<ShipmentDashboardVM>> GetShipmentDashboardB
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting product info for order items");
                 return orderItems.Select(oi => new OrderItemVM
                 {
                     OrderItemId = oi.OrderItemId,
@@ -395,7 +386,6 @@ public async Task<HTTPResponseClient<ShipmentDashboardVM>> GetShipmentDashboardB
                             .Where(p => productIds.Contains(p.ProductId))
                             .ToDictionary(p => p.ProductId, p => p);
                         
-                        _logger.LogInformation("✅ Retrieved {Count} products from Product Service", productDict.Count);
                     }
                 }
 
@@ -403,7 +393,6 @@ public async Task<HTTPResponseClient<ShipmentDashboardVM>> GetShipmentDashboardB
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ Error calling Product Service");
                 return new Dictionary<int, ProductVM>();
             }
         }
@@ -420,7 +409,6 @@ public async Task<HTTPResponseClient<ShipmentDashboardVM>> GetShipmentDashboardB
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking order shipping eligibility for {OrderId}", orderId);
                 return false;
             }
         }
@@ -455,7 +443,6 @@ public async Task<HTTPResponseClient<ShipmentDashboardVM>> GetShipmentDashboardB
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting assigned orders for shipper {ShipperId}", shipperId);
                 return new List<AssignedOrderVM>();
             }
         }
@@ -487,7 +474,6 @@ public async Task<HTTPResponseClient<ShipmentDashboardVM>> GetShipmentDashboardB
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting available status updates for {StatusId}", currentStatusId);
                 return new List<OrderStatusOptionVM>();
             }
         }
@@ -528,18 +514,13 @@ public async Task<HTTPResponseClient<ShipmentDashboardVM>> GetShipmentDashboardB
         // ✅ CACHE INVALIDATION - GIỐNG CÁC SERVICE KHÁC
         private async Task InvalidateShipmentCaches(int shipmentId, int orderId)
         {
-            try
-            {
+
                 await _cacheService.DeleteByPatternAsync("AllShipments");
                 await _cacheService.DeleteByPatternAsync("PagedShipments_*");
                 await _cacheService.DeleteByPatternAsync($"Shipment_{shipmentId}_*");
                 await _cacheService.DeleteByPatternAsync($"Order_{orderId}_*");
                 await _cacheService.DeleteByPatternAsync("ShipperDashboard_*");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error invalidating shipment caches");
-            }
+
         }
 
         #endregion

@@ -21,21 +21,15 @@ public class OrderStatusService : IOrderStatusService
     private readonly IUnitOfWork _unitOfWork;
     private readonly RedisHelper _cacheService;
     private readonly IHubContext<NotificationHub> _hubContext;
-    private readonly IKafkaProducerService _kafkaProducer;
-    private readonly ILogger<OrderStatusService> _logger;
 
     public OrderStatusService(
         IUnitOfWork unitOfWork,
         RedisHelper cacheService,
-        IHubContext<NotificationHub> hubContext,
-        IKafkaProducerService kafkaProducer,
-        ILogger<OrderStatusService> logger)
+        IHubContext<NotificationHub> hubContext)
     {
         _unitOfWork = unitOfWork;
         _cacheService = cacheService;
         _hubContext = hubContext;
-        _kafkaProducer = kafkaProducer;
-        _logger = logger;
     }
 
     public async Task<HTTPResponseClient<IEnumerable<OrderStatusVM>>> GetAllOrderStatuses()

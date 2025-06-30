@@ -313,9 +313,38 @@ namespace BlazorWebApp.Services
                 return null;
             }
         }
+        public async Task<(string, bool)> ForgotPassword(ForgotPasswordVM forgotPasswordModel)
+        {
+            // Gọi API để gửi email quên mật khẩu
+            var response = await _httpClient.PostAsJsonAsync("main/api/UserLogin/forgot", forgotPasswordModel);
+
+            // Đọc phản hồi từ server
+            var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<ForgotPasswordResponseVM>>();
+
+            if (result == null)
+            {
+                return (null, false);
+            }
+
+            return (result.Data.Token, result.Data.IsSuccess);
+        }
         /// <summary>
-        /// refresh token
         /// </summary>
+        public async Task<bool> ResetPassword(ResetPasswordVM resetPasswordModel)
+        {
+            // Gọi API để đặt lại mật khẩu
+            var response = await _httpClient.PostAsJsonAsync("main/api/UserLogin/reset", resetPasswordModel);
+
+            // Đọc phản hồi từ server
+            var result = await response.Content.ReadFromJsonAsync<HTTPResponseClient<ResetPasswordResponseVM>>();
+
+            if (result == null)
+            {
+                return false;
+            }
+
+            return result.Data.IsSuccess;
+        }
 
     }
 }

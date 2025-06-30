@@ -21,7 +21,6 @@ public class ProductImageService : IProductImageService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IS3Service _s3Service;
     private readonly RedisHelper _cacheService;
-    private readonly ILogger<ProductImageService> _logger;
 
     public ProductImageService(
         IUnitOfWork unitOfWork,
@@ -32,7 +31,6 @@ public class ProductImageService : IProductImageService
         _unitOfWork = unitOfWork;
         _s3Service = s3Service;
         _cacheService = cacheService;
-        _logger = logger;
     }
 
     public async Task<HTTPResponseClient<ProductImageViewModel>> UploadImageAsync(CreateProductImageViewModel model)
@@ -118,12 +116,10 @@ public class ProductImageService : IProductImageService
             response.Message = "Upload ảnh thành công";
             response.DateTime = DateTime.Now;
 
-            _logger.LogInformation($"Image uploaded successfully for product {model.ProductId}");
         }
         catch (Exception ex)
         {
             await _unitOfWork.RollbackTransaction();
-            _logger.LogError(ex, $"Error uploading image for product {model.ProductId}");
             response.Success = false;
             response.StatusCode = 500;
             response.Message = $"Lỗi khi upload ảnh: {ex.Message}";
@@ -198,7 +194,6 @@ public class ProductImageService : IProductImageService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error uploading multiple images for product {model.ProductId}");
             response.Success = false;
             response.StatusCode = 500;
             response.Message = $"Lỗi khi upload nhiều ảnh: {ex.Message}";
@@ -284,7 +279,6 @@ public class ProductImageService : IProductImageService
         catch (Exception ex)
         {
             await _unitOfWork.RollbackTransaction();
-            _logger.LogError(ex, $"Error updating image {model.ImageId}");
             response.Success = false;
             response.StatusCode = 500;
             response.Message = $"Lỗi khi cập nhật ảnh: {ex.Message}";
@@ -337,7 +331,6 @@ public class ProductImageService : IProductImageService
         catch (Exception ex)
         {
             await _unitOfWork.RollbackTransaction();
-            _logger.LogError(ex, $"Error deleting image {imageId}");
             response.Success = false;
             response.StatusCode = 500;
             response.Message = $"Lỗi khi xóa ảnh: {ex.Message}";
@@ -387,7 +380,6 @@ public class ProductImageService : IProductImageService
         catch (Exception ex)
         {
             await _unitOfWork.RollbackTransaction();
-            _logger.LogError(ex, $"Error deleting all images for product {productId}");
             response.Success = false;
             response.StatusCode = 500;
             response.Message = $"Lỗi khi xóa tất cả ảnh: {ex.Message}";
@@ -429,7 +421,7 @@ public class ProductImageService : IProductImageService
             };
 
             // Cache for 15 minutes
-            await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(15));
+            await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromDays(1));
 
             response.Data = result;
             response.Success = true;
@@ -439,7 +431,6 @@ public class ProductImageService : IProductImageService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error getting images for product {productId}");
             response.Success = false;
             response.StatusCode = 500;
             response.Message = $"Lỗi khi lấy danh sách ảnh: {ex.Message}";
@@ -472,7 +463,6 @@ public class ProductImageService : IProductImageService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error getting image {imageId}");
             response.Success = false;
             response.StatusCode = 500;
             response.Message = $"Lỗi khi lấy thông tin ảnh: {ex.Message}";
@@ -515,7 +505,6 @@ public class ProductImageService : IProductImageService
         catch (Exception ex)
         {
             await _unitOfWork.RollbackTransaction();
-            _logger.LogError(ex, $"Error setting primary image {imageId} for product {productId}");
             response.Success = false;
             response.StatusCode = 500;
             response.Message = $"Lỗi khi đặt ảnh chính: {ex.Message}";
@@ -548,7 +537,6 @@ public class ProductImageService : IProductImageService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error getting primary image for product {productId}");
             response.Success = false;
             response.StatusCode = 500;
             response.Message = $"Lỗi khi lấy ảnh chính: {ex.Message}";

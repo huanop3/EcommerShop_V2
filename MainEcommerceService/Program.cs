@@ -86,7 +86,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     {
         OnAuthenticationFailed = context =>
         {
-            Console.WriteLine("OnAuthenticationFailed: " + context.Exception.Message);
             return Task.CompletedTask;
         }
     };
@@ -166,7 +165,6 @@ builder.Services.AddCors(options =>
     options.AddPolicy("CorsPolicy", builder =>
         builder
             // 🔥 SỬA LỖI: Thêm origin của Blazor App khi chạy qua Docker
-            .WithOrigins("http://localhost:5000", "http://localhost:5093", "https://localhost:7257", "http://localhost:5282")
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials()); // Quan trọng cho SignalR

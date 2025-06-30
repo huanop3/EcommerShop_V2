@@ -22,27 +22,28 @@
             <div class="col-lg-3 mb-4">
                 <div class="sidebar-container">
                     <div class="category-header">
-    <h2>
-        @if (!string.IsNullOrEmpty(selectedCategoryName))
-        {
-            @selectedCategoryName
-        }
-        else
-        {
-            <text>All Products</text>
-        }
-    </h2>
-    <div class="breadcrumb-nav">
-        <a href="/" class="text-decoration-none">Home</a>
-        <span class="separator">/</span>
-        <a href="/products" class="text-decoration-none">Products</a>
-        @if (!string.IsNullOrEmpty(selectedCategoryName))
-        {
-            <span class="separator">/</span>
-            <span class="current">@selectedCategoryName</span>
-        }
-    </div>
-</div>
+                        <h2>
+                            @if (!string.IsNullOrEmpty(selectedCategoryName))
+                            {
+                                @selectedCategoryName
+                            }
+                            else
+                            {
+                                <text>All Products</text>
+                            }
+                        </h2>
+                        <div class="breadcrumb-nav">
+                            <a href="/" class="text-decoration-none">Home</a>
+                            <span class="separator">/</span>
+                            <a href="/products" class="text-decoration-none">Products</a>
+                            @if (!string.IsNullOrEmpty(selectedCategoryName))
+                            {
+                                <span class="separator">/</span>
+                                <span class="current">@selectedCategoryName</span>
+                            }
+                        </div>
+                    </div>
+
                     <div class="filters-sidebar">
                         <!-- Categories Filter -->
                         <div class="filter-section">
@@ -110,6 +111,57 @@
                             </div>
                         </div>
 
+                        <!-- ✅ NEW: Price Range Filter -->
+                        <div class="filter-section">
+                            <h4>Price Range</h4>
+                            <div class="price-range">
+                                <div class="pure-dropdown">
+                                    <div class="dropdown-header" @onclick="TogglePriceDropdown">
+                                        <span>@GetPriceRangeLabel(selectedPriceRange)</span>
+                                        <div class="dropdown-arrow"></div>
+                                    </div>
+                                    <div class="dropdown-list-container @(isPriceDropdownOpen ? "open" : "")">
+                                        <ul class="dropdown-list">
+                                            @foreach (var priceRange in priceRanges)
+                                            {
+                                                <li class="dropdown-item @(selectedPriceRange == priceRange.Key ? "selected" : "")"
+                                                    @onclick="() => SelectPriceRange(priceRange.Key)">
+                                                    <span>@GetPriceRangeLabel(priceRange.Key)</span>
+                                                    @if (selectedPriceRange == priceRange.Key)
+                                                    {
+                                                        <div class="checkmark">✓</div>
+                                                    }
+                                                </li>
+                                            }
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ✅ NEW: Stock Filter -->
+                        <div class="filter-section">
+                            <h4>Stock Status</h4>
+                            <div class="filter-list">
+                                @foreach (var stockOption in stockFilterOptions)
+                                {
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="stock" 
+                                               id="stock-@stockOption.Key"
+                                               checked="@(selectedStockFilter == stockOption.Key)"
+                                               @onchange="() => OnStockFilterChanged(stockOption.Key)">
+                                        <label class="form-check-label" for="stock-@stockOption.Key">
+                                            @stockOption.Value
+                                            @if (selectedStockFilter == stockOption.Key)
+                                            {
+                                                <span class="badge bg-primary ms-2">Active</span>
+                                            }
+                                        </label>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
                         <!-- Page Size Selector -->
                         <div class="filter-section">
                             <h4>Items per page</h4>
@@ -119,6 +171,16 @@
                                 <option value="24">24 per page</option>
                                 <option value="48">48 per page</option>
                             </select>
+                        </div>
+
+                        <!-- ✅ NEW: Filter Actions -->
+                        <div class="filter-buttons">
+                            <button class="btn btn-primary w-100 mb-2" @onclick="ApplyFilters">
+                                <i class="fas fa-filter me-2"></i>Apply Filters
+                            </button>
+                            <button class="btn btn-outline-secondary w-100" @onclick="ResetFilters">
+                                <i class="fas fa-refresh me-2"></i>Reset All
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -138,29 +200,69 @@
                 }
                 else
                 {
-                    <!-- Products Header -->
-                    <!-- Products Header -->
-<div class="products-header">
-    <div class="results-count">
-        <p class="mb-0">
-            @if (!string.IsNullOrEmpty(selectedCategoryName))
-            {
-                <text>Showing @((currentPage - 1) * pageSize + 1) - @Math.Min(currentPage * pageSize, totalProducts) 
-                of @totalProducts products in <strong>@selectedCategoryName</strong> (Page @currentPage of @totalPages)</text>
-            }
-            else
-            {
-                <text>Showing @((currentPage - 1) * pageSize + 1) - @Math.Min(currentPage * pageSize, totalProducts) 
-                of @totalProducts products (Page @currentPage of @totalPages)</text>
-            }
-            @if (lastUpdateTime.HasValue)
-            {
-                <small class="text-muted">(Last updated: @lastUpdateTime.Value.ToString("HH:mm:ss"))</small>
-            }
-        </p>
-    </div>
-    <!-- ...existing sorting options... -->
-</div>
+                    <!-- ✅ UPDATED: Products Header with Sorting -->
+                    <div class="products-header">
+                        <div class="results-count">
+                            <p class="mb-0">
+                                @if (!string.IsNullOrEmpty(selectedCategoryName))
+                                {
+                                    <text>Showing @((currentPage - 1) * pageSize + 1) - @Math.Min(currentPage * pageSize, totalProducts) 
+                                    of @totalProducts products in <strong>@selectedCategoryName</strong> (Page @currentPage of @totalPages)</text>
+                                }
+                                else
+                                {
+                                    <text>Showing @((currentPage - 1) * pageSize + 1) - @Math.Min(currentPage * pageSize, totalProducts) 
+                                    of @totalProducts products (Page @currentPage of @totalPages)</text>
+                                }
+                                @if (lastUpdateTime.HasValue)
+                                {
+                                    <small class="text-muted">(Last updated: @lastUpdateTime.Value.ToString("HH:mm:ss"))</small>
+                                }
+                            </p>
+                        </div>
+
+                        <!-- ✅ NEW: Sorting và View Options -->
+                        <div class="sorting-view-options">
+                            <!-- Sort Dropdown -->
+                            <div class="sorting-options">
+                                <div class="pure-dropdown">
+                                    <div class="dropdown-header" @onclick="ToggleSortDropdown">
+                                        <span>@sortOptions[selectedSortOption]</span>
+                                        <div class="dropdown-arrow"></div>
+                                    </div>
+                                    <div class="dropdown-list-container @(isSortDropdownOpen ? "open" : "")">
+                                        <ul class="dropdown-list">
+                                            @foreach (var sortOption in sortOptions)
+                                            {
+                                                <li class="dropdown-item @(selectedSortOption == sortOption.Key ? "selected" : "")"
+                                                    @onclick="() => SelectSortOption(sortOption.Key)">
+                                                    <span>@sortOption.Value</span>
+                                                    @if (selectedSortOption == sortOption.Key)
+                                                    {
+                                                        <div class="checkmark">✓</div>
+                                                    }
+                                                </li>
+                                            }
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- View Options -->
+                            <div class="view-options">
+                                <button class="btn @(viewMode == "grid" ? "active" : "")" 
+                                        @onclick="@(() => SetViewMode("grid"))"
+                                        title="Grid View">
+                                    <i class="fas fa-th-large"></i>
+                                </button>
+                                <button class="btn @(viewMode == "list" ? "active" : "")" 
+                                        @onclick="@(() => SetViewMode("list"))"
+                                        title="List View">
+                                    <i class="fas fa-list"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
 
                     <!-- Products Grid/List -->
                     @if (currentPageProducts.Any())
@@ -184,15 +286,13 @@
                                                 <div class="product-badge-new bg-success">New</div>
                                             }
                                             
-                                            <!-- Updated Wishlist Button -->
-<!-- Font Awesome 6 syntax -->
-<div class="product-wishlist" @onclick:stopPropagation="true">
-    <button class="wishlist-btn @(IsInWishlist(product) ? "active" : "")" 
-            @onclick="() => ToggleWishlist(product)"
-            title="@(IsInWishlist(product) ? "Remove from Wishlist" : "Add to Wishlist")">
-        <i class="@(IsInWishlist(product) ? "fas fa-heart" : "far fa-heart")"></i>
-    </button>
-</div>
+                                            <div class="product-wishlist" @onclick:stopPropagation="true">
+                                                <button class="wishlist-btn @(IsInWishlist(product) ? "active" : "")" 
+                                                        @onclick="() => ToggleWishlist(product)"
+                                                        title="@(IsInWishlist(product) ? "Remove from Wishlist" : "Add to Wishlist")">
+                                                    <i class="@(IsInWishlist(product) ? "fas fa-heart" : "far fa-heart")"></i>
+                                                </button>
+                                            </div>
                                             
                                             <div class="product-img">
                                                 <img src="@GetProductImageUrl(product)" alt="@product.ProductName" 
@@ -255,14 +355,13 @@
                                             <div class="row">
                                                 <div class="col-md-3">
                                                     <div class="product-img position-relative">
-                                                        <!-- Wishlist button for list view -->
-                                                        <div class="product-wishlist-list" @onclick:stopPropagation="true">
-                                                            <button class="wishlist-btn @(IsInWishlist(product) ? "active" : "")" 
-                                                                    @onclick="() => ToggleWishlist(product)"
-                                                                    title="@(IsInWishlist(product) ? "Remove from Wishlist" : "Add to Wishlist")">
-                                                                <i class="fa @(IsInWishlist(product) ? "fa-heart" : "fa-heart-o")"></i>
-                                                            </button>
-                                                        </div>
+                                                        <div class="product-wishlist" @onclick:stopPropagation="true">
+                                                <button class="wishlist-btn @(IsInWishlist(product) ? "active" : "")" 
+                                                        @onclick="() => ToggleWishlist(product)"
+                                                        title="@(IsInWishlist(product) ? "Remove from Wishlist" : "Add to Wishlist")">
+                                                    <i class="@(IsInWishlist(product) ? "fas fa-heart" : "far fa-heart")"></i>
+                                                </button>
+                                            </div>
                                                         <img src="@GetProductImageUrl(product)" alt="@product.ProductName" 
                                                             class="img-fluid"
                                                             style="width: 100%; height: 200px; object-fit: cover;"
@@ -354,7 +453,6 @@
                                             var startPage = Math.Max(1, currentPage - 2);
                                             var endPage = Math.Min(totalPages, currentPage + 2);
                                             
-                                            // Show first page if we're not showing it
                                             if (startPage > 1)
                                             {
                                                 <li class="page-item">
@@ -371,7 +469,7 @@
                                         
                                         @for (int pageNum = startPage; pageNum <= endPage; pageNum++)
                                         {
-                                            var currentPageNum = pageNum; // Local copy to avoid closure issue
+                                            var currentPageNum = pageNum;
                                             <li class="page-item @(currentPageNum == currentPage ? "active" : "")">
                                                 <button class="page-link" @onclick="@(async () => await GoToPage(currentPageNum))">
                                                     @currentPageNum
@@ -380,7 +478,6 @@
                                         }
                                         
                                         @{
-                                            // Show last page if we're not showing it
                                             if (endPage < totalPages)
                                             {
                                                 if (endPage < totalPages - 1)
@@ -413,14 +510,12 @@
                                     </ul>
                                 </nav>
                                 
-                                <!-- Page info -->
                                 <div class="text-center mt-2">
                                     <small class="text-muted">
                                         Page @currentPage of @totalPages | Total: @totalProducts products
                                     </small>
                                 </div>
                                 
-                                <!-- Quick jump to page (optional) -->
                                 <div class="text-center mt-2">
                                     <div class="d-inline-flex align-items-center">
                                         <small class="me-2">Go to page:</small>
@@ -439,7 +534,7 @@
                         <div class="text-center py-5">
                             <i class="fa fa-search fa-3x text-muted mb-3"></i>
                             <h4>No products found</h4>
-                            <p class="text-muted">No products available on this page.</p>
+                            <p class="text-muted">No products available with current filters.</p>
                             @if (currentPage > 1)
                             {
                                 <button class="btn btn-primary me-2" @onclick="() => GoToPage(1)">Go to First Page</button>
@@ -456,6 +551,7 @@
 @code {
     [Parameter] public string? CategorySlug { get; set; }
     [Parameter, SupplyParameterFromQuery] public string? Search { get; set; }
+    
     // State properties
     private bool isLoading = true;
     private string viewMode = "grid";
@@ -463,13 +559,19 @@
     private int? selectedCategoryId = null;
     private string? selectedCategoryName = null;
 
-    // Pagination - Updated to use server-side pagination
+    // ✅ NEW: Filter và Sort properties
+    private string selectedPriceRange = "all";
+    private string selectedSortOption = "name-asc";
+    private string selectedStockFilter = "all";
+
+    // Pagination
     private int currentPage = 1;
     private int pageSize = 12;
     private int totalPages = 0;
     private int totalProducts = 0;
- private int jumpToPage = 1; // For quick jump functionality
-    // Data collections - Now only holds current page data
+    private int jumpToPage = 1;
+    
+    // Data collections
     private List<PrdVMWithImages> currentPageProducts = new();
     private List<CategoryVM> categories = new();
 
@@ -479,16 +581,52 @@
     private int lowStockCount = 0;
     private DateTime? lastUpdateTime;
     private Timer? cleanupTimer;
-        private bool hasInitialized = false;
-    private string? lastCategorySlug = null; // ✅ Track last parameters
+    private bool hasInitialized = false;
+    private string? lastCategorySlug = null;
     private string? lastSearch = null;
-protected override async Task OnInitializedAsync()
+
+    // ✅ NEW: Dropdown state
+    private bool isPriceDropdownOpen = false;
+    private bool isSortDropdownOpen = false;
+
+    // ✅ NEW: Filter options
+    private readonly Dictionary<string, (decimal min, decimal max)> priceRanges = new()
+    {
+        { "all", (0, decimal.MaxValue) },
+        { "0-100", (0, 100) },
+        { "100-500", (100, 500) },
+        { "500-1000", (500, 1000) },
+        { "1000-2000", (1000, 2000) },
+        { "2000-5000", (2000, 5000) },
+        { "5000+", (5000, decimal.MaxValue) }
+    };
+
+    private readonly Dictionary<string, string> sortOptions = new()
+    {
+        { "name-asc", "Name A-Z" },
+        { "name-desc", "Name Z-A" },
+        { "price-asc", "Price Low to High" },
+        { "price-desc", "Price High to Low" },
+        { "newest", "Newest First" },
+        { "oldest", "Oldest First" },
+        { "rating", "Best Rating" },
+        { "popularity", "Most Popular" }
+    };
+
+    private readonly Dictionary<string, string> stockFilterOptions = new()
+    {
+        { "all", "All Products" },
+        { "in-stock", "In Stock Only" },
+        { "out-of-stock", "Out of Stock" },
+        { "low-stock", "Low Stock (≤10)" }
+    };
+
+    protected override async Task OnInitializedAsync()
     {
         try
         {
             isLoading = true;
             
-            // ✅ Initialize tracking variables
             lastCategorySlug = CategorySlug;
             lastSearch = Search;
             
@@ -511,34 +649,26 @@ protected override async Task OnInitializedAsync()
         }
     }
 
-protected override async Task OnParametersSetAsync()
+    protected override async Task OnParametersSetAsync()
     {
         if (!hasInitialized) return;
         
-        // ✅ CHỈ process nếu parameters thực sự thay đổi
         bool parametersChanged = false;
         
         if (CategorySlug != lastCategorySlug)
         {
-            Console.WriteLine($"🔄 CategorySlug changed: '{lastCategorySlug}' → '{CategorySlug}'");
             lastCategorySlug = CategorySlug;
             parametersChanged = true;
         }
         
         if (Search != lastSearch)
         {
-            Console.WriteLine($"🔄 Search changed: '{lastSearch}' → '{Search}'");
             lastSearch = Search;
             parametersChanged = true;
         }
         
-        if (!parametersChanged)
-        {
-            Console.WriteLine("🚫 OnParametersSetAsync skipped - no parameter changes");
-            return;
-        }
+        if (!parametersChanged) return;
         
-        Console.WriteLine("✅ OnParametersSetAsync processing - parameters changed");
         await HandleParametersFromUrl();
         await LoadProductsPage();
     }
@@ -547,7 +677,6 @@ protected override async Task OnParametersSetAsync()
     {
         if (!string.IsNullOrEmpty(CategorySlug))
         {
-            // Find category by slug (name)
             var category = categories.FirstOrDefault(c => 
                 c.CategoryName.Replace(" ", "-").ToLower() == CategorySlug.ToLower() ||
                 c.CategoryName.ToLower() == CategorySlug.ToLower().Replace("-", " "));
@@ -559,10 +688,9 @@ protected override async Task OnParametersSetAsync()
             }
             else
             {
-                // Category not found, redirect to all products
                 selectedCategoryId = null;
                 selectedCategoryName = null;
-                Navigation.NavigateTo("/products",false);
+                Navigation.NavigateTo("/products", false);
             }
         }
         else
@@ -571,31 +699,30 @@ protected override async Task OnParametersSetAsync()
             selectedCategoryName = null;
         }
     }
+
     private async Task HandleParametersFromUrl()
-{
-    // Handle search parameter first (higher priority than category)
-    if (!string.IsNullOrEmpty(Search))
     {
-        searchTerm = Search;
-        selectedCategoryId = null;
-        selectedCategoryName = null;
-        currentPage = 1;
-        jumpToPage = 1;
+        if (!string.IsNullOrEmpty(Search))
+        {
+            searchTerm = Search;
+            selectedCategoryId = null;
+            selectedCategoryName = null;
+            currentPage = 1;
+            jumpToPage = 1;
+        }
+        else if (!string.IsNullOrEmpty(CategorySlug))
+        {
+            await HandleCategoryFromUrl();
+            searchTerm = "";
+        }
+        else
+        {
+            searchTerm = "";
+            selectedCategoryId = null;
+            selectedCategoryName = null;
+        }
     }
-    // Handle category parameter
-    else if (!string.IsNullOrEmpty(CategorySlug))
-    {
-        await HandleCategoryFromUrl();
-        searchTerm = "";
-    }
-    else
-    {
-        // Reset all filters if no parameters
-        searchTerm = "";
-        selectedCategoryId = null;
-        selectedCategoryName = null;
-    }
-}
+
     private void RegisterSignalREvents()
     {
         SignalRService.ProductCreated += OnProductCreated;
@@ -604,10 +731,9 @@ protected override async Task OnParametersSetAsync()
         SignalRService.ProductStockChanged += OnProductStockChanged;
         SignalRService.ProductPriceChanged += OnProductPriceChanged;
         SignalRService.LowStockAlert += OnLowStockAlert;
-                SignalRService.CategoryCreated += OnCategoryCreated;
+        SignalRService.CategoryCreated += OnCategoryCreated;
         SignalRService.CategoryUpdated += OnCategoryUpdated;
         SignalRService.CategoryDeleted += OnCategoryDeleted;
-
     }
 
     private async Task LoadCategories()
@@ -623,7 +749,7 @@ protected override async Task OnParametersSetAsync()
         }
     }
 
-    // Updated to use paginated API
+    // ✅ UPDATED: LoadProductsPage with filters
     private async Task LoadProductsPage()
     {
         try
@@ -631,8 +757,12 @@ protected override async Task OnParametersSetAsync()
             isLoading = true;
             StateHasChanged();
 
-            // If we have filters, use the old method for now
-            if (!string.IsNullOrWhiteSpace(searchTerm) || selectedCategoryId.HasValue)
+            // If we have any filters, use the filtered method
+            if (!string.IsNullOrWhiteSpace(searchTerm) || 
+                selectedCategoryId.HasValue || 
+                selectedPriceRange != "all" || 
+                selectedStockFilter != "all" || 
+                selectedSortOption != "name-asc")
             {
                 await LoadFilteredProducts();
                 return;
@@ -644,8 +774,6 @@ protected override async Task OnParametersSetAsync()
             {
                 currentPageProducts = result.Data.ToList();
                 
-                // Get total count from all products for pagination calculation
-                // This is a temporary solution - ideally the API should return total count
                 var allProductsResult = await ProdService.GetAllProductsAsync();
                 if (allProductsResult != null)
                 {
@@ -664,7 +792,7 @@ protected override async Task OnParametersSetAsync()
         }
         catch (Exception ex)
         {
-            ToastService.ShowError ("Failed to load products");
+            ToastService.ShowError("Failed to load products");
             currentPageProducts = new List<PrdVMWithImages>();
         }
         finally
@@ -673,23 +801,8 @@ protected override async Task OnParametersSetAsync()
             StateHasChanged();
         }
     }
-    // Quick jump functionality
-    private async Task JumpToPage()
-    {
-        if (jumpToPage >= 1 && jumpToPage <= totalPages && jumpToPage != currentPage)
-        {
-            await GoToPage(jumpToPage);
-        }
-        else if (jumpToPage < 1)
-        {
-            jumpToPage = 1;
-        }
-        else if (jumpToPage > totalPages)
-        {
-            jumpToPage = totalPages;
-        }
-    }
-    // Fallback for filtered results
+
+    // ✅ NEW: LoadFilteredProducts method
     private async Task LoadFilteredProducts()
     {
         try
@@ -710,10 +823,16 @@ protected override async Task OnParametersSetAsync()
             }
 
             var productList = products?.ToList() ?? new List<PrdVMWithImages>();
+
+            // ✅ Apply filters
+            productList = ApplyPriceFilter(productList);
+            productList = ApplyStockFilter(productList);
+            productList = ApplySorting(productList);
+
             totalProducts = productList.Count;
             totalPages = (int)Math.Ceiling((double)totalProducts / pageSize);
 
-            // Apply client-side pagination for filtered results
+            // Apply client-side pagination
             var skip = (currentPage - 1) * pageSize;
             currentPageProducts = productList.Skip(skip).Take(pageSize).ToList();
 
@@ -723,6 +842,125 @@ protected override async Task OnParametersSetAsync()
         {
             ToastService.ShowError("Failed to load filtered products");
             currentPageProducts = new List<PrdVMWithImages>();
+        }
+    }
+
+    // ✅ NEW: Filter methods
+    private List<PrdVMWithImages> ApplyPriceFilter(List<PrdVMWithImages> products)
+    {
+        if (selectedPriceRange == "all" || !priceRanges.ContainsKey(selectedPriceRange))
+            return products;
+
+        var (minPrice, maxPrice) = priceRanges[selectedPriceRange];
+        
+        return products.Where(p =>
+        {
+            var currentPrice = p.DiscountPrice ?? p.Price;
+            return currentPrice >= minPrice && (maxPrice == decimal.MaxValue || currentPrice <= maxPrice);
+        }).ToList();
+    }
+
+    private List<PrdVMWithImages> ApplyStockFilter(List<PrdVMWithImages> products)
+    {
+        return selectedStockFilter switch
+        {
+            "in-stock" => products.Where(p => p.Quantity > 0).ToList(),
+            "out-of-stock" => products.Where(p => p.Quantity == 0).ToList(),
+            "low-stock" => products.Where(p => p.Quantity > 0 && p.Quantity <= 10).ToList(),
+            _ => products
+        };
+    }
+
+    private List<PrdVMWithImages> ApplySorting(List<PrdVMWithImages> products)
+    {
+        return selectedSortOption switch
+        {
+            "name-asc" => products.OrderBy(p => p.ProductName).ToList(),
+            "name-desc" => products.OrderByDescending(p => p.ProductName).ToList(),
+            "price-asc" => products.OrderBy(p => p.DiscountPrice ?? p.Price).ToList(),
+            "price-desc" => products.OrderByDescending(p => p.DiscountPrice ?? p.Price).ToList(),
+            "newest" => products.OrderByDescending(p => p.CreatedAt ?? DateTime.MinValue).ToList(),
+            "oldest" => products.OrderBy(p => p.CreatedAt ?? DateTime.MinValue).ToList(),
+            "rating" => products.OrderByDescending(p => GetProductRating(p)).ToList(),
+            "popularity" => products.OrderByDescending(p => p.Quantity).ToList(),
+            _ => products.OrderBy(p => p.ProductName).ToList()
+        };
+    }
+
+    private double GetProductRating(PrdVMWithImages product)
+    {
+        // Temporary implementation
+        return Random.Shared.NextDouble() * 5;
+    }
+
+    // ✅ NEW: Dropdown methods
+    private void TogglePriceDropdown()
+    {
+        isPriceDropdownOpen = !isPriceDropdownOpen;
+        isSortDropdownOpen = false;
+    }
+
+    private void ToggleSortDropdown()
+    {
+        isSortDropdownOpen = !isSortDropdownOpen;
+        isPriceDropdownOpen = false;
+    }
+
+    private async Task SelectPriceRange(string priceRange)
+    {
+        isPriceDropdownOpen = false;
+        selectedPriceRange = priceRange;
+        currentPage = 1;
+        jumpToPage = 1;
+        await LoadProductsPage();
+    }
+
+    private async Task SelectSortOption(string sortOption)
+    {
+        isSortDropdownOpen = false;
+        selectedSortOption = sortOption;
+        currentPage = 1;
+        jumpToPage = 1;
+        await LoadProductsPage();
+    }
+
+    private string GetPriceRangeLabel(string priceRange)
+    {
+        return priceRange switch
+        {
+            "all" => "All Prices",
+            "0-100" => "$0 - $100",
+            "100-500" => "$100 - $500",
+            "500-1000" => "$500 - $1,000",
+            "1000-2000" => "$1,000 - $2,000",
+            "2000-5000" => "$2,000 - $5,000",
+            "5000+" => "$5,000+",
+            _ => "All Prices"
+        };
+    }
+
+    // ✅ NEW: Filter event handlers
+    private async Task OnStockFilterChanged(string stockFilter)
+    {
+        selectedStockFilter = stockFilter;
+        currentPage = 1;
+        jumpToPage = 1;
+        await LoadProductsPage();
+    }
+
+    private async Task JumpToPage()
+    {
+        if (jumpToPage >= 1 && jumpToPage <= totalPages && jumpToPage != currentPage)
+        {
+            await GoToPage(jumpToPage);
+        }
+        else if (jumpToPage < 1)
+        {
+            jumpToPage = 1;
+        }
+        else if (jumpToPage > totalPages)
+        {
+            jumpToPage = totalPages;
         }
     }
 
@@ -736,10 +974,8 @@ protected override async Task OnParametersSetAsync()
         return categories.FirstOrDefault(c => c.CategoryId == categoryId)?.CategoryName ?? "Unknown";
     }
 
-    // Updated to use placeholder image service
     private string GetProductImageUrl(PrdVMWithImages product)
     {
-        // Use a placeholder service for consistent default images
         return product.PrimaryImageUrl ?? 
                $"https://via.placeholder.com/300x300/f8f9fa/6c757d?text=Product+Image+{product.ProductId}";
     }
@@ -750,105 +986,59 @@ protected override async Task OnParametersSetAsync()
                product.CreatedAt.Value > DateTime.Now.AddDays(-30);
     }
 
-    // Event handlers
-    private async Task OnSearchKeyUp(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter")
-        {
-            await SearchProducts();
-        }
-    }
-
-    private async Task SearchProducts()
-    {
-        currentPage = 1;
-        await LoadProductsPage();
-    }
-
     private async Task FilterByCategory(int? categoryId, string? categoryName = null)
-{
-    try
     {
-        Console.WriteLine($"🎯 FilterByCategory called - ID: {categoryId}, Name: '{categoryName}'");
-        
-        selectedCategoryId = categoryId;
-        selectedCategoryName = categoryName;
-        currentPage = 1;
-        jumpToPage = 1;
-
-        // Clear search when filtering by category
-        searchTerm = "";
-        
-        // ✅ SỬA: Load data trực tiếp, không cần navigate
-        await LoadProductsPage();
-        
-        // ✅ Update URL AFTER loading (optional)
-        if (categoryId.HasValue && !string.IsNullOrEmpty(categoryName))
+        try
         {
-            var slug = categoryName.Replace(" ", "-").ToLower();
-            lastCategorySlug = slug;
-            Navigation.NavigateTo($"/products/{slug}", replace: true);
-        }
-        else
-        {
-            lastCategorySlug = null;
-            Navigation.NavigateTo("/products", replace: true);
-        }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"❌ Error in FilterByCategory: {ex.Message}");
-        ToastService.ShowError("Failed to filter by category");
-    }
-}
-    private string CreateSlug(string categoryName)
-    {
-        if (string.IsNullOrEmpty(categoryName))
-            return "";
+            selectedCategoryId = categoryId;
+            selectedCategoryName = categoryName;
+            currentPage = 1;
+            jumpToPage = 1;
+            searchTerm = "";
             
-        return categoryName
-            .ToLower()
-            .Replace(" ", "-")
-            .Replace("&", "and")
-            .Replace("/", "-")
-            .Replace("\\", "-")
-            .Replace("(", "")
-            .Replace(")", "")
-            .Trim('-');
-    }
-
-    // Helper method to get category name from slug
-    private string GetCategoryNameFromSlug(string slug)
-    {
-        if (string.IsNullOrEmpty(slug))
-            return "";
+            await LoadProductsPage();
             
-        return slug
-            .Replace("-", " ")
-            .Replace("and", "&");
+            if (categoryId.HasValue && !string.IsNullOrEmpty(categoryName))
+            {
+                var slug = categoryName.Replace(" ", "-").ToLower();
+                lastCategorySlug = slug;
+                Navigation.NavigateTo($"/products/{slug}", replace: true);
+            }
+            else
+            {
+                lastCategorySlug = null;
+                Navigation.NavigateTo("/products", replace: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Failed to filter by category");
+        }
     }
 
-    // Update breadcrumb to show category
-    private string GetBreadcrumb()
-    {
-        if (!string.IsNullOrEmpty(selectedCategoryName))
-        {
-            return $"Home / Products / {selectedCategoryName}";
-        }
-        return "Home / Products";
-    }
     private async Task ApplyFilters()
     {
         currentPage = 1;
+        jumpToPage = 1;
         await LoadProductsPage();
     }
 
+    // ✅ UPDATED: ResetFilters method
     private async Task ResetFilters()
     {
         searchTerm = "";
         selectedCategoryId = null;
+        selectedCategoryName = null;
+        selectedPriceRange = "all";
+        selectedSortOption = "name-asc";
+        selectedStockFilter = "all";
         currentPage = 1;
         jumpToPage = 1;
+        
+        lastCategorySlug = null;
+        lastSearch = null;
+        Navigation.NavigateTo("/products", replace: true);
+        
         await LoadProductsPage();
     }
 
@@ -886,11 +1076,9 @@ protected override async Task OnParametersSetAsync()
         {
             if (product.Quantity > 0)
             {
-                // Thêm sản phẩm vào cart sử dụng CartVM
                 CartVM.AddToCart(product, 1);
-                
                 ToastService.ShowSuccess($"Added '{product.ProductName}' to cart!");
-                StateHasChanged(); // Refresh UI để cập nhật button text
+                StateHasChanged();
             }
             else
             {
@@ -904,62 +1092,57 @@ protected override async Task OnParametersSetAsync()
     }
 
     // Wishlist functionality
-private bool IsInWishlist(PrdVMWithImages product)
-{
-    return WishlistVM.IsInWishlist(product.ProductId);
-}
+    private bool IsInWishlist(PrdVMWithImages product)
+    {
+        return WishlistVM.IsInWishlist(product.ProductId);
+    }
 
-private async Task ToggleWishlist(PrdVMWithImages product)
-{
-    try
+    private async Task ToggleWishlist(PrdVMWithImages product)
     {
-        if (IsInWishlist(product))
+        try
         {
-            // Remove from wishlist
-            WishlistVM.RemoveFromWishlist(product.ProductId);
-            ToastService.ShowInfo($"Removed {product.ProductName} from wishlist");
-        }
-        else
-        {
-            // Add to wishlist
-            var wishlistItem = new WishlistVM
+            if (IsInWishlist(product))
             {
-                ProductId = product.ProductId,
-                ProductName = product.ProductName,
-                Description = product.Description,
-                Price = product.Price,
-                DiscountPrice = product.DiscountPrice,
-                Quantity = product.Quantity,
-                AddedAt = DateTime.Now,
-                PrimaryImageUrl = product.PrimaryImageUrl,
-            };
+                WishlistVM.RemoveFromWishlist(product.ProductId);
+                ToastService.ShowInfo($"Removed {product.ProductName} from wishlist");
+            }
+            else
+            {
+                var wishlistItem = new WishlistVM
+                {
+                    ProductId = product.ProductId,
+                    ProductName = product.ProductName,
+                    Description = product.Description,
+                    Price = product.Price,
+                    DiscountPrice = product.DiscountPrice,
+                    Quantity = product.Quantity,
+                    AddedAt = DateTime.Now,
+                    PrimaryImageUrl = product.PrimaryImageUrl,
+                };
+                
+                WishlistVM.AddToWishlist(wishlistItem);
+                ToastService.ShowSuccess($"Added {product.ProductName} to wishlist");
+            }
             
-            WishlistVM.AddToWishlist(wishlistItem);
-            ToastService.ShowSuccess($"Added {product.ProductName} to wishlist");
+            StateHasChanged();
         }
-        
-        StateHasChanged();
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error updating wishlist: {ex.Message}");
+        }
     }
-    catch (Exception ex)
-    {
-        ToastService.ShowError($"Error updating wishlist: {ex.Message}");
-    }
-}
-    // SignalR event handlers
+
+    // SignalR event handlers (keeping existing ones)
     private async void OnProductCreated(int productId, string productName, string categoryName)
     {
         await InvokeAsync(async () =>
         {
             ToastService.ShowSuccess($"🆕 New Product: {productName} added to {categoryName}");
-            
             productHighlights[productId] = "product-highlight";
             recentUpdates++;
             lastUpdateTime = DateTime.Now;
-            
-            // Refresh current page to include new products
             await LoadProductsPage();
             StateHasChanged();
-            
             _ = Task.Delay(5000).ContinueWith(_ => RemoveProductHighlight(productId));
         });
     }
@@ -969,12 +1152,10 @@ private async Task ToggleWishlist(PrdVMWithImages product)
         await InvokeAsync(async () =>
         {
             ToastService.ShowInfo($"📝 Product Updated: {productName} - New price: ${price:F2}");
-            
             productHighlights[productId] = "product-highlight";
             recentUpdates++;
             lastUpdateTime = DateTime.Now;
             
-            // Update the specific product if it exists on current page
             var product = currentPageProducts.FirstOrDefault(p => p.ProductId == productId);
             if (product != null)
             {
@@ -992,14 +1173,9 @@ private async Task ToggleWishlist(PrdVMWithImages product)
         await InvokeAsync(async () =>
         {
             ToastService.ShowWarning($"🗑️ Product Removed: {productName} has been removed from catalog");
-            
-            // Remove the product from current page if it exists
             currentPageProducts.RemoveAll(p => p.ProductId == productId);
-            
             recentUpdates++;
             lastUpdateTime = DateTime.Now;
-            
-            // Refresh the page to maintain proper pagination
             await LoadProductsPage();
             StateHasChanged();
         });
@@ -1010,12 +1186,10 @@ private async Task ToggleWishlist(PrdVMWithImages product)
         await InvokeAsync(() =>
         {
             ToastService.ShowInfo($"📦 Stock Updated: {productName} - {newStock} units available");
-            
             productHighlights[productId] = "product-highlight";
             recentUpdates++;
             lastUpdateTime = DateTime.Now;
             
-            // Update the specific product stock
             var product = currentPageProducts.FirstOrDefault(p => p.ProductId == productId);
             if (product != null)
             {
@@ -1033,12 +1207,10 @@ private async Task ToggleWishlist(PrdVMWithImages product)
         await InvokeAsync(() =>
         {
             ToastService.ShowWarning($"💰 Price Changed: {productName} from ${oldPrice:F2} to ${newPrice:F2}");
-            
             productHighlights[productId] = "product-price-updated";
             recentUpdates++;
             lastUpdateTime = DateTime.Now;
             
-            // Update the specific product price
             var product = currentPageProducts.FirstOrDefault(p => p.ProductId == productId);
             if (product != null)
             {
@@ -1055,11 +1227,9 @@ private async Task ToggleWishlist(PrdVMWithImages product)
         await InvokeAsync(() =>
         {
             ToastService.ShowError($"⚠️ Low Stock Alert: {productName} - Only {currentStock} units left!");
-            
             productHighlights[productId] = "product-low-stock";
             lastUpdateTime = DateTime.Now;
             CalculateStats();
-            
             StateHasChanged();
             _ = Task.Delay(10000).ContinueWith(_ => RemoveProductHighlight(productId));
         });
@@ -1070,16 +1240,10 @@ private async Task ToggleWishlist(PrdVMWithImages product)
         await InvokeAsync(async () =>
         {
             ToastService.ShowSuccess($"🗂️ New Category: {categoryName} has been added");
-            
             recentUpdates++;
             lastUpdateTime = DateTime.Now;
-            
-            // Refresh categories để có category mới
             await LoadCategories();
-            
-            // Refresh products để cập nhật category count
             await LoadProductsPage();
-            
             StateHasChanged();
         });
     }
@@ -1089,14 +1253,10 @@ private async Task ToggleWishlist(PrdVMWithImages product)
         await InvokeAsync(async () =>
         {
             ToastService.ShowInfo($"📝 Category Updated: {categoryName}");
-            
             recentUpdates++;
             lastUpdateTime = DateTime.Now;
-            
-            // Refresh categories để có thông tin category mới
             await LoadCategories();
             
-            // Nếu đang filter theo category này, highlight các products
             if (selectedCategoryId == categoryId)
             {
                 foreach (var product in currentPageProducts.Where(p => p.CategoryId == categoryId))
@@ -1104,10 +1264,8 @@ private async Task ToggleWishlist(PrdVMWithImages product)
                     productHighlights[product.ProductId] = "product-category-updated";
                     _ = Task.Delay(5000).ContinueWith(_ => RemoveProductHighlight(product.ProductId));
                 }
-                
                 ToastService.ShowInfo($"Products in '{categoryName}' category have been highlighted");
             }
-            
             StateHasChanged();
         });
     }
@@ -1117,11 +1275,9 @@ private async Task ToggleWishlist(PrdVMWithImages product)
         await InvokeAsync(async () =>
         {
             ToastService.ShowWarning($"🗑️ Category Removed: {categoryName} has been deleted");
-            
             recentUpdates++;
             lastUpdateTime = DateTime.Now;
             
-            // Nếu đang filter theo category bị xóa, reset về all categories
             if (selectedCategoryId == categoryId)
             {
                 selectedCategoryId = null;
@@ -1130,12 +1286,8 @@ private async Task ToggleWishlist(PrdVMWithImages product)
                 ToastService.ShowInfo("Filter reset to 'All Categories' because selected category was deleted");
             }
             
-            // Refresh categories để xóa category khỏi list
             await LoadCategories();
-            
-            // Refresh products để cập nhật category count và hiển thị
             await LoadProductsPage();
-            
             StateHasChanged();
         });
     }
@@ -1154,15 +1306,7 @@ private async Task ToggleWishlist(PrdVMWithImages product)
         });
     }
 
-    private void CleanupOldHighlights(object? state)
-    {
-        if (productHighlights.Any())
-        {
-            productHighlights.Clear();
-            InvokeAsync(StateHasChanged);
-        }
-    }
-        private async Task OnJumpToPageKeyUp(KeyboardEventArgs e)
+    private async Task OnJumpToPageKeyUp(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")
         {
@@ -1170,28 +1314,15 @@ private async Task ToggleWishlist(PrdVMWithImages product)
         }
     }
 
-    // Handle page size change event
-    private async Task OnPageSizeChangedEvent(ChangeEventArgs e)
-    {
-        if (int.TryParse(e.Value?.ToString(), out int newPageSize))
-        {
-            pageSize = newPageSize;
-            currentPage = 1;
-            jumpToPage = 1;
-            await LoadProductsPage();
-        }
-    }
-
     public async ValueTask DisposeAsync()
     {
-        // Unsubscribe from SignalR events
         SignalRService.ProductCreated -= OnProductCreated;
         SignalRService.ProductUpdated -= OnProductUpdated;
         SignalRService.ProductDeleted -= OnProductDeleted;
         SignalRService.ProductStockChanged -= OnProductStockChanged;
         SignalRService.ProductPriceChanged -= OnProductPriceChanged;
         SignalRService.LowStockAlert -= OnLowStockAlert;
-                SignalRService.CategoryCreated -= OnCategoryCreated;
+        SignalRService.CategoryCreated -= OnCategoryCreated;
         SignalRService.CategoryUpdated -= OnCategoryUpdated;
         SignalRService.CategoryDeleted -= OnCategoryDeleted;
         cleanupTimer?.Dispose();
@@ -1202,4 +1333,3 @@ private async Task ToggleWishlist(PrdVMWithImages product)
         }
     }
 }
-

@@ -56,33 +56,25 @@ public class RedisHelper
     // ✅ THÊM: Delete by pattern (wildcard support)
     public async Task<long> DeleteByPatternAsync(string pattern)
     {
-        try
-        {
+
             var server = _redis.GetServer(_redis.GetEndPoints().First());
             var keys = server.Keys(pattern: pattern).ToArray();
             
             if (keys.Length > 0)
             {
                 var deletedCount = await _db.KeyDeleteAsync(keys);
-                Console.WriteLine($"🗑️ Deleted {deletedCount} keys matching pattern: {pattern}");
                 return deletedCount;
             }
             
-            Console.WriteLine($"🔍 No keys found matching pattern: {pattern}");
+
             return 0;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ Error deleting keys by pattern '{pattern}': {ex.Message}");
-            throw;
-        }
+
     }
 
     // ✅ THÊM: Delete multiple patterns
     public async Task<long> DeleteByPatternsAsync(params string[] patterns)
     {
-        try
-        {
+
             var server = _redis.GetServer(_redis.GetEndPoints().First());
             var allKeys = new List<RedisKey>();
 
@@ -98,36 +90,22 @@ public class RedisHelper
                 var uniqueKeys = allKeys.Distinct().ToArray();
                 var deletedCount = await _db.KeyDeleteAsync(uniqueKeys);
                 
-                Console.WriteLine($"🗑️ Deleted {deletedCount} unique keys from {patterns.Length} patterns");
                 return deletedCount;
             }
 
-            Console.WriteLine($"🔍 No keys found for any of the {patterns.Length} patterns");
             return 0;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ Error deleting keys by patterns: {ex.Message}");
-            throw;
-        }
+
     }
 
     // ✅ THÊM: Get keys by pattern (useful for debugging)
     public async Task<string[]> GetKeysByPatternAsync(string pattern)
     {
-        try
-        {
+
             var server = _redis.GetServer(_redis.GetEndPoints().First());
             var keys = server.Keys(pattern: pattern).Select(k => k.ToString()).ToArray();
             
-            Console.WriteLine($"🔍 Found {keys.Length} keys matching pattern: {pattern}");
             return keys;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ Error getting keys by pattern '{pattern}': {ex.Message}");
-            return Array.Empty<string>();
-        }
+
     }
 
     // ✅ THÊM: Delete multiple specific keys
@@ -140,12 +118,10 @@ public class RedisHelper
             var redisKeys = keys.Select(k => (RedisKey)k).ToArray();
             var deletedCount = await _db.KeyDeleteAsync(redisKeys);
             
-            Console.WriteLine($"🗑️ Deleted {deletedCount} out of {keys.Length} specified keys");
             return deletedCount;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ Error deleting specified keys: {ex.Message}");
             throw;
         }
     }
@@ -161,7 +137,6 @@ public class RedisHelper
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ Error checking existence by pattern '{pattern}': {ex.Message}");
             return false;
         }
     }
@@ -171,15 +146,7 @@ public class RedisHelper
     // ✅ THÊM: Clear ALL cache (Nuclear option)
     public async Task<long> ClearAllAsync()
     {
-        try
-        {
-            Console.WriteLine("💥 WARNING: Clearing ALL Redis cache!");
             return await DeleteByPatternAsync("*");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ Error clearing all cache: {ex.Message}");
-            throw;
-        }
+
     }
 }

@@ -11,12 +11,10 @@ namespace Controllers
     public class ShipmentController : ControllerBase
     {
         private readonly IShipmentService _shipmentService;
-        private readonly ILogger<ShipmentController> _logger;
 
-        public ShipmentController(IShipmentService shipmentService, ILogger<ShipmentController> logger)
+        public ShipmentController(IShipmentService shipmentService)
         {
             _shipmentService = shipmentService;
-            _logger = logger;
         }
 
         /// <summary>
@@ -33,7 +31,6 @@ namespace Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in GetShipmentDashboard");
                 return StatusCode(500, new HTTPResponseClient<object>
                 {
                     Success = false,
@@ -69,7 +66,6 @@ namespace Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in UpdateShipmentStatus");
                 return StatusCode(500, new HTTPResponseClient<object>
                 {
                     Success = false,
@@ -101,7 +97,6 @@ namespace Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in GetAssignedOrders");
                 return StatusCode(500, new HTTPResponseClient<object>
                 {
                     Success = false,
@@ -137,7 +132,6 @@ namespace Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in AssignShipment");
                 return StatusCode(500, new HTTPResponseClient<object>
                 {
                     Success = false,
@@ -169,7 +163,6 @@ namespace Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in CanOrderBeShipped");
                 return StatusCode(500, new HTTPResponseClient<object>
                 {
                     Success = false,
@@ -201,7 +194,6 @@ namespace Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in GetAvailableStatusUpdates");
                 return StatusCode(500, new HTTPResponseClient<object>
                 {
                     Success = false,
@@ -234,7 +226,6 @@ namespace Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in GetMyAssignedOrders");
                 return StatusCode(500, new HTTPResponseClient<object>
                 {
                     Success = false,

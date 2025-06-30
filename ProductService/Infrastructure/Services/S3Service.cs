@@ -19,13 +19,11 @@ namespace ProductService.Infrastructure.Services
     {
         private readonly IAmazonS3 _s3Client;
         private readonly string _bucketName;
-        private readonly ILogger<S3Service> _logger;
 
         public S3Service(IAmazonS3 s3Client, IConfiguration configuration, ILogger<S3Service> logger)
         {
             _s3Client = s3Client;
             _bucketName = configuration["AWS:S3:BucketName"];
-            _logger = logger;
         }
 
         public async Task<string> UploadImageAsync(IFormFile file, string keyName)
@@ -52,13 +50,11 @@ namespace ProductService.Infrastructure.Services
                 await _s3Client.PutObjectAsync(request);
 
                 var imageUrl = $"https://{_bucketName}.s3.amazonaws.com/{keyName}";
-                _logger.LogInformation($"Image uploaded successfully: {imageUrl}");
 
                 return imageUrl;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error uploading image: {ex.Message}");
                 throw new Exception($"Error uploading image: {ex.Message}");
             }
         }
@@ -74,12 +70,10 @@ namespace ProductService.Infrastructure.Services
                 };
 
                 await _s3Client.DeleteObjectAsync(request);
-                _logger.LogInformation($"Image deleted successfully: {keyName}");
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error deleting image: {keyName}");
                 return false;
             }
         }
@@ -97,13 +91,11 @@ namespace ProductService.Infrastructure.Services
                 };
 
                 var presignedUrl = await _s3Client.GetPreSignedURLAsync(request);
-                _logger.LogInformation($"Presigned URL generated for: {keyName}");
 
                 return presignedUrl;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error generating presigned URL for: {keyName}");
                 throw new Exception($"Error generating presigned URL: {ex.Message}");
             }
         }
@@ -119,12 +111,10 @@ namespace ProductService.Infrastructure.Services
                 };
 
                 await _s3Client.ListObjectsV2Async(request);
-                _logger.LogInformation("S3 bucket connection successful");
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "S3 bucket connection failed");
                 return false;
             }
         }
@@ -156,13 +146,11 @@ namespace ProductService.Infrastructure.Services
                 };
 
                 var response = await _s3Client.ListObjectsV2Async(request);
-                _logger.LogInformation($"Listed {response.S3Objects.Count} objects with prefix: {prefix}");
                 
                 return response;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error listing objects with prefix: {prefix}");
                 throw new Exception($"Error listing objects: {ex.Message}");
             }
         }
