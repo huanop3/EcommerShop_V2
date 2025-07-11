@@ -745,7 +745,7 @@ private async Task RefreshOrders()
                 }
                 else
                 {
-                    Snackbar.Add("Failed to update order status", Severity.Error);
+                    Snackbar.Add($"Failed to update order status", Severity.Error);
                 }
             }
             catch (Exception ex)

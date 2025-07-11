@@ -747,29 +747,67 @@ public class OrderService : IOrderService
                 response.DateTime = DateTime.Now;
                 return response;
             }
-
+            //Nếu Trạng thái đơn hàng là Cancelled thì không cần gửi message tới Kafka
+            if (statusName == "Cancelled")
+            {
+                var orderItemsFromDb = await _unitOfWork._orderItemRepository.Query()
+                .Where(oi => oi.OrderId == orderId && oi.IsDeleted == false)
+                .ToListAsync();
+            //Kiểm tra trạng thát đơn hàng nếu đang ở trạng thái Shipped trở lên (statusId >= 4) thì không thể hủy
+            if (order.OrderStatusId >= 4)
+            {
+                response.Success = false;
+                response.StatusCode = 400;
+                response.Message = "Không thể hủy đơn hàng đã được giao hoặc đang trong quá trình giao hàng";
+                response.Data = "ORDER_CANCEL_NOT_ALLOWED";
+                response.DateTime = DateTime.Now;
+                return response;
+            }
+            try
+            {
+                // Gửi message tới Kafka để xử lý hủy đơn hàng
+                var orderCancelledMessage = new OrderCreatedMessage
+                {
+                    RequestId = Guid.NewGuid().ToString(),
+                    OrderId = order.OrderId,
+                    UserId = order.UserId,
+                    OrderItems = orderItemsFromDb.Select(oi => new OrderItemData
+                    {
+                        ProductId = oi.ProductId,
+                        Quantity = oi.Quantity,
+                        UnitPrice = oi.UnitPrice
+                    }).ToList(),
+                    CreatedAt = order.CreatedAt.Value
+                };
+                await _kafkaProducer.SendMessageAsync(
+                    "order-cancelled",
+                    order.OrderId.ToString(),
+                    orderCancelledMessage);
+            }
+            catch (Exception kafkaEx)
+            {
+            }
+            //Nếu message gửi thành công, cập nhật trạng thái đơn hàng
+            order.OrderStatusId = (await _unitOfWork._orderStatusRepository.Query()
+                .FirstOrDefaultAsync(os => os.StatusName == "Cancelled" && os.IsDeleted == false)).StatusId;
+            // Đánh dấu đơn hàng là đã bị xóa
+            if (order.OrderStatusId == 8)
+            {
+                order.UpdatedAt = DateTime.Now;
+                _unitOfWork._orderRepository.Update(order);
+                await _unitOfWork.SaveChangesAsync();
+                await _hubContext.Clients.All.SendAsync("OrderStatusChanged", orderId, order.UserId, order.OrderStatusId, "Cancelled");
+                response.Success = true;
+                response.StatusCode = 200;
+                response.Message = "Hủy đơn hàng thành công";
+                response.Data = "ORDER_CANCELLED_SUCCESS";
+                response.DateTime = DateTime.Now;
+            }
+            }
             var oldStatusId = order.OrderStatusId;
             order.OrderStatusId = newStatus.StatusId;
             order.UpdatedAt = DateTime.Now;
-            //Nếu Trạng thái đơn hàng là Cancelled thì không cần gửi message tới Kafka
-            if (newStatus.StatusName == "Cancelled")
-            {
-                var cancellationResult = await CancelOrder(orderId);
-                if (!cancellationResult.Success)
-                {
-                    response.Success = false;
-                    response.StatusCode = cancellationResult.StatusCode;
-                    response.Message = cancellationResult.Message;
-                    response.Data = null;
-                    response.DateTime = DateTime.Now;
-                    return response;
-                }
-                response.Success = true;
-                response.StatusCode = 200;
-                response.Message = $"Cập nhật trạng thái đơn hàng thành {statusName} thành công và đã hủy đơn hàng";
-                response.Data = $"ORDER_STATUS_UPDATED_AND_CANCELLED_SUCCESS_{orderId}_{statusName}";
-                response.DateTime = DateTime.Now;
-            }
+
             _unitOfWork._orderRepository.Update(order);
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitTransaction();
