@@ -523,13 +523,12 @@
 
             // Show processing message
             ToastService.ShowInfo("Processing your order...");
-
             // ✅ Create order request từ dữ liệu hiện tại
             var createOrderRequest = new CreateOrderRequest
             {
                 UserId = currentUserId.Value,
                 ShippingAddressId = selectedAddress?.AddressId,
-                CouponId = appliedCoupon.CouponId,
+                CouponId = appliedCoupon?.CouponId,
                 OrderItems = cartItems.Select(item => new OrderItemRequest
                 {
                     ProductId = item.ProductId ?? 0,
@@ -559,7 +558,7 @@
                 // ✅ Gọi API để tạo order
                 var orderCreated = await OrderService.CreateOrderWithItemsAsync(createOrderRequest);
                 await SignalRService.NotifyOrderCreatedAsync(int.Parse(orderCreated.OrderId), currentUserId.Value,
-            currentPricing.TotalAmount);
+                currentPricing.TotalAmount);
             }
             else if (SellerIdChecked.Count > 1)
             {
@@ -576,19 +575,22 @@
                         {
                             UserId = currentUserId.Value,
                             ShippingAddressId = selectedAddress?.AddressId,
-                            CouponId = appliedCoupon.CouponId,
+                            CouponId = appliedCoupon?.CouponId,
                             OrderItems = sellerOrderItems
                         };
                         var orderCreated = await OrderService.CreateOrderWithItemsAsync(sellerOrderRequest);
                         await SignalRService.NotifyOrderCreatedAsync(int.Parse(orderCreated.OrderId), currentUserId.Value,
-            currentPricing.TotalAmount);
+                        currentPricing.TotalAmount);
                     }
                 }
             }
             // ✅ Clear cart and checkout data after successful order
             // Show success message
             ToastService.ShowSuccess("Order placed successfully! Redirecting to order confirmation...");
-            await CouponService.UpdateCouponUsageCount(appliedCoupon.CouponId);
+            if (appliedCoupon != null)
+            {
+                await CouponService.UpdateCouponUsageCount(appliedCoupon.CouponId);
+            }
             CartVM.ClearCart();
             CouponStateService.ClearAllData();
             // Redirect to order confirmation page
@@ -620,6 +622,6 @@
 
     private string GetProductImageUrl(CartVM item)
     {
-        return $"https://via.placeholder.com/80x80/f8f9fa/6c757d?text=Product+{item.ProductId ?? 0}";
+        return item.PrimaryImageUrl ?? "/images/default-product.png";
     }
 }

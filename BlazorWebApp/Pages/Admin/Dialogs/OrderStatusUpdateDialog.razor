@@ -48,9 +48,6 @@
     {
         Snackbar.Add($"Loading...", Severity.Info);
         
-        // ✅ DEBUG: Log parameters trước khi gửi
-        Console.WriteLine($"🚀 Calling NotifyOrderStatusChangedAsync with Order: {Order.OrderId}, Status: {selectedStatus}");
-        
         // ✅ KIỂM TRA: Method này có tồn tại trong SignalRService không?
         await SignalRService.NotifyOrderStatusChangedAsync(Order.OrderId, 0, 0, selectedStatus);
         

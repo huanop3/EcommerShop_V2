@@ -197,7 +197,7 @@
         // Subscribe to SignalR events
         SignalRService.OrderCreated += OnOrderCreated;
         SignalRService.OrderUpdated += OnOrderUpdated;
-        SignalRService.YourOrderStatusChanged += OnOrderStatusChanged;
+        SignalRService.OrderStatusChanged += OnOrderStatusChanged;
 
         // Initialize cleanup timer
         cleanupTimer = new Timer(CleanupOldNotifications, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
@@ -213,14 +213,13 @@
     }
 
     #region SignalR Event Handlers
-    public async void OnOrderStatusChanged(int orderId, string statusName, string message)
+    public async void OnOrderStatusChanged(int orderId, int userId, int statusName, string message)
     {
         
         await InvokeAsync(async () =>
         {
             
-            Snackbar?.Add($"Trạng thái đơn hàng #ORD-{orderId} đã thay đổi: {statusName}", Severity.Info);
-            Snackbar?.Add($"New Order Status Changed: #ORD-{orderId} - {message}: {statusName}", Severity.Success);
+            Snackbar?.Add($"New Order Status Changed: #ORD-{orderId}: {message}", Severity.Success);
             lastUpdateTime = DateTime.Now;
             
             await LoadOrders();
@@ -797,7 +796,7 @@ private async Task RefreshOrders()
         if (userRole == "Seller")
         {
             var currentStatus = GetOrderStatusName(order.OrderStatusId);
-            var allowedStatuses = new[] { "Confirmed", "Processing", "Shipped" };
+            var allowedStatuses = new[] { "Confirmed", "Processing" };
             return allowedStatuses.Contains(currentStatus);
         }
         
@@ -807,7 +806,7 @@ private async Task RefreshOrders()
     private bool CanCancelOrder(OrderVM order)
     {
         var currentStatus = GetOrderStatusName(order.OrderStatusId);
-        var allowedStatuses = new[] { "Pending", "Confirmed" };
+        var allowedStatuses = new[] { "Pending", "Processing", "Confirmed" };
         return allowedStatuses.Contains(currentStatus);
     }
 
@@ -824,7 +823,6 @@ private async Task RefreshOrders()
             {
                 "Confirmed" => new List<string> { "Processing", "Cancelled" },
                 "Processing" => new List<string> { "Shipped", "Cancelled" },
-                "Shipped" => new List<string> { "Delivered" },
                 _ => new List<string>()
             };
         }
@@ -908,7 +906,7 @@ private async Task RefreshOrders()
         // Unsubscribe from SignalR events
         SignalRService.OrderCreated -= OnOrderCreated;
         SignalRService.OrderUpdated -= OnOrderUpdated;
-        SignalRService.YourOrderStatusChanged -= OnOrderStatusChanged;
+        SignalRService.OrderStatusChanged -= OnOrderStatusChanged;
 
         // Dispose timer
         cleanupTimer?.Dispose();

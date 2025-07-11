@@ -683,6 +683,6 @@
 
     private string GetProductImageUrl(CartVM item)
     {
-        return $"https://via.placeholder.com/60x60/f8f9fa/6c757d?text=Product+{item.ProductId ?? 0}";
+        return item.PrimaryImageUrl ?? "/images/default-product.png";
     }
 }

@@ -217,6 +217,7 @@ public async Task<HTTPResponseClient<ShipmentDashboardVM>> GetShipmentDashboardB
 
                 // ✅ GỬI THÔNG BÁO REALTIME
                 await _hubContext.Clients.All.SendAsync("ShipmentStatusUpdated", shipmentId, newStatusId, shipment.Order?.OrderId);
+                await _hubContext.Clients.All.SendAsync("OrderStatusChanged", shipment.Order?.OrderId, 0, newStatusId, shipment.Order?.OrderStatus?.StatusName);
 
                 response.Success = true;
                 response.StatusCode = 200;
@@ -428,7 +429,7 @@ public async Task<HTTPResponseClient<ShipmentDashboardVM>> GetShipmentDashboardB
                     .Select(s => new AssignedOrderVM
                     {
                         OrderId = s.Order.OrderId,
-                        OrderCode = $"ORD{s.Order.OrderId:D6}",
+                        OrderCode = $"ORD-{s.Order.OrderId}",
                         TotalAmount = s.Order.TotalAmount,
                         OrderDate = s.Order.OrderDate,
                         BuyerName = $"{s.Order.User.FirstName} {s.Order.User.LastName}".Trim(),
@@ -515,12 +516,19 @@ public async Task<HTTPResponseClient<ShipmentDashboardVM>> GetShipmentDashboardB
         private async Task InvalidateShipmentCaches(int shipmentId, int orderId)
         {
 
-                await _cacheService.DeleteByPatternAsync("AllShipments");
-                await _cacheService.DeleteByPatternAsync("PagedShipments_*");
-                await _cacheService.DeleteByPatternAsync($"Shipment_{shipmentId}_*");
-                await _cacheService.DeleteByPatternAsync($"Order_{orderId}_*");
-                await _cacheService.DeleteByPatternAsync("ShipperDashboard_*");
-
+            await _cacheService.DeleteByPatternAsync("AllShipments");
+            await _cacheService.DeleteByPatternAsync("PagedShipments_*");
+            await _cacheService.DeleteByPatternAsync($"Shipment_{shipmentId}_*");
+            await _cacheService.DeleteByPatternAsync($"Order_{orderId}_*");
+            await _cacheService.DeleteByPatternAsync("ShipperDashboard_*");
+            await _cacheService.DeleteByPatternAsync("AllOrders");
+            await _cacheService.DeleteByPatternAsync($"Order_*");
+            await _cacheService.DeleteByPatternAsync($"OrdersByUser_*");
+            await _cacheService.DeleteByPatternAsync($"OrderItemsByOrder_*");
+            await _cacheService.DeleteByPatternAsync($"OrderStatus_*");
+            await _cacheService.DeleteByPatternAsync($"AllProducts");
+            await _cacheService.DeleteByPatternAsync($"OrdersBySellerWithDetails_*");
+            await _cacheService.DeleteByPatternAsync($"AdminOrdersCompleteView");
         }
 
         #endregion

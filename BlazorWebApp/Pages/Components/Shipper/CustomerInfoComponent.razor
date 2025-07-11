@@ -189,8 +189,8 @@
     {
         try
         {
-            var subject = Uri.EscapeDataString($"Đơn hàng #{Dashboard.OrderInfo.OrderId} - Thông báo giao hàng");
-            var body = Uri.EscapeDataString($"Xin chào {Dashboard.BuyerInfo.FullName},\n\nTôi là shipper phụ trách giao đơn hàng #{Dashboard.OrderInfo.OrderId} cho bạn.\n\nTrân trọng!");
+            var subject = Uri.EscapeDataString($"Đơn hàng #ORD-{Dashboard.OrderInfo.OrderId} - Thông báo giao hàng");
+            var body = Uri.EscapeDataString($"Xin chào {Dashboard.BuyerInfo.FullName},\n\nTôi là shipper phụ trách giao đơn hàng #ORD-{Dashboard.OrderInfo.OrderId} cho bạn.\n\nTrân trọng!");
             var emailUrl = $"mailto:{Dashboard.BuyerInfo.Email}?subject={subject}&body={body}";
             
             await JSRuntime.InvokeVoidAsync("open", emailUrl);

@@ -640,7 +640,7 @@ public class OrderService : IOrderService
                 OrderDate = DateTime.Now,
                 TotalAmount = totalAmount,
                 ShippingAddressId = orderVM.ShippingAddressId,
-                CouponId = orderVM.CouponId,
+                CouponId = orderVM.CouponId ?? null,
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now,
                 IsDeleted = false
@@ -751,7 +751,25 @@ public class OrderService : IOrderService
             var oldStatusId = order.OrderStatusId;
             order.OrderStatusId = newStatus.StatusId;
             order.UpdatedAt = DateTime.Now;
-
+            //Nếu Trạng thái đơn hàng là Cancelled thì không cần gửi message tới Kafka
+            if (newStatus.StatusName == "Cancelled")
+            {
+                var cancellationResult = await CancelOrder(orderId);
+                if (!cancellationResult.Success)
+                {
+                    response.Success = false;
+                    response.StatusCode = cancellationResult.StatusCode;
+                    response.Message = cancellationResult.Message;
+                    response.Data = null;
+                    response.DateTime = DateTime.Now;
+                    return response;
+                }
+                response.Success = true;
+                response.StatusCode = 200;
+                response.Message = $"Cập nhật trạng thái đơn hàng thành {statusName} thành công và đã hủy đơn hàng";
+                response.Data = $"ORDER_STATUS_UPDATED_AND_CANCELLED_SUCCESS_{orderId}_{statusName}";
+                response.DateTime = DateTime.Now;
+            }
             _unitOfWork._orderRepository.Update(order);
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitTransaction();

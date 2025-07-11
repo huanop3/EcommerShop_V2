@@ -124,7 +124,7 @@
                 <MudPaper Elevation="1" Class="pa-4">
                     <MudText Typo="Typo.h6" Class="mb-3">
                         <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" />
-                        Thông tin đơn hàng #@orderPreview.OrderInfo.OrderId
+                        Thông tin đơn hàng #ORD-@orderPreview.OrderInfo.OrderId
                         <MudChip T="string" 
                                 Size="Size.Small" 
                                 Color="GetStatusColor(orderPreview.OrderInfo.OrderStatusId)"
@@ -141,7 +141,7 @@
                         <tbody>
                             <tr>
                                 <td width="30%"><strong>Mã đơn hàng:</strong></td>
-                                <td>ORD-@orderPreview.OrderInfo.OrderId.ToString("D4")</td>
+                                <td>ORD-@orderPreview.OrderInfo.OrderId</td>
                             </tr>
                             <tr>
                                 <td><strong>Khách hàng:</strong></td>

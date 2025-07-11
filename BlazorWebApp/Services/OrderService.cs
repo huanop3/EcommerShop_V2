@@ -285,8 +285,8 @@ namespace BlazorWebApp.Services
                     return (false, "Không thể lấy trạng thái đơn hàng");
                 }
 
-                // Chỉ cho phép hủy khi đơn hàng ở trạng thái Pending hoặc Confirmed
-                var allowedStatuses = new[] { "Pending", "Confirmed" };
+                // Chỉ cho phép hủy khi đơn hàng ở trạng thái Pending hoặc Processing
+                var allowedStatuses = new[] { "Pending", "Processing" };
                 if (!allowedStatuses.Contains(currentStatus, StringComparer.OrdinalIgnoreCase))
                 {
                     return (false, $"Không thể hủy đơn hàng ở trạng thái '{currentStatus}'. Chỉ có thể hủy khi đơn hàng đang ở trạng thái 'Pending' hoặc 'Confirmed'.");

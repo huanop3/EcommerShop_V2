@@ -73,7 +73,7 @@
         <div class="current-status-section">
             <h3 class="section-title">
                 <i class="fas fa-info-circle"></i>
-                Trạng thái đơn hàng
+                Order Status
             </h3>
             
             <div class="status-card @GetStatusCardClass()">
@@ -82,20 +82,20 @@
                         <h4>@GetCurrentStatusName()</h4>
                         <p>@GetCurrentStatusDescription()</p>
                         <small class="status-time">
-                            Cập nhật lúc: @GetCurrentStatusTime().ToString("dd/MM/yyyy HH:mm")
+                            Last Updated: @GetCurrentStatusTime()?.ToString("dd/MM/yyyy HH:mm")
                         </small>
                         @if (signalRConnected)
                         {
                             <div class="live-updates">
                                 <i class="fas fa-circle pulse"></i>
-                                <span>Đang cập nhật trực tiếp</span>
+                                <span>Live Updating...</span>
                             </div>
                         }
                         else
                         {
                             <div class="live-updates-disabled">
                                 <i class="fas fa-circle-notch fa-spin"></i>
-                                <span>Đang kết nối...</span>
+                                <span>Connecting...</span>
                             </div>
                         }
                     </div>
@@ -114,7 +114,7 @@
         <div class="order-tracking-section">
             <h3 class="section-title">
                 <i class="fas fa-truck"></i>
-                Tiến độ đơn hàng
+                Order Progress
             </h3>
             
             <div class="shopee-progress-tracker">
@@ -324,12 +324,12 @@
                     @if (isCancellingOrder)
                     {
                         <i class="fas fa-spinner fa-spin"></i>
-                        <span>Đang hủy...</span>
+                        <span>Canceling...</span>
                     }
                     else
                     {
                         <i class="fas fa-times"></i>
-                        <span>Hủy đơn hàng</span>
+                        <span>Cancel Order</span>
                     }
                 </button>
             }
@@ -341,7 +341,7 @@
             <div class="modal-overlay" @onclick="HideCancelOrderDialog">
                 <div class="cancel-dialog" @onclick:stopPropagation="true">
                     <div class="dialog-header">
-                        <h3>Hủy đơn hàng</h3>
+                        <h3>Cancel Order</h3>
                         <button class="close-btn" @onclick="HideCancelOrderDialog">
                             <i class="fas fa-times"></i>
                         </button>
@@ -350,43 +350,43 @@
                     <div class="dialog-content">
                         <div class="warning-message">
                             <i class="fas fa-exclamation-triangle"></i>
-                            <p>Bạn có chắc chắn muốn hủy đơn hàng này?</p>
-                            <small>Hành động này không thể hoàn tác.</small>
+                            <p>Are you sure you want to cancel this order?</p>
+                            <small>This action cannot be undone.</small>
                         </div>
                         
                         <div class="order-info">
                             <div class="info-row">
-                                <span class="label">Đơn hàng:</span>
+                                <span class="label">Order:</span>
                                 <span class="value">#ORD-@orderDetails.OrderId</span>
                             </div>
                             <div class="info-row">
-                                <span class="label">Tổng tiền:</span>
+                                <span class="label">Total:</span>
                                 <span class="value">$@orderDetails.TotalAmount.ToString("F2")</span>
                             </div>
                         </div>
                         
                         <div class="form-group">
-                            <label for="cancelReason">Lý do hủy đơn hàng (không bắt buộc):</label>
+                            <label for="cancelReason">Reason for Cancellation (Optional):</label>
                             <textarea id="cancelReason" @bind="cancelReason" 
-                                     placeholder="Vui lòng cho biết lý do hủy đơn hàng..."
+                                     placeholder="Please provide a reason for cancellation..."
                                      rows="3" class="form-control"></textarea>
                         </div>
                     </div>
                     
                     <div class="dialog-actions">
                         <button class="btn btn-secondary" @onclick="HideCancelOrderDialog" disabled="@isCancellingOrder">
-                            Giữ đơn hàng
+                            Keep Order
                         </button>
                         <button class="btn btn-danger" @onclick="ConfirmCancelOrder" disabled="@isCancellingOrder">
                             @if (isCancellingOrder)
                             {
                                 <i class="fas fa-spinner fa-spin"></i>
-                                <span>Đang hủy...</span>
+                                <span>Canceling...</span>
                             }
                             else
                             {
                                 <i class="fas fa-times"></i>
-                                <span>Xác nhận hủy</span>
+                                <span>Confirm Cancel</span>
                             }
                         </button>
                     </div>
@@ -566,7 +566,7 @@
         {
             if (SignalRService != null)
             {
-                SignalRService.YourOrderStatusChanged += OnOrderStatusChanged;
+                SignalRService.OrderStatusChanged += OnOrderStatusChanged;
                 
                 if (!SignalRService.IsMainHubConnected)
                 {
@@ -592,41 +592,41 @@
     {
         return currentOrderStatus?.StatusName switch
         {
-            "Pending" => "Chờ xác nhận",
-            "Confirmed" => "Đã xác nhận",
-            "Processing" => "Đang chuẩn bị hàng",
-            "Shipped" => "Đã giao cho ĐVVC",
-            "In Transit" => "Đang vận chuyển",
-            "Out for Delivery" => "Đang giao hàng",
-            "Delivered" => "Đã giao hàng",
-            "Cancelled" => "Đã hủy",
-            "Returned" => "Đã trả hàng",
-            "Refunded" => "Đã hoàn tiền",
-            _ => "Đang tải..."
+            "Pending" => "Waiting for Confirmation",
+            "Confirmed" => "Confirmed",
+            "Processing" => "Processing",
+            "Shipped" => "Shipped",
+            "In Transit" => "In Transit",
+            "Out for Delivery" => "Out for Delivery",
+            "Delivered" => "Delivered",
+            "Cancelled" => "Cancelled",
+            "Returned" => "Returned",
+            "Refunded" => "Refunded",
+            _ => "Loading..."
         };
     }
 
     public string GetCurrentStatusDescription()
     {
-        return currentOrderStatus?.Description ?? currentOrderStatus?.StatusName switch
+        return currentOrderStatus?.StatusName switch
         {
-            "Pending" => "Đơn hàng đang chờ người bán xác nhận",
-            "Confirmed" => "Người bán đã xác nhận và sẽ chuẩn bị hàng sớm",
-            "Processing" => "Người bán đang đóng gói sản phẩm",
-            "Shipped" => "Đơn hàng đã được giao cho đơn vị vận chuyển",
-            "In Transit" => "Đơn hàng đang trên đường đến địa chỉ của bạn",
-            "Out for Delivery" => "Đơn hàng đang được giao đến bạn",
-            "Delivered" => "Đơn hàng đã được giao thành công",
-            "Cancelled" => "Đơn hàng đã bị hủy",
-            "Returned" => "Đơn hàng đã được trả lại người bán",
-            "Refunded" => "Tiền đã được hoàn vào tài khoản của bạn",
-            _ => "Đang tải thông tin..."
+            "Pending" => "My order is waiting for confirmation from the seller",
+            "Confirmed" => "The seller has confirmed and will prepare the goods soon",
+            "Processing" => "The seller is packing the product",
+            "Shipped" => "The order has been handed over to the shipping unit",
+            "In Transit" => "The order is on its way to your address",
+            "Out for Delivery" => "The order is being delivered to you",
+            "Delivered" => "The order has been successfully delivered",
+            "Cancelled" => "The order has been cancelled",
+            "Returned" => "The order has been returned to the seller",
+            "Refunded" => "The money has been refunded to your account",
+            _ => "Loading information..."
         };
     }
 
-    public DateTime GetCurrentStatusTime()
+    public DateTime? GetCurrentStatusTime()
     {
-        return orderDetails?.UpdatedAt ?? orderDetails?.OrderDate ?? DateTime.Now;
+        return orderDetails?.UpdatedAt;
     }
 
     public RenderFragment GetCurrentStatusIcon()
@@ -687,23 +687,23 @@
         
         var allSteps = new[]
         {
-            new { Name = "Pending", Title = "Đơn hàng đã đặt", Description = "Đơn hàng đang chờ xử lý", Icon = "fas fa-shopping-cart" },
-            new { Name = "Confirmed", Title = "Đã xác nhận", Description = "Đơn hàng đã được xác nhận", Icon = "fas fa-check-circle" },
-            new { Name = "Processing", Title = "Đang chuẩn bị hàng", Description = "Đơn hàng đang được chuẩn bị", Icon = "fas fa-box-open" },
-            new { Name = "Shipped", Title = "Đã giao cho ĐVVC", Description = "Đơn hàng đã được giao cho đơn vị vận chuyển", Icon = "fas fa-shipping-fast" },
-            new { Name = "In Transit", Title = "Đang vận chuyển", Description = "Đơn hàng đang trên đường giao", Icon = "fas fa-truck" },
-            new { Name = "Out for Delivery", Title = "Đang giao hàng", Description = "Đơn hàng đang được giao đến địa chỉ nhận", Icon = "fas fa-motorcycle" },
-            new { Name = "Delivered", Title = "Đã giao hàng", Description = "Đơn hàng đã được giao thành công", Icon = "fas fa-check-double" }
+            new { Name = "Pending", Title = "Order Placed", Description = "The order is waiting for confirmation", Icon = "fas fa-shopping-cart" },
+            new { Name = "Confirmed", Title = "Confirmed", Description = "The order has been confirmed", Icon = "fas fa-check-circle" },
+            new { Name = "Processing", Title = "Processing", Description = "The order is being prepared", Icon = "fas fa-box-open" },
+            new { Name = "Shipped", Title = "Shipped", Description = "The order has been handed over to the shipping unit", Icon = "fas fa-shipping-fast" },
+            new { Name = "In Transit", Title = "In Transit", Description = "The order is on its way to your address", Icon = "fas fa-truck" },
+            new { Name = "Out for Delivery", Title = "Out for Delivery", Description = "The order is being delivered to you", Icon = "fas fa-motorcycle" },
+            new { Name = "Delivered", Title = "Delivered", Description = "The order has been successfully delivered", Icon = "fas fa-check-double" }
         };
 
         if (currentStatusName == "Cancelled")
         {
             steps.Add(new ProgressStep
             {
-                Title = "Đã hủy",
-                Description = "Đơn hàng đã bị hủy",
+                Title = "Cancelled",
+                Description = "The order has been cancelled",
                 Icon = @<i class="fas fa-times"></i>,
-                Timestamp = orderDetails?.UpdatedAt ?? orderDetails?.OrderDate,
+                Timestamp = orderDetails?.UpdatedAt,
                 IsCompleted = false,
                 IsCurrent = true,
                 CssClass = "cancelled current",
@@ -728,7 +728,7 @@
                     Icon = isCurrent && currentStatusName == "Cancelled" 
                         ? @<i class="fas fa-times"></i> 
                         : @<i class="@stepInfo.Icon"></i>,
-                    Timestamp = (isCompleted || isCurrent) ? (orderDetails?.UpdatedAt ?? orderDetails?.OrderDate) : null,
+                    Timestamp = orderDetails?.UpdatedAt,
                     IsCompleted = isCompleted,
                     IsCurrent = isCurrent,
                     CssClass = $"{(isCompleted ? "completed" : "")} {(isCurrent ? "current" : "")} {(isCompleted || isCurrent ? "active" : "")}",
@@ -771,7 +771,7 @@
         }
     }
 
-    public void OnOrderStatusChanged(int orderId, string statusName, string message)
+    private async void OnOrderStatusChanged(int orderId, int userId, int statusId, string statusName)
     {
         if (disposed || OrderId != orderId) return;
         
@@ -779,7 +779,7 @@
         {
             if (disposed) return;
             
-            latestStatusMessage = message;
+            latestStatusMessage = statusName;
             
             // Reload current status
             if (orderDetails != null)
@@ -795,10 +795,9 @@
             }
             
             await InvokeAsync(StateHasChanged);
-            ToastService?.ShowInfo($"Trạng thái đơn hàng: {GetCurrentStatusName()}");
+            ToastService?.ShowInfo($"Order Status: {GetCurrentStatusName()}");
         });
     }
-
     public void ShowCancelOrderDialog()
     {
         if (!canCancelOrder) return;
@@ -856,7 +855,7 @@
             disposed = true;
             if (SignalRService != null)
             {
-                SignalRService.YourOrderStatusChanged -= OnOrderStatusChanged;
+                SignalRService.OrderStatusChanged -= OnOrderStatusChanged;
             }
         }
         catch (Exception ex)

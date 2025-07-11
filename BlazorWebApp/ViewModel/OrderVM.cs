@@ -36,7 +36,7 @@ namespace MainEcommerceService.Models.ViewModel
     {
         public int UserId { get; set; }
         public int? ShippingAddressId { get; set; }
-        public int CouponId { get; set; }
+        public int? CouponId { get; set; }
         public List<OrderItemRequest> OrderItems { get; set; } = new List<OrderItemRequest>();
     }
 

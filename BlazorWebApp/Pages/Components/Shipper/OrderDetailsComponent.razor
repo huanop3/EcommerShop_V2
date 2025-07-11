@@ -17,7 +17,7 @@
             
             <MudList T="string">
                 <MudListItem T="string" Icon="@Icons.Material.Filled.Tag">
-                    <MudText><strong>Order ID:</strong> #@Dashboard.OrderInfo.OrderId</MudText>
+                    <MudText><strong>Order ID:</strong> #ORD-@Dashboard.OrderInfo.OrderId</MudText>
                 </MudListItem>
                 <MudListItem T="string" Icon="@Icons.Material.Filled.Schedule">
                     <MudText><strong>Ngày đặt:</strong> @Dashboard.OrderInfo.FormattedOrderDate</MudText>
@@ -163,11 +163,14 @@
 
             if (success)
             {
+                await SignalRService.NotifyOrderStatusChangedAsync(Dashboard.OrderInfo.OrderId, 0, 0, $"Updated Order Status {Dashboard.OrderInfo.OrderId}");
+                // Reset fields after successful update
                 selectedStatusId = 0;
                 updateNote = string.Empty;
-                Snackbar.Add("Cập nhật trạng thái thành công", Severity.Success);
                 //call signalR to notify other components
                 await SignalRService.NotifyShipmentStatusUpdatedAsync(Dashboard.ShipmentInfo.ShipmentId ,Dashboard.OrderInfo.OrderId, selectedStatusId.ToString());
+
+                Snackbar.Add("Cập nhật trạng thái thành công", Severity.Success);
                 await OnStatusUpdated.InvokeAsync();
             }
             else

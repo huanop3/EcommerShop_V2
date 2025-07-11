@@ -20,7 +20,7 @@ namespace BlazorWebApp.ViewModel
         public string CurrentOrderStatus { get; set; } = string.Empty;
         public int OrderStatusId { get; set; }
         public string FormattedOrderDate => OrderDate.ToString("dd/MM/yyyy HH:mm");
-        public string FormattedTotalAmount => TotalAmount.ToString("N0") + " VND";
+        public string FormattedTotalAmount => TotalAmount.ToString("N0") + " $";
     }
 
     public class BuyerInfoVM
@@ -51,8 +51,8 @@ namespace BlazorWebApp.ViewModel
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
         public decimal TotalPrice { get; set; }
-        public string FormattedUnitPrice => UnitPrice.ToString("N0") + " VND";
-        public string FormattedTotalPrice => TotalPrice.ToString("N0") + " VND";
+        public string FormattedUnitPrice => UnitPrice.ToString("N0") + " $";
+        public string FormattedTotalPrice => TotalPrice.ToString("N0") + " $";
     }
 
     public class ShipmentInfoVM
@@ -80,7 +80,7 @@ namespace BlazorWebApp.ViewModel
         public string CurrentStatus { get; set; } = string.Empty;
         public int OrderStatusId { get; set; }
         public string FormattedOrderDate => OrderDate.ToString("dd/MM/yyyy");
-        public string FormattedTotalAmount => TotalAmount.ToString("N0") + " VND";
+        public string FormattedTotalAmount => TotalAmount.ToString("N0") + " $";
         public string StatusBadgeColor => OrderStatusId switch
         {
             4 => "primary",    // Shipped
@@ -137,7 +137,7 @@ namespace BlazorWebApp.ViewModel
         public int OrdersReturned { get; set; }
         public decimal TotalEarnings { get; set; }
         public double SuccessRate { get; set; }
-        public string FormattedTotalEarnings => TotalEarnings.ToString("N0") + " VND";
+        public string FormattedTotalEarnings => TotalEarnings.ToString("N0") + " $";
         public string FormattedSuccessRate => SuccessRate.ToString("F1") + "%";
     }
 }

@@ -520,7 +520,7 @@
         await InvokeAsync(async () =>
         {
             await LoadUserOrdersAsync(); // Refresh orders after status change
-            ToastService?.ShowInfo($"Trạng thái đơn hàng {orderId} đã cập nhật: {statusName}");
+            ToastService?.ShowInfo($"Order #{orderId} has been updated: {statusName}");
             StateHasChanged();
         });
     }
@@ -529,7 +529,7 @@
         await InvokeAsync(async () =>
         {
             await LoadUserOrdersAsync(); // Refresh orders after status change
-            ToastService?.ShowInfo($"Trạng thái đơn hàng {orderId} đã cập nhật: {statusName}");
+            ToastService?.ShowInfo($"Order #{orderId} has been updated: {statusName}");
             StateHasChanged();
         });
     }
@@ -590,20 +590,7 @@
 
     private string GetOrderStatusDisplayName(OrderVM order)
     {
-        return GetOrderStatusName(order) switch
-        {
-            "Pending" => "Chờ xác nhận",
-            "Confirmed" => "Đã xác nhận",
-            "Processing" => "Đang chuẩn bị",
-            "Shipped" => "Đã giao ĐVVC",
-            "In Transit" => "Đang vận chuyển",
-            "Out for Delivery" => "Đang giao hàng",
-            "Delivered" => "Đã giao hàng",
-            "Cancelled" => "Đã hủy",
-            "Returned" => "Đã trả hàng",
-            "Refunded" => "Đã hoàn tiền",
-            _ => GetOrderStatusName(order)
-        };
+        return GetOrderStatusName(order);
     }
 
     private string GetOrderStatusBadgeClass(OrderVM order)
